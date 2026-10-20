@@ -1,0 +1,46 @@
+# Credenciales y configuración local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Temporales y herramientas
+tmp/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python (stack candidato; ajustar al elegirlo)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Frontend y compilación
+node_modules/
+dist/
+build/
+
+# Infraestructura y estado local
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+
+# Datos y resultados locales
+*.log
+coverage/
+test-results/
+playwright-report/
+
+# Se versionan lockfiles, migraciones, ejemplos y evidencias seleccionadas.
