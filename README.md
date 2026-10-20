@@ -120,6 +120,12 @@ Las rutas parten de `/api/v1`. Los datos se intercambian en JSON y el acceso se 
 
 Al crear una conexión se indican nombre, dirección y forma de acceso. Una sincronización relaciona origen, destino y campos que deben adaptarse. Una regla establece qué evento la activa, qué condiciones debe cumplir y qué acciones realizará.
 
+## Trabajo en el repositorio
+
+`main` mantiene la versión estable del proyecto. Cada cambio se prepara en una rama aparte y se incorpora mediante una pull request, donde se revisa qué se ha modificado y cómo se ha comprobado.
+
+Los mensajes de commit llevan un prefijo que indica el tipo de cambio: `feat:` para nuevas funciones, `fix:` para correcciones, `docs:` para documentación y `refactor:` para reorganizar código sin cambiar su funcionamiento.
+
 ## Documentación
 
 Los [casos de uso](docs/casos-de-uso.md) y los [requisitos](docs/requisitos.md) describen las funciones previstas. La [arquitectura](docs/arquitectura.md), las [decisiones de diseño](docs/decisiones.md) y la [API](docs/api.md) recogen el detalle de funcionamiento.
