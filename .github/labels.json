@@ -1,0 +1,62 @@
+[
+  {
+    "name": "user-story",
+    "color": "1D76DB",
+    "description": "Función descrita desde la necesidad de quien la utiliza."
+  },
+  {
+    "name": "bug",
+    "color": "D73A4A",
+    "description": "Algo funciona de forma incorrecta."
+  },
+  {
+    "name": "enhancement",
+    "color": "1D76DB",
+    "description": "Mejora de una función existente."
+  },
+  {
+    "name": "documentation",
+    "color": "0075CA",
+    "description": "Cambio en la documentación."
+  },
+  {
+    "name": "testing",
+    "color": "0075CA",
+    "description": "Creación o mejora de pruebas."
+  },
+  {
+    "name": "sync",
+    "color": "0E8A16",
+    "description": "Conexiones, comparación y sincronización de datos."
+  },
+  {
+    "name": "automation",
+    "color": "0E8A16",
+    "description": "Eventos, condiciones y acciones de las reglas."
+  },
+  {
+    "name": "monitoring",
+    "color": "0E8A16",
+    "description": "Actividad, notificaciones y estadísticas."
+  },
+  {
+    "name": "infrastructure",
+    "color": "0E8A16",
+    "description": "Alojamiento, red y recursos definidos con Terraform."
+  },
+  {
+    "name": "security",
+    "color": "FBCA04",
+    "description": "Protección de accesos, credenciales y comunicaciones."
+  },
+  {
+    "name": "priority-high",
+    "color": "D93F0B",
+    "description": "Requiere atención antes que el resto del trabajo."
+  },
+  {
+    "name": "blocked",
+    "color": "E99695",
+    "description": "No puede avanzar hasta resolver una dependencia concreta."
+  }
+]
