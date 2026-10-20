@@ -9,7 +9,7 @@ Los diagramas generales están en el [README](../README.md). Este documento expl
 | Sync | Conexiones, sincronizaciones, comparación de datos y resultados. |
 | Automation | Reglas, condiciones, acciones y su seguimiento. |
 | Monitoring | Cambios, historial, avisos y estadísticas. |
-| Acceso y cuentas | Identificación de usuarios y sesiones, si se gestionan dentro de Synkron. |
+| Acceso y cuentas | Registro, comprobación de contraseñas y sesiones propias, incluido en la entrada API de NestJS. |
 
 Cada servicio se podrá ejecutar y actualizar por separado. Sync tendrá procesos en segundo plano para realizar las sincronizaciones. Se podrán añadir más si aumenta el trabajo.
 
@@ -67,7 +67,13 @@ Una sincronización incompleta puede haber cambiado parte de los datos. No se pr
 
 ## Acceso y funcionamiento
 
-Cada servicio comprobará los permisos del usuario. Las credenciales se guardarán protegidas y no aparecerán en respuestas, mensajes ni registros técnicos.
+El componente de acceso guarda cuentas y sesiones en sus propias tablas de PostgreSQL. El panel utiliza una cookie protegida y se sirve bajo el mismo origen que la API. La sesión caduca o se invalida al cerrarla, según [ADR-005](decisiones.md#adr-005-acceso-a-la-información-personal).
+
+Cada servicio consulta la sesión al componente de acceso por una ruta interna autenticada y comprueba la propiedad del recurso antes de operar. Esa ruta no se expone a Internet y no acepta una identidad indicada libremente por el cliente. Si la comprobación falla o el componente no responde, se rechaza el acceso. Esto añade una dependencia de disponibilidad y una consulta interna a las peticiones autenticadas.
+
+Las tareas y los eventos internos conservan el propietario de la operación aceptada. Solo pueden publicarlos servicios autorizados, y los consumidores comprueban que las conexiones y acciones pertenecen a esa cuenta. Cerrar sesión no cancela una sincronización ya aceptada.
+
+Las credenciales se guardarán protegidas y no aparecerán en respuestas, mensajes ni registros técnicos. Las peticiones del navegador que cambian datos requieren comprobar origen y token CSRF, además de los permisos. El inicio de sesión limita los intentos por cuenta y dirección de origen.
 
 Las direcciones configuradas se revisarán para impedir el acceso a servicios internos. También se comprobarán los cambios de dirección durante una conexión. Las pruebas locales solo podrán acceder a los servicios simulados autorizados por el administrador.
 

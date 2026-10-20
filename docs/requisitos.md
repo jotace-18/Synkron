@@ -8,7 +8,7 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 
 | Código | Qué debe permitir | Prioridad |
 |---|---|---|
-| RF-01 | Crear una cuenta, iniciar y cerrar sesión. | Inicial |
+| RF-01 | Crear una cuenta con correo y contraseña, iniciar sesión y cerrarla invalidándola en el servidor. | Inicial |
 | RF-02 | Añadir, consultar, modificar y desactivar conexiones propias. | Inicial |
 | RF-03 | Probar una conexión sin mostrar credenciales ni acceder a direcciones prohibidas. | Inicial |
 | RF-04 | Elegir origen, destino y relación entre campos de una sincronización. | Inicial |
@@ -47,6 +47,7 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 | RI-11 | Versión de la API, mensajes, formato de datos y aplicación. |
 | RI-12 | Instantes guardados en UTC y mostrados en la zona horaria del usuario. |
 | RI-13 | Referencia del registro modificado, tipo de cambio, campos afectados, fecha y ejecución de origen. |
+| RI-14 | Identificador y correo de la cuenta, y fechas de creación, última actividad y caducidad de la sesión. Sin contraseñas ni identificadores secretos de sesión. |
 
 El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y uso. Cada vista mostrará solo los datos de la cuenta.
 
@@ -57,7 +58,7 @@ El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y
 | RIC-01 | Usar HTTP y JSON, con rutas bajo `/api/v1`. | Inicial |
 | RIC-02 | Las tareas en segundo plano devuelven `202`, identificador y dirección de consulta (`Location`). | Inicial |
 | RIC-03 | Los errores siguen el mismo formato, Problem Details. | Inicial |
-| RIC-04 | Cada servicio puede verificar el acceso; el mecanismo se elegirá en ADR-005. | Inicial |
+| RIC-04 | Cada servicio valida la sesión consultando al componente de acceso mediante una comunicación interna autenticada, según ADR-005. | Inicial |
 | RIC-05 | Cada servicio comprueba a quién pertenece el recurso. | Inicial |
 | RIC-06 | Los mensajes comparten estructura e identifican su versión. | Inicial |
 | RIC-07 | Recibir otra vez un mensaje no repite una acción ya realizada. | Inicial |
@@ -76,7 +77,7 @@ El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y
 | RD-02 | Guardar siempre el propietario, identificado internamente por `tenant_id`. | Inicial |
 | RD-03 | Cada servicio solo modifica sus propias tablas. | Inicial |
 | RD-04 | Cifrar las credenciales o guardarlas en un almacén de secretos. | Inicial |
-| RD-05 | Guardar las contraseñas mediante un hash adaptativo: una protección de un solo sentido cuyo coste se puede aumentar. | Inicial |
+| RD-05 | Guardar las contraseñas mediante Argon2id, con una sal aleatoria por contraseña y un coste ajustado al entorno. | Inicial |
 | RD-06 | Definir qué estados y cambios de estado admite una ejecución. | Inicial |
 | RD-07 | Conservar la relación entre operaciones, su origen y sus intentos. | Inicial |
 | RD-08 | Guardar solo el contenido personal necesario. | Inicial |
@@ -86,6 +87,7 @@ El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y
 | RD-12 | Poder ajustar cuánto tiempo se conserva la información. | Después |
 | RD-13 | Permitir el borrado o anonimización conforme al RGPD. | Después |
 | RD-14 | Conservar referencias y huellas del contenido para reconocer cambios entre revisiones. | Inicial |
+| RD-15 | Guardar cuentas y sesiones en tablas propias del componente de acceso; exigir correos únicos y registrar caducidad e invalidación de las sesiones. | Inicial |
 
 ## Seguridad y funcionamiento
 
@@ -106,12 +108,16 @@ El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y
 | RNF-13 | Comprobar formatos, calidad de código y pruebas automáticamente con cada cambio. |
 | RNF-14 | Identificar las versiones de la API y sus cambios incompatibles. |
 | RNF-15 | Controlar gasto, identificar recursos y comprobar su eliminación cuando dejen de usarse. |
+| RNF-16 | Limitar los intentos de acceso por cuenta y por dirección de origen, con mensajes que no revelen si una cuenta existe. |
+| RNF-17 | Usar cookies de sesión protegidas por HTTPS, HttpOnly y SameSite; comprobar origen y token CSRF en las peticiones del navegador que cambian datos. |
 
 Los tiempos p95 y p99 son los que no supera el 95 % y el 99 % de las peticiones. La carga y el entorno de medida se fijarán antes de comprobar el objetivo de rendimiento.
 
 ## Criterios de aplicación
 
 La cuenta se obtiene del acceso verificado, no de un campo que se pueda cambiar libremente. Las contraseñas, claves y parámetros sensibles no se devuelven en consultas.
+
+La sesión se renueva con un identificador nuevo al iniciar sesión. Su caducidad inicial es de 30 minutos sin actividad y un máximo de 12 horas desde su creación, comprobados en el servidor. Cerrar sesión invalida el acceso para nuevas peticiones, pero no cancela tareas ya aceptadas. Si el componente de acceso no puede verificar la sesión, se rechaza la petición.
 
 Una misma solicitud con la misma clave identifica la ejecución existente; si cambia su contenido, se rechaza por conflicto. El control de duplicados abarca distintas ejecuciones de la misma sincronización y destino.
 

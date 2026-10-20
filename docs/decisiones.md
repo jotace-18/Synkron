@@ -32,9 +32,19 @@ El historial permite seguir estas situaciones y conocer qué parte de una operac
 
 ## ADR-005. Acceso a la información personal
 
-Cada cuenta dispone de sus propias conexiones, reglas e historial. La identificación del usuario determina qué recursos puede consultar y utilizar.
+Las cuentas son propias de Synkron y se crean con correo y contraseña. El correo es único y las contraseñas se guardan mediante Argon2id, que permite comprobarlas sin conservarlas en texto legible. No se utiliza un proveedor externo de acceso en la primera versión.
 
-Los permisos se comprueban en cada servicio, además de en la entrada API. Las credenciales de las aplicaciones conectadas se guardan protegidas y no aparecen en las respuestas, los eventos ni los registros técnicos.
+El componente de acceso, desarrollado con NestJS e incluido en la entrada API, gestiona las cuentas y las sesiones en sus propias tablas de PostgreSQL. El navegador recibe un identificador aleatorio mediante una cookie `HttpOnly`, `Secure` y `SameSite=Lax`, sin acceso desde JavaScript y solo enviada por HTTPS. El panel y la API se publican bajo el mismo origen.
+
+Al iniciar sesión se genera un identificador nuevo. La sesión caduca tras 30 minutos sin actividad o, como máximo, a las 12 horas de su creación. Cerrar sesión la invalida en el servidor y elimina la cookie; no basta con borrarla del navegador. Estos tiempos son configurables.
+
+Sync, Automation y Monitoring consultan la validez de la sesión al componente de acceso mediante una comunicación interna autenticada. Si no pueden comprobarla, no conceden acceso. Después verifican que el recurso pertenece a la cuenta identificada, sin confiar en un usuario o propietario enviado libremente por el cliente. Las tablas de cuentas y sesiones solo las modifica el componente de acceso.
+
+Las peticiones del navegador que cambian datos, incluidos registro, inicio y cierre de sesión, comprueban el origen y un token contra peticiones no autorizadas (CSRF). Se limitan los intentos de acceso por cuenta y por dirección de origen, y los errores de inicio de sesión no distinguen entre un correo inexistente y una contraseña incorrecta.
+
+Las credenciales de conexiones, las contraseñas y los identificadores de sesión no aparecen en respuestas JSON, eventos ni registros técnicos. Las tareas ya aceptadas conservan su propietario y no se cancelan por cerrar sesión.
+
+Referencias: [gestión de sesiones](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) y [protección de contraseñas](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) de OWASP. Los valores de configuración previstos están en [.env.example](../.env.example); no contienen credenciales reales.
 
 ## ADR-006. Tecnologías de la aplicación
 

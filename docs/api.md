@@ -8,8 +8,11 @@ Los identificadores y direcciones de este documento son ficticios.
 
 | Método | Ruta sin prefijo | Resultado previsto |
 |---|---|---|
-| POST | `/auth/register` | `201`, usuario sin contraseña ni hash. |
-| POST | `/auth/login` | `200`, sesión; formato por cerrar en ADR-005. |
+| GET | `/auth/csrf` | `200`, token CSRF ligado al contexto del navegador. No inicia sesión. |
+| POST | `/auth/register` | `201`, cuenta sin contraseña ni hash. No inicia sesión automáticamente. |
+| POST | `/auth/login` | `200`, cuenta y caducidad; crea la cookie de sesión. |
+| POST | `/auth/logout` | `204`, invalida la sesión actual y elimina su cookie. |
+| GET | `/auth/session` | `200`, cuenta y caducidad; `401` si no hay sesión válida. |
 | GET / POST | `/connections` | `200` listado / `201` conexión. |
 | GET / PATCH | `/connections/{id}` | `200` detalle o cambio. |
 | POST | `/connections/{id}/test` | `200` resultado de prueba acotada. |
@@ -27,6 +30,27 @@ Los identificadores y direcciones de este documento son ficticios.
 `Location` indica la dirección donde consultar el recurso creado. Los listados tendrán páginas; la actividad se podrá filtrar por tipo, estado y fechas con `type`, `status`, `from` y `to`. Las fechas y horas se guardarán en UTC.
 
 Cada servicio tendrá además `/healthz` para comprobar su funcionamiento.
+
+## Cuentas y sesiones
+
+El registro recibe `email` y `password`. El correo debe ser único y la contraseña se guarda mediante Argon2id. El inicio de sesión recibe los mismos campos y, si son correctos, devuelve la cuenta y la fecha límite de la sesión:
+
+```json
+{
+  "user": {"id": "44444444-4444-4444-8444-444444444444", "email": "persona@example.com"},
+  "expires_at": "2026-10-21T02:00:00Z"
+}
+```
+
+El identificador secreto se envía solo en `Set-Cookie`, no dentro del JSON. La cookie se llama `__Host-synkron_session`, usa `Path=/`, no define `Domain` y lleva `Secure`, `HttpOnly` y `SameSite=Lax`. El navegador la envía en las siguientes peticiones al mismo origen. No se guarda una credencial de acceso en `localStorage` ni se utiliza un JWT para la sesión del panel.
+
+La sesión tiene un límite de 30 minutos sin actividad y 12 horas desde su creación. `expires_at` indica el vencimiento efectivo al responder, sujeto a invalidación anterior por cierre de sesión. `POST /auth/logout` recibe `{}`, invalida la sesión en PostgreSQL y elimina la cookie. Repetir el cierre devuelve `204` si la comprobación de origen y CSRF es válida, aunque ya no exista una sesión autenticada. `GET /auth/session` devuelve la misma estructura de cuenta y caducidad que el acceso.
+
+Antes del registro o del acceso, el panel obtiene `GET /auth/csrf`, que devuelve `{"csrf_token":"valor-aleatorio"}` y establece un contexto previo sin autenticar. Las peticiones `POST`, `PUT`, `PATCH` y `DELETE` del navegador envían ese valor en `X-CSRF-Token`; el servidor comprueba también el origen. Al iniciar o cerrar sesión se renuevan el contexto y el token. El contexto previo no permite acceder a datos personales ni se convierte en una sesión autenticada sin regenerar su identificador.
+
+Las rutas de CSRF, registro e inicio de sesión no requieren una sesión autenticada. El resto de rutas de datos sí la requieren. Sin sesión válida se devuelve `401`; un recurso ajeno devuelve `404` y una comprobación CSRF fallida, `403`. Una contraseña incorrecta y un correo inexistente producen el mismo error de acceso. Al superar el límite de intentos se responde `429` con `Retry-After`.
+
+Cada servicio verifica la sesión mediante el componente de acceso y comprueba a quién pertenece el recurso. La verificación interna no es una ruta pública de `/api/v1` y no acepta un propietario elegido por el cliente. Las contraseñas, cookies y tokens CSRF no se incluyen en los registros técnicos. Estos contratos describen el funcionamiento previsto, no una implementación disponible.
 
 ## Datos que se envían
 
@@ -117,7 +141,7 @@ Este es el contenido de `payload`, acompañado de los campos anteriores. El camb
 
 ## Errores
 
-Los errores usan el mismo formato, con código y una explicación sin datos sensibles. Los principales son `401` para acceso no válido, `404` para un recurso inexistente o ajeno, `409` para conflicto y `422` para configuración incorrecta. Se devuelven como `application/problem+json`:
+Los errores usan el mismo formato, con código y una explicación sin datos sensibles. Los principales son `401` para acceso no válido, `403` para comprobación CSRF fallida, `404` para un recurso inexistente o ajeno, `409` para conflicto, `422` para configuración incorrecta y `429` para exceso de intentos o peticiones. Se devuelven como `application/problem+json`:
 
 ```json
 {

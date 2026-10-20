@@ -30,6 +30,8 @@ Los servicios se desarrollarán con NestJS y TypeScript. El panel web utilizará
 
 Una API, la interfaz por la que se comunican las aplicaciones, recibe las peticiones del panel web y las dirige al servicio correspondiente. También se comprueba quién accede y qué información le pertenece.
 
+Cada persona tendrá una cuenta con correo y contraseña. La sesión se guardará en el servidor y el navegador conservará una cookie protegida para identificarla. Cerrar sesión o dejarla caducar impedirá seguir utilizándola. Las contraseñas no se guardarán en texto legible y cada servicio comprobará que los datos solicitados pertenecen a la cuenta.
+
 ```mermaid
 flowchart TB
     U["Usuario / panel web"] -->|HTTPS| API["Acceso y autenticación"]
@@ -43,6 +45,7 @@ flowchart TB
     S -->|SQL: datos de Sync| D[(PostgreSQL)]
     A -->|SQL: datos de Automation| D
     M -->|SQL: datos de Monitoring| D
+    API -->|SQL: cuentas y sesiones| D
 ```
 
 RabbitMQ guarda los mensajes pendientes y los reparte entre los servicios. Esto permite realizar una sincronización larga en segundo plano y comunicar su resultado sin mantener al usuario esperando.
@@ -109,7 +112,10 @@ Las rutas parten de `/api/v1`. Los datos se intercambian en JSON y el acceso se 
 
 | Método | Ruta | Para qué sirve |
 |---|---|---|
+| `POST` | `/auth/register` | Crear una cuenta. |
 | `POST` | `/auth/login` | Acceder a la cuenta. |
+| `POST` | `/auth/logout` | Cerrar la sesión actual. |
+| `GET` | `/auth/session` | Consultar la cuenta y la sesión actual. |
 | `GET`, `POST` | `/connections` | Consultar o añadir conexiones. |
 | `POST` | `/connections/{id}/test` | Comprobar una conexión. |
 | `GET`, `POST` | `/sync-definitions` | Consultar o definir sincronizaciones. |

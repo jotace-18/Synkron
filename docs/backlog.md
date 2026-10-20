@@ -1,6 +1,6 @@
 # Trabajo previsto
 
-Estas historias recogen las funciones y el trabajo de desarrollo. Falta publicarlas como Issues y añadirlas al tablero de GitHub.
+Estas historias resumen las funciones y el trabajo de desarrollo. El seguimiento actualizado está en las [Issues](https://github.com/jotace-18/Synkron/issues) y en el [tablero de GitHub](https://github.com/users/jotace-18/projects/1).
 
 Todas son de prioridad inicial. US-01 a US-13 se sitúan en el Hito 2; US-14 en el 3; US-15 en el 4 y US-16 en el 5.
 
@@ -14,13 +14,15 @@ Criterios de aceptación:
 
 - Una contraseña válida permite iniciar sesión; una inválida no concede acceso.
 - Ninguna respuesta incluye contraseña ni hash.
-- Cerrar sesión y caducar el acceso funciona según la solución elegida.
+- Cerrar sesión invalida la sesión en el servidor; también se rechazan sesiones caducadas.
+- La cookie está protegida y las peticiones que cambian datos comprueban origen y token CSRF.
 
 Tareas:
 
-- [ ] Elegir cómo gestionar las cuentas y sesiones (ADR-005).
+- [x] Definir cuentas propias y sesiones en PostgreSQL (ADR-005).
 - [ ] Crear registro e inicio de sesión con contraseñas protegidas.
-- [ ] Probar acceso, expiración y ausencia de secretos.
+- [ ] Crear cierre de sesión y comprobación de la cuenta actual.
+- [ ] Probar acceso, expiración, cierre de sesión, CSRF y ausencia de secretos.
 
 ## US-02 — Mantener separados los datos de cada cuenta
 
