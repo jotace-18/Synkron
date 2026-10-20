@@ -2,7 +2,7 @@
 
 Estas historias recogen las funciones y el trabajo de desarrollo. Falta publicarlas como Issues y añadirlas al tablero de GitHub.
 
-Todas son de prioridad inicial. US-01 a US-13 se sitúan en el Hito 2; US-14 en el 3; US-15 en el 4 y US-16 en el 5. El [seguimiento del Hito 1](hito-1.md) recoge lo necesario para preparar el proyecto.
+Todas son de prioridad inicial. US-01 a US-13 se sitúan en el Hito 2; US-14 en el 3; US-15 en el 4 y US-16 en el 5.
 
 ## US-01 — Registrarse e iniciar sesión
 
