@@ -12,21 +12,12 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Python (stack candidato; ajustar al elegirlo)
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage
-htmlcov/
-
-# Frontend y compilación
+# Node.js, TypeScript y compilación
 node_modules/
 dist/
 build/
+*.tsbuildinfo
+.vite/
 
 # Infraestructura y estado local
 .terraform/

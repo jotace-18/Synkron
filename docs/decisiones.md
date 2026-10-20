@@ -35,3 +35,11 @@ El historial permite seguir estas situaciones y conocer qué parte de una operac
 Cada cuenta dispone de sus propias conexiones, reglas e historial. La identificación del usuario determina qué recursos puede consultar y utilizar.
 
 Los permisos se comprueban en cada servicio, además de en la entrada API. Las credenciales de las aplicaciones conectadas se guardan protegidas y no aparecen en las respuestas, los eventos ni los registros técnicos.
+
+## ADR-006. Tecnologías de la aplicación
+
+Los servicios utilizan NestJS con TypeScript. Su organización en módulos permite separar las funciones de cada servicio, validar las peticiones y probar su comportamiento. Sync, Automation y Monitoring se ejecutan por separado y se comunican mediante HTTP y RabbitMQ.
+
+El panel utiliza React con TypeScript y Vite. React permite organizar las pantallas en componentes y TypeScript ayuda a comprobar los datos que manejan tanto el panel como los servicios. Vite prepara el entorno de desarrollo y genera los archivos del panel para su publicación.
+
+Synkron dispone de su propio panel y API para gestionar conexiones, sincronizaciones, reglas y actividad. Las aplicaciones conectadas intercambian información con Synkron mediante sus API, sin compartir sus bases de datos ni formar parte de su despliegue.
