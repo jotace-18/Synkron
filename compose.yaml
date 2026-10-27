@@ -8,5 +8,31 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     init: true
+    networks:
+      - default
+      - sync-data
+    environment:
+      PGHOST: sync-db
+      PGPORT: "5432"
+      PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
 
-    
+  sync-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      POSTGRES_USER: ${SYNC_DB_ADMIN_USER:?Falta SYNC_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${SYNC_DB_ADMIN_PASSWORD:?Falta SYNC_DB_ADMIN_PASSWORD}
+    volumes:
+      - sync-db-data:/var/lib/postgresql/data
+    networks:
+      - sync-data
+
+volumes:
+  sync-db-data:
+
+networks:
+  default:
+  sync-data:
+    internal: true
