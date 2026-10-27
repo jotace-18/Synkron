@@ -47,3 +47,21 @@ jobs:
 
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e -- --runInBand
+
+  docker:
+    name: Comprobar imagen de Sync
+    needs: sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Revisar Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/sync/Dockerfile
+
+      - name: Construir imagen
+        run: docker build -t synkron-sync:ci apps/sync
