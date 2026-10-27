@@ -16,11 +16,13 @@ RabbitMQ reparte las tareas entre los procesos de Sync y comunica los cambios a 
 
 Cada servicio lleva el seguimiento de los mensajes que procesa para que una interrupción o una repetición no haga perder el trabajo ni duplique una acción ya realizada.
 
-## ADR-003. Datos separados en PostgreSQL
+## ADR-003. Base de datos independiente por servicio
 
-PostgreSQL conserva las configuraciones y el historial. La infraestructura inicial comparte una base de datos para reducir coste y mantenimiento, pero cada servicio tiene sus propias tablas y permisos.
+Cada backend tendrá su propia instancia de PostgreSQL en un contenedor independiente: Sync, Automation, Monitoring y el componente de cuentas y sesiones de la entrada API. Cada instancia tendrá credenciales, migraciones y un volumen persistente propios.
 
-Los servicios intercambian información mediante la API y los mensajes, sin modificar las tablas de otro. Así se mantienen claras sus responsabilidades. Compartir la base también implica que una caída puede afectar a toda la plataforma.
+Esta decisión sustituye la instancia compartida con tablas y permisos separados, para aplicar la indicación docente de mantener una base de datos por servicio. La separación permite gestionar el ciclo de vida y los fallos de cada base por separado, a cambio de mayor consumo de memoria y más componentes que mantener. Compartir el host sigue siendo una dependencia común.
+
+Cada backend solo accede a su propia base de datos. Los servicios intercambian información mediante la API y los mensajes; no utilizan consultas, claves foráneas ni transacciones entre bases. Los workers de un servicio utilizan la misma base que su backend. El frontend consume la API y no necesita una base propia.
 
 ## ADR-004. Control de duplicados
 
@@ -34,7 +36,7 @@ El historial permite seguir estas situaciones y conocer qué parte de una operac
 
 Las cuentas son propias de Synkron y se crean con correo y contraseña. El correo es único y las contraseñas se guardan mediante Argon2id, que permite comprobarlas sin conservarlas en texto legible. No se utiliza un proveedor externo de acceso en la primera versión.
 
-El componente de acceso, desarrollado con NestJS e incluido en la entrada API, gestiona las cuentas y las sesiones en sus propias tablas de PostgreSQL. El navegador recibe un identificador aleatorio mediante una cookie `HttpOnly`, `Secure` y `SameSite=Lax`, sin acceso desde JavaScript y solo enviada por HTTPS. El panel y la API se publican bajo el mismo origen.
+El componente de acceso, desarrollado con NestJS e incluido en la entrada API, gestiona las cuentas y las sesiones en su propia instancia de PostgreSQL. El navegador recibe un identificador aleatorio mediante una cookie `HttpOnly`, `Secure` y `SameSite=Lax`, sin acceso desde JavaScript y solo enviada por HTTPS. El panel y la API se publican bajo el mismo origen.
 
 Al iniciar sesión se genera un identificador nuevo. La sesión caduca tras 30 minutos sin actividad o, como máximo, a las 12 horas de su creación. Cerrar sesión la invalida en el servidor y elimina la cookie; no basta con borrarla del navegador. Estos tiempos son configurables.
 

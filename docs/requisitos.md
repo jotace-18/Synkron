@@ -75,7 +75,7 @@ El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y
 |---|---|---|
 | RD-01 | Usar identificadores únicos que no revelen datos personales. | Inicial |
 | RD-02 | Guardar siempre el propietario, identificado internamente por `tenant_id`. | Inicial |
-| RD-03 | Cada servicio solo modifica sus propias tablas. | Inicial |
+| RD-03 | Cada backend utiliza exclusivamente su propia instancia de PostgreSQL, en un contenedor con credenciales, migraciones y volumen persistente independientes. | Inicial |
 | RD-04 | Cifrar las credenciales o guardarlas en un almacén de secretos. | Inicial |
 | RD-05 | Guardar las contraseñas mediante Argon2id, con una sal aleatoria por contraseña y un coste ajustado al entorno. | Inicial |
 | RD-06 | Definir qué estados y cambios de estado admite una ejecución. | Inicial |

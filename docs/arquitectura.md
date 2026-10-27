@@ -13,7 +13,18 @@ Los diagramas generales están en el [README](../README.md). Este documento expl
 
 Cada servicio se podrá ejecutar y actualizar por separado. Sync tendrá procesos en segundo plano para realizar las sincronizaciones. Se podrán añadir más si aumenta el trabajo.
 
-PostgreSQL guardará los datos en grupos de tablas separados por servicio. Cada uno tendrá sus permisos y solo escribirá en sus tablas. La base inicial será compartida, así que una caída puede afectar a todo el sistema.
+Cada backend tendrá una instancia de PostgreSQL en un contenedor independiente, con credenciales, migraciones y volumen persistente propios:
+
+| Backend | Base de datos |
+|---|---|
+| Sync y sus workers | PostgreSQL de Sync. |
+| Automation y sus workers | PostgreSQL de Automation. |
+| Monitoring | PostgreSQL de Monitoring. |
+| Entrada API: cuentas y sesiones | PostgreSQL de acceso. |
+
+Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tendrá su propio contenedor, consumirá la API y no necesitará base de datos.
+
+Esta separación permite gestionar cada base por separado, aunque el host y otros componentes compartidos siguen siendo dependencias comunes. Aumenta el consumo de recursos frente a una instancia compartida.
 
 Cada cuenta tendrá sus propios recursos. El campo interno `tenant_id` identifica a su propietario.
 
@@ -67,7 +78,7 @@ Una sincronización incompleta puede haber cambiado parte de los datos. No se pr
 
 ## Acceso y funcionamiento
 
-El componente de acceso guarda cuentas y sesiones en sus propias tablas de PostgreSQL. El panel utiliza una cookie protegida y se sirve bajo el mismo origen que la API. La sesión caduca o se invalida al cerrarla, según [ADR-005](decisiones.md#adr-005-acceso-a-la-información-personal).
+El componente de acceso guarda cuentas y sesiones en su propia instancia de PostgreSQL. El panel utiliza una cookie protegida y se sirve bajo el mismo origen que la API. La sesión caduca o se invalida al cerrarla, según [ADR-005](decisiones.md#adr-005-acceso-a-la-información-personal).
 
 Cada servicio consulta la sesión al componente de acceso por una ruta interna autenticada y comprueba la propiedad del recurso antes de operar. Esa ruta no se expone a Internet y no acepta una identidad indicada libremente por el cliente. Si la comprobación falla o el componente no responde, se rechaza el acceso. Esto añade una dependencia de disponibilidad y una consulta interna a las peticiones autenticadas.
 

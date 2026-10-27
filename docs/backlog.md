@@ -231,13 +231,15 @@ Como desarrollador, quiero levantar y verificar el sistema para trabajar sobre u
 
 Criterios de aceptación:
 
-- Un comando inicia servicios, RabbitMQ, base de datos y aplicaciones simuladas con redes y volúmenes.
+- Un comando inicia los backends, el frontend, RabbitMQ, una instancia de PostgreSQL por backend y las aplicaciones simuladas con redes y volúmenes.
+- Cada backend solo accede a su base, con credenciales, migraciones y volumen persistente independientes.
 - Las imágenes separan preparación y ejecución y usan un usuario sin permisos de administrador.
 - La comprobación automática (CI) revisa el código, ejecuta pruebas y publica las imágenes con su versión en GitHub Container Registry.
 
 Tareas:
 
 - [ ] Crear Dockerfiles, Compose y env de ejemplo.
+- [ ] Configurar las bases de Sync, Automation, Monitoring y acceso con redes privadas, credenciales, migraciones y volúmenes propios.
 - [ ] Añadir revisiones de código y pruebas automáticas.
 - [ ] Comprobar que los datos se conservan y las imágenes se construyen y publican sin secretos.
 

@@ -42,15 +42,15 @@ flowchart TB
     A <-->|AMQP: eventos y acciones| Q
     Q -->|AMQP: cambios y resultados| M
     S <-->|HTTPS / JSON| X["Servicios conectados"]
-    S -->|SQL: datos de Sync| D[(PostgreSQL)]
-    A -->|SQL: datos de Automation| D
-    M -->|SQL: datos de Monitoring| D
-    API -->|SQL: cuentas y sesiones| D
+    S -->|SQL| DS[(PostgreSQL Sync)]
+    A -->|SQL| DA[(PostgreSQL Automation)]
+    M -->|SQL| DM[(PostgreSQL Monitoring)]
+    API -->|SQL| DU[(PostgreSQL cuentas y sesiones)]
 ```
 
 RabbitMQ guarda los mensajes pendientes y los reparte entre los servicios. Esto permite realizar una sincronización larga en segundo plano y comunicar su resultado sin mantener al usuario esperando.
 
-PostgreSQL guarda las configuraciones y el historial. Cada servicio gestiona sus propios datos, y cada usuario solo puede acceder a los suyos.
+Cada backend tendrá su propia base de datos PostgreSQL en un contenedor independiente: Sync, Automation, Monitoring y el componente de cuentas y sesiones de la entrada API. Cada base tendrá credenciales y un volumen persistente propios. Los servicios intercambian información por HTTP y mensajes, sin acceder a las bases de otros servicios. Cada usuario solo puede acceder a sus propios recursos.
 
 Una sincronización recorre este camino:
 
