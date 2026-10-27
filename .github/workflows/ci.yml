@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Comprobar Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: apps/sync
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/sync/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar formato
+        run: npx --no-install prettier --check "src/**/*.ts" "test/**/*.ts"
+
+      - name: Comprobar lint
+        run: npx --no-install eslint "{src,apps,libs,test}/**/*.ts" --max-warnings=0
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Ejecutar pruebas unitarias
+        run: npm test -- --runInBand
+
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e -- --runInBand
