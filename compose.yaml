@@ -17,6 +17,9 @@ services:
       PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
       PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
       PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+    depends_on:
+      sync-db:
+        condition: service_healthy
 
   sync-db:
     image: postgres:17-bookworm
@@ -24,10 +27,21 @@ services:
       POSTGRES_DB: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
       POSTGRES_USER: ${SYNC_DB_ADMIN_USER:?Falta SYNC_DB_ADMIN_USER}
       POSTGRES_PASSWORD: ${SYNC_DB_ADMIN_PASSWORD:?Falta SYNC_DB_ADMIN_PASSWORD}
+      SYNC_DB_USER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      SYNC_DB_PASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
     volumes:
       - sync-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/sync/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
     networks:
       - sync-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
 volumes:
   sync-db-data:
