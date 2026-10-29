@@ -43,6 +43,14 @@ services:
       retries: 10
       start_period: 10s
 
+  api:
+    build:
+      context: ./apps/api
+      target: runtime
+    ports:
+      - "127.0.0.1:3002:3000"
+    init: true
+
 volumes:
   sync-db-data:
 

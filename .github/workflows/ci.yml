@@ -108,10 +108,15 @@ jobs:
         run: npm run test:e2e -- --runInBand
 
   docker:
-    name: Comprobar imagen de Sync
-    needs: sync
+    name: Comprobar imagen de ${{ matrix.service }}
+    needs: [sync, api]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [sync, api]
 
     steps:
       - name: Descargar el código
@@ -120,7 +125,7 @@ jobs:
       - name: Revisar Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: apps/sync/Dockerfile
+          dockerfile: apps/${{ matrix.service }}/Dockerfile
 
       - name: Construir imagen
-        run: docker build -t synkron-sync:ci apps/sync
+        run: docker build -t synkron-${{ matrix.service }}:ci apps/${{ matrix.service }}
