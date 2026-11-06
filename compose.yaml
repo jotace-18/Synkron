@@ -49,12 +49,50 @@ services:
       target: runtime
     ports:
       - "127.0.0.1:3002:3000"
+    networks:
+      - default
+      - api-data
     init: true
+    environment:
+      PGHOST: api-db
+      PGPORT: "5432"
+      PGDATABASE: ${API_DB_NAME:?Falta API_DB_NAME}
+      PGUSER: ${API_DB_USER:?Falta API_DB_USER}
+      PGPASSWORD: ${API_DB_PASSWORD:?Falta API_DB_PASSWORD}
+    depends_on:
+      api-db:
+        condition: service_healthy
+
+
+  api-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${API_DB_NAME:?Falta API_DB_NAME}
+      POSTGRES_USER: ${API_DB_ADMIN_USER:?Falta API_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${API_DB_ADMIN_PASSWORD:?Falta API_DB_ADMIN_PASSWORD}
+      API_DB_USER: ${API_DB_USER:?Falta API_DB_USER}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:?Falta API_DB_PASSWORD}
+    volumes:
+      - api-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/api/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - api-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
 volumes:
   sync-db-data:
+  api-db-data:
 
 networks:
   default:
   sync-data:
+    internal: true
+  api-data:
     internal: true

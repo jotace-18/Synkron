@@ -74,6 +74,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: api_test
+          POSTGRES_USER: api_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - "127.0.0.1:5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U api_test -d api_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     defaults:
       run:
         working-directory: apps/api
@@ -106,6 +121,12 @@ jobs:
 
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e -- --runInBand
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGDATABASE: api_test
+          PGUSER: api_test
+          PGPASSWORD: ci-only-password
 
   docker:
     name: Comprobar imagen de ${{ matrix.service }}
