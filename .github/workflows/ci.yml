@@ -119,6 +119,15 @@ jobs:
       - name: Ejecutar pruebas unitarias
         run: npm test -- --runInBand
 
+      - name: Aplicar migraciones de la API
+        run: npm run migrate:up -- --create-schema
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGDATABASE: api_test
+          PGUSER: api_test
+          PGPASSWORD: ci-only-password
+
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e -- --runInBand
         env:
