@@ -152,16 +152,44 @@ jobs:
           PGUSER: api_test
           PGPASSWORD: ci-only-password
 
+  task-api:
+    name: Comprobar API de tareas simulada
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Comprobar sintaxis
+        run: |
+          node --check fixtures/task-api/src/server.js
+          node --check fixtures/task-api/test/server.test.js
+
+      - name: Ejecutar pruebas HTTP
+        run: npm --prefix fixtures/task-api test
+
   docker:
     name: Comprobar imagen de ${{ matrix.service }}
-    needs: [sync, api]
+    needs: [sync, api, task-api]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     strategy:
       fail-fast: false
       matrix:
-        service: [sync, api]
+        include:
+          - service: sync
+            context: apps/sync
+          - service: api
+            context: apps/api
+          - service: task-api
+            context: fixtures/task-api
 
     steps:
       - name: Descargar el código
@@ -170,7 +198,7 @@ jobs:
       - name: Revisar Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: apps/${{ matrix.service }}/Dockerfile
+          dockerfile: ${{ matrix.context }}/Dockerfile
 
       - name: Construir imagen
-        run: docker build -t synkron-${{ matrix.service }}:ci apps/${{ matrix.service }}
+        run: docker build -t synkron-${{ matrix.service }}:ci ${{ matrix.context }}
