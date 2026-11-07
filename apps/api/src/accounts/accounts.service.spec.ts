@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { DatabaseError } from 'pg';
@@ -6,6 +6,67 @@ import { AccountsService } from './accounts.service';
 import { DatabaseService } from '../database/database.service';
 
 describe('AccountsService', () => {
+  it('verifies credentials and returns only public account fields', async () => {
+    const password = 'clave-ficticia-para-la-prueba';
+    const account = {
+      id: '44444444-4444-4444-8444-444444444444',
+      email: 'persona@example.com',
+      created_at: new Date('2026-11-07T12:00:00Z'),
+    };
+    const query = jest.fn().mockResolvedValue({
+      rows: [
+        {
+          ...account,
+          password_hash: await argon2.hash(password, { type: argon2.argon2id }),
+        },
+      ],
+    });
+    const testingModule = await Test.createTestingModule({
+      providers: [
+        AccountsService,
+        { provide: DatabaseService, useValue: { query } },
+      ],
+    }).compile();
+    const service = testingModule.get(AccountsService);
+    await expect(
+      service.authenticate(' Persona@Example.com ', password),
+    ).resolves.toEqual(account);
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      'persona@example.com',
+    ]);
+  });
+
+  it.each(['unknown email', 'wrong password'])(
+    'rejects credentials for %s',
+    async (scenario) => {
+      const rows =
+        scenario === 'unknown email'
+          ? []
+          : [
+              {
+                id: '44444444-4444-4444-8444-444444444444',
+                email: 'persona@example.com',
+                created_at: new Date('2026-11-07T12:00:00Z'),
+                password_hash: await argon2.hash(
+                  'clave-ficticia-para-la-prueba',
+                  { type: argon2.argon2id },
+                ),
+              },
+            ];
+      const query = jest.fn().mockResolvedValue({ rows });
+      const testingModule = await Test.createTestingModule({
+        providers: [
+          AccountsService,
+          { provide: DatabaseService, useValue: { query } },
+        ],
+      }).compile();
+      const service = testingModule.get(AccountsService);
+      await expect(
+        service.authenticate('persona@example.com', 'incorrecta'),
+      ).rejects.toThrow(UnauthorizedException);
+    },
+  );
+
   it('normalizes the email and stores an Argon2id hash', async () => {
     const account = {
       id: '44444444-4444-4444-8444-444444444444',

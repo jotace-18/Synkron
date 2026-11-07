@@ -5,10 +5,17 @@ import { DatabaseService } from './database/database.service';
 import { AccountsService } from './accounts/accounts.service';
 import { AccountsController } from './accounts/accounts.controller';
 import { CsrfService } from './accounts/csrf.service';
+import { AuthService } from './accounts/auth.service';
 
 @Module({
   imports: [],
   controllers: [AppController, AccountsController],
-  providers: [AppService, DatabaseService, AccountsService, CsrfService],
+  providers: [
+    AppService,
+    DatabaseService,
+    AccountsService,
+    CsrfService,
+    AuthService,
+  ],
 })
 export class AppModule {}

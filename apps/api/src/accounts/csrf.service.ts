@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { doubleCsrf, type DoubleCsrfUtilities } from 'csrf-csrf';
 import type { Request, Response } from 'express';
+import { readSessionToken } from './session-cookie';
 
 const CONTEXT_COOKIE = '__Host-synkron_context';
 
@@ -25,7 +26,11 @@ export class CsrfService {
 
     this.csrf = doubleCsrf({
       getSecret: () => secret,
-      getSessionIdentifier: (request) => this.readContext(request),
+      getSessionIdentifier: (request) => {
+        const context = this.readContext(request);
+        const session = readSessionToken(request);
+        return session ? `${context}:${session}` : context;
+      },
       cookieName: '__Host-synkron_csrf',
       cookieOptions,
       getCsrfTokenFromRequest: (request) => request.get('X-CSRF-Token'),
