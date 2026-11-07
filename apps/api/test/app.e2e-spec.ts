@@ -12,6 +12,7 @@ import {
 } from '../src/accounts/auth.service';
 import { AccountsService } from '../src/accounts/accounts.service';
 import { sessionCookieName } from '../src/accounts/session-cookie';
+import { InternalAuthModule } from '../src/internals/internal-auth.module';
 
 const appOrigin = process.env.APP_ORIGIN ?? '';
 
@@ -23,7 +24,9 @@ describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
   let authenticationEmails: string[];
   let testBuckets: string[];
+  const serviceToken = '3'.repeat(64);
   const testSettings = {
+    SYNC_AUTH_SERVICE_TOKEN: serviceToken,
     SESSION_IDLE_TTL_MINUTES: '30',
     SESSION_ABSOLUTE_TTL_HOURS: '12',
     AUTH_LOGIN_MAX_ATTEMPTS_PER_ACCOUNT: '5',
@@ -625,6 +628,118 @@ describe('AppController (e2e)', () => {
     await expect(
       limited.login(otherEmail, 'incorrecta', fakeRequest, fakeResponse),
     ).rejects.toBeInstanceOf(LoginRateLimitException);
+  });
+
+  describe('internal session verification', () => {
+    let internalApp: INestApplication<App>;
+
+    beforeEach(async () => {
+      const moduleFixture = await Test.createTestingModule({
+        imports: [InternalAuthModule],
+      }).compile();
+
+      internalApp = moduleFixture.createNestApplication();
+      configureApp(internalApp);
+      await internalApp.init();
+    });
+
+    afterEach(async () => {
+      await internalApp?.close();
+    });
+
+    it.each([
+      { label: 'missing', token: undefined },
+      { label: 'incorrect', token: '4'.repeat(64) },
+    ])(
+      'rejects a $label service token even with a valid session',
+      async ({ token }) => {
+        const account = await createAccount();
+        const session = await loginAccount(account, account.context);
+        const query = request(internalApp.getHttpServer())
+          .get('/internal/auth/session')
+          .set('Cookie', session.cookies);
+
+        if (token !== undefined) query.set('X-Synkron-Service-Token', token);
+
+        await query.expect(403);
+      },
+    );
+
+    it('rejects an authorized service without a user session', async () => {
+      await request(internalApp.getHttpServer())
+        .get('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .expect(401);
+    });
+
+    it('reports only the owner and expiration of a valid session', async () => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      const response = await request(internalApp.getHttpServer())
+        .get('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .set('Cookie', session.cookies)
+        .expect(200)
+        .expect('Cache-Control', 'no-store');
+
+      const body = response.body as { tenant_id: string; expires_at: string };
+      expect(Object.keys(body).sort()).toEqual(['expires_at', 'tenant_id']);
+      expect(body.tenant_id).toBe(account.id);
+      expect(Number.isFinite(Date.parse(body.expires_at))).toBe(true);
+      expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('rejects a session revoked through the public logout', async () => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/logout')
+        .set('Origin', appOrigin)
+        .set('Cookie', session.context.cookies)
+        .set('X-CSRF-Token', session.context.token)
+        .send({})
+        .expect(204);
+
+      await request(internalApp.getHttpServer())
+        .get('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .set('Cookie', session.cookies)
+        .expect(401);
+    });
+
+    it('rejects an idle-expired session', async () => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      await app.get(DatabaseService).query(
+        `UPDATE auth.sessions
+         SET created_at = now() - interval '1 hour',
+             last_seen_at = now() - interval '31 minutes'
+         WHERE token_hash = $1`,
+        [sessionHash(session.cookies)],
+      );
+
+      await request(internalApp.getHttpServer())
+        .get('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .set('Cookie', session.cookies)
+        .expect(401);
+    });
+
+    it('does not expose the internal route on the public application', async () => {
+      await request(app.getHttpServer())
+        .get('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .expect(404);
+    });
+
+    it('does not expose public authentication routes on the internal application', async () => {
+      await request(internalApp.getHttpServer())
+        .get('/api/v1/auth/csrf')
+        .expect(404);
+    });
   });
 
   afterEach(async () => {
