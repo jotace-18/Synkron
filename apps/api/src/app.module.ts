@@ -4,10 +4,11 @@ import { AppService } from './app.service';
 import { DatabaseService } from './database/database.service';
 import { AccountsService } from './accounts/accounts.service';
 import { AccountsController } from './accounts/accounts.controller';
+import { CsrfService } from './accounts/csrf.service';
 
 @Module({
   imports: [],
   controllers: [AppController, AccountsController],
-  providers: [AppService, DatabaseService, AccountsService],
+  providers: [AppService, DatabaseService, AccountsService, CsrfService],
 })
 export class AppModule {}
