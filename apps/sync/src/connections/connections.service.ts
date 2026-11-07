@@ -16,7 +16,11 @@ export type ConnectionSummary = {
 export class ConnectionsService {
   constructor(private readonly database: DatabaseService) {}
 
-  async list(tenantId: string): Promise<ConnectionSummary[]> {
+  async list(
+    tenantId: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<ConnectionSummary[]> {
     const result = await this.database.query<ConnectionSummary>(
       `SELECT id, name, base_url, auth_type,
               credentials_encrypted IS NOT NULL AS has_credentials,
@@ -24,8 +28,8 @@ export class ConnectionsService {
        FROM sync.connections
        WHERE tenant_id = $1
        ORDER BY created_at DESC, id DESC
-       LIMIT 50`,
-      [tenantId],
+       LIMIT $2 OFFSET $3`,
+      [tenantId, limit, offset],
     );
 
     return result.rows;

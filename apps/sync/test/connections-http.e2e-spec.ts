@@ -137,19 +137,92 @@ describe('Connections listing (HTTP)', () => {
     expect(body[0]).not.toHaveProperty('tenant_id');
   });
 
-  it('uses the verified owner even when another owner is supplied by the caller', async () => {
+  it('uses the verified owner even when another owner is supplied in a header', async () => {
     const own = await seedConnections();
 
     const response = await request(app.getHttpServer())
       .get('/api/v1/connections')
-      .query({ tenant_id: otherOwner })
       .set('X-Tenant-ID', otherOwner)
       .set('Cookie', cookie)
       .expect(200);
 
     const body = response.body as { id: string }[];
     expect(body.map((connection) => connection.id)).toEqual([own.id]);
-    expect(listSpy).toHaveBeenCalledWith(owner);
+    expect(listSpy).toHaveBeenCalledWith(owner, 20, 0);
+  });
+
+  it('paginates only the owner connections with deterministic ordering for equal timestamps', async () => {
+    const connections = app.get(ConnectionsService);
+    const ids: string[] = [];
+    for (let index = 0; index < 5; index++) {
+      const connection = await connections.createWithoutAuth(owner, {
+        name: `Connection ${index}`,
+        base_url: 'https://tasks.example.com',
+      });
+      ids.push(connection.id);
+    }
+    await connections.createWithoutAuth(otherOwner, {
+      name: 'Other owner',
+      base_url: 'https://other.example.com',
+    });
+    await app.get(DatabaseService).query(
+      `UPDATE sync.connections SET created_at = '2026-01-01T00:00:00Z'
+       WHERE tenant_id IN ($1, $2)`,
+      [owner, otherOwner],
+    );
+
+    async function page(offset: number): Promise<string[]> {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/connections')
+        .query({ limit: 2, offset })
+        .set('Cookie', cookie)
+        .expect(200)
+        .expect('Cache-Control', 'no-store');
+
+      const body = response.body as { id: string }[];
+      return body.map((connection) => connection.id);
+    }
+
+    const orderedIds = ids.sort().reverse();
+    await expect(page(0)).resolves.toEqual(orderedIds.slice(0, 2));
+    await expect(page(2)).resolves.toEqual(orderedIds.slice(2, 4));
+    await expect(page(4)).resolves.toEqual(orderedIds.slice(4));
+    await expect(page(6)).resolves.toEqual([]);
+  });
+
+  it('accepts the maximum page size', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .query({ limit: '50', offset: '0' })
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect([]);
+
+    expect(listSpy).toHaveBeenCalledWith(owner, 50, 0);
+  });
+
+  it.each([
+    { label: 'zero limit', query: { limit: '0' } },
+    { label: 'excessive limit', query: { limit: '51' } },
+    { label: 'fractional limit', query: { limit: '1.5' } },
+    { label: 'non-numeric limit', query: { limit: 'invalid' } },
+    { label: 'negative offset', query: { offset: '-1' } },
+    { label: 'fractional offset', query: { offset: '0.5' } },
+    { label: 'unsafe offset', query: { offset: '9007199254740992' } },
+    { label: 'unknown parameter', query: { unexpected: 'value' } },
+    {
+      label: 'owner query parameter',
+      query: { tenant_id: '11111111-1111-4111-8111-111111111111' },
+    },
+    { label: 'repeated limit', query: { limit: ['1', '2'] } },
+  ])('rejects $label before querying connections', async ({ query }) => {
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .query(query)
+      .set('Cookie', cookie)
+      .expect(422);
+
+    expect(listSpy).not.toHaveBeenCalled();
   });
 
   it('creates a connection for the verified owner and lists it', async () => {

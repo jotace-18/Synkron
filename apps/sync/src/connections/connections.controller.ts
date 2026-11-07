@@ -4,6 +4,7 @@ import {
   Get,
   Header,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ import {
 } from '../session-client/session.guard';
 import { WriteSessionGuard } from '../session-client/write-session.guard';
 import { CreateConnectionDto } from './dto/create-connection.dto';
+import { ListConnectionsDto } from './dto/list-connections.dto';
 import {
   ConnectionsService,
   type ConnectionSummary,
@@ -25,8 +27,11 @@ export class ConnectionsController {
   @Get()
   @UseGuards(SessionGuard)
   @Header('Cache-Control', 'no-store')
-  list(@Req() request: AuthenticatedRequest): Promise<ConnectionSummary[]> {
-    return this.connections.list(request.tenantId);
+  list(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: ListConnectionsDto,
+  ): Promise<ConnectionSummary[]> {
+    return this.connections.list(request.tenantId, query.limit, query.offset);
   }
 
   @Post()

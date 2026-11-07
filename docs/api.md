@@ -31,6 +31,17 @@ Los identificadores y direcciones de este documento son ficticios.
 
 Cada servicio tendrá además `/healthz` para comprobar su funcionamiento.
 
+El listado de conexiones acepta `GET /api/v1/connections?limit=20&offset=0`.
+`limit` es un entero entre 1 y 50 (20 por defecto); `offset` es un entero entre
+0 y 9007199254740991 (0 por defecto). Devuelve un array ordenado por
+`created_at DESC, id DESC`, filtrado siempre por el propietario autenticado
+antes de aplicar la paginación. Un desplazamiento posterior al último resultado
+devuelve `[]`. Parámetros inválidos o desconocidos, incluido `tenant_id`, producen
+`422`. El cliente solicita la siguiente página incrementando `offset` en `limit`;
+una página con menos resultados que `limit` indica el final en esa consulta.
+La paginación no mantiene una instantánea entre peticiones: crear o eliminar
+conexiones mientras se recorren las páginas puede desplazar los resultados.
+
 ## Cuentas y sesiones
 
 El registro recibe `email` y `password`. El correo debe ser único y la contraseña se guarda mediante Argon2id. El inicio de sesión recibe los mismos campos y, si son correctos, devuelve la cuenta y la fecha límite de la sesión:
