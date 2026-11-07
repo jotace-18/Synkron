@@ -3,6 +3,10 @@ import {
   Controller,
   Get,
   Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -15,6 +19,7 @@ import {
 import { WriteSessionGuard } from '../session-client/write-session.guard';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { ListConnectionsDto } from './dto/list-connections.dto';
+import type { ConnectionProbeResult } from './connection-probe.service';
 import {
   ConnectionsService,
   type ConnectionSummary,
@@ -51,5 +56,23 @@ export class ConnectionsController {
     }
 
     return this.connections.createWithoutAuth(request.tenantId, body);
+  }
+
+  @Post(':id/test')
+  @HttpCode(200)
+  @UseGuards(WriteSessionGuard)
+  @Header('Cache-Control', 'no-store')
+  testConnection(
+    @Req() request: AuthenticatedRequest,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        version: '4',
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    id: string,
+  ): Promise<ConnectionProbeResult> {
+    return this.connections.testConnection(request.tenantId, id);
   }
 }

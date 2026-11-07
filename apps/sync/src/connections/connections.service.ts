@@ -1,7 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { CredentialsService } from '../credentials/credentials.service';
 import { DatabaseService } from '../database/database.service';
+import {
+  ConnectionProbeService,
+  type ConnectionProbeResult,
+} from './connection-probe.service';
 
 export type ConnectionSummary = {
   id: string;
@@ -19,6 +27,7 @@ export class ConnectionsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly credentials: CredentialsService,
+    private readonly probe: ConnectionProbeService,
   ) {}
 
   async list(
@@ -38,6 +47,51 @@ export class ConnectionsService {
     );
 
     return result.rows;
+  }
+
+  async testConnection(
+    tenantId: string,
+    connectionId: string,
+  ): Promise<ConnectionProbeResult> {
+    const result = await this.database.query<{
+      id: string;
+      base_url: string;
+      auth_type: 'none' | 'bearer';
+      credentials_encrypted: string | null;
+    }>(
+      `SELECT id, base_url, auth_type, credentials_encrypted
+       FROM sync.connections
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, connectionId],
+    );
+
+    const connection = result.rows[0];
+    if (!connection) {
+      throw new NotFoundException('Conexión no encontrada');
+    }
+
+    let token: string | undefined;
+    if (connection.auth_type === 'bearer') {
+      if (!connection.credentials_encrypted) {
+        throw new ServiceUnavailableException(
+          'No se pudo recuperar la credencial',
+        );
+      }
+
+      try {
+        token = this.credentials.decrypt(
+          connection.credentials_encrypted,
+          tenantId,
+          connection.id,
+        );
+      } catch {
+        throw new ServiceUnavailableException(
+          'No se pudo recuperar la credencial',
+        );
+      }
+    }
+
+    return this.probe.probe(connection.base_url, token);
   }
 
   async createWithoutAuth(

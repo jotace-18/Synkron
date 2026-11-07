@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { ConnectionsService } from '../src/connections/connections.service';
@@ -135,6 +136,34 @@ describe('ConnectionsService (integration)', () => {
       }
     },
   );
+
+  it('does not test another owner connection or disclose whether it exists', async () => {
+    const owner = randomUUID();
+    const otherOwner = randomUUID();
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('Unexpected external request'));
+
+    try {
+      const created = await connections.createWithoutAuth(owner, {
+        name: 'Private connection',
+        base_url: 'http://task-api:3000/tasks',
+      });
+
+      for (const id of [created.id, randomUUID()]) {
+        const pending = connections.testConnection(otherOwner, id);
+        await expect(pending).rejects.toBeInstanceOf(NotFoundException);
+        await expect(pending).rejects.toThrow('Conexión no encontrada');
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      fetchMock.mockRestore();
+      await database.query(
+        'DELETE FROM sync.connections WHERE tenant_id = $1',
+        [owner],
+      );
+    }
+  });
 
   it('lists only the connections belonging to each owner', async () => {
     const ownerA = randomUUID();

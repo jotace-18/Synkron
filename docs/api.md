@@ -102,6 +102,31 @@ no se almacena en PostgreSQL. Cambiar o perder esa clave impide descifrar los
 valores existentes. Crear o listar una conexión no devuelve el token ni el cifrado
 y no realiza todavía peticiones a la aplicación externa.
 
+Prueba de conexión: `POST /api/v1/connections/{id}/test`, con cuerpo `{}`, sesión,
+origen y CSRF válidos. Hace un `GET` a la URL guardada, incluida su ruta; para la
+API ficticia se utiliza `http://task-api:3000/tasks`. La conexión debe pertenecer
+a la cuenta; una conexión ajena o inexistente produce el mismo `404`, y un UUID
+inválido produce `422`. No se aceptan direcciones alternativas en el cuerpo:
+el destino procede siempre de la conexión guardada.
+
+La prueba devuelve `200` con `{"ok":true,"status_code":200,"error":null}` si el
+destino responde correctamente. Los fallos externos también devuelven `200`,
+con `ok:false` y `error` igual a `http_error`, `network_error`, `timeout`,
+`redirect_not_allowed` o `response_too_large`. `status_code` contiene el estado
+HTTP externo si se recibió, o `null` si no llegó. El cuerpo externo y las
+credenciales no se incluyen en el resultado.
+
+Solo se consultan los orígenes expresamente configurados en
+`SYNC_ALLOWED_CONNECTION_ORIGINS` (separados por comas, sin rutas, credenciales,
+query ni fragmentos). En el entorno local se autoriza `http://task-api:3000`;
+esta configuración está pensada para servicios controlados en la red de Docker.
+Los destinos no autorizados, o las URLs con credenciales, query o fragmentos,
+se rechazan con `403` antes de hacer la petición externa. Las redirecciones no
+se siguen. El límite de espera es de 3 segundos y el de respuesta es de 64 KiB,
+contados durante la lectura, también cuando no hay `Content-Length` fiable.
+Una credencial que no puede descifrarse produce `503` sin contactar con el destino.
+El resultado se devuelve en esta petición; guardar la última prueba queda pendiente.
+
 Creación de sincronización, `POST /api/v1/sync-definitions`:
 
 ```json
