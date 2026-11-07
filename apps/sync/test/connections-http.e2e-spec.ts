@@ -1,0 +1,274 @@
+import type { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import type { App } from 'supertest/types';
+import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/configure-app';
+import { ConnectionsService } from '../src/connections/connections.service';
+import { DatabaseService } from '../src/database/database.service';
+
+describe('Connections listing (HTTP)', () => {
+  const cookie = `__Host-synkron_session=${'a'.repeat(64)}`;
+  const settings = {
+    AUTH_API_INTERNAL_URL: 'http://api:3003',
+    SYNC_AUTH_SERVICE_TOKEN: 'b'.repeat(64),
+    SESSION_COOKIE_NAME: '__Host-synkron_session',
+  };
+  let app: INestApplication<App>;
+  let owner: string;
+  let otherOwner: string;
+  let previousSettings: Map<string, string | undefined>;
+  let fetchMock: jest.SpiedFunction<typeof fetch>;
+  let listSpy: jest.SpiedFunction<ConnectionsService['list']>;
+
+  beforeEach(async () => {
+    owner = randomUUID();
+    otherOwner = randomUUID();
+    previousSettings = new Map();
+    for (const [name, value] of Object.entries(settings)) {
+      previousSettings.set(name, process.env[name]);
+      process.env[name] = value;
+    }
+
+    // Se simula solo la llamada HTTP a la API; guard, cliente y PostgreSQL son reales.
+    fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(() =>
+      Promise.resolve(
+        Response.json({
+          tenant_id: owner,
+          expires_at: new Date(Date.now() + 60000).toISOString(),
+        }),
+      ),
+    );
+
+    const module = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    app = module.createNestApplication();
+    configureApp(app);
+    await app.init();
+
+    listSpy = jest.spyOn(app.get(ConnectionsService), 'list');
+  });
+
+  afterEach(async () => {
+    try {
+      if (app) {
+        await app
+          .get(DatabaseService)
+          .query('DELETE FROM sync.connections WHERE tenant_id IN ($1, $2)', [
+            owner,
+            otherOwner,
+          ]);
+      }
+    } finally {
+      try {
+        await app?.close();
+      } finally {
+        listSpy?.mockRestore();
+        fetchMock.mockRestore();
+        for (const [name, value] of previousSettings) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+      }
+    }
+  });
+
+  async function seedConnections() {
+    const connections = app.get(ConnectionsService);
+    const own = await connections.createWithoutAuth(owner, {
+      name: 'Own connection',
+      base_url: 'https://own.example.com',
+    });
+    await connections.createWithoutAuth(otherOwner, {
+      name: 'Other connection',
+      base_url: 'https://other.example.com',
+    });
+    return own;
+  }
+
+  it('rejects missing session cookies before querying connections', async () => {
+    await request(app.getHttpServer()).get('/api/v1/connections').expect(401);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects sessions invalidated by the API before querying connections', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 401 }));
+
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(401);
+
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when session verification is unavailable without listing data', async () => {
+    fetchMock.mockRejectedValue(new Error('API unavailable'));
+
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(503);
+
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it('lists only the verified owner connections without exposing credentials', async () => {
+    const own = await seedConnections();
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+
+    const body = response.body as Record<string, unknown>[];
+    expect(body).toHaveLength(1);
+    expect(body[0]).toMatchObject({
+      id: own.id,
+      name: 'Own connection',
+      has_credentials: false,
+    });
+    expect(body[0]).not.toHaveProperty('credentials_encrypted');
+    expect(body[0]).not.toHaveProperty('tenant_id');
+  });
+
+  it('uses the verified owner even when another owner is supplied by the caller', async () => {
+    const own = await seedConnections();
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .query({ tenant_id: otherOwner })
+      .set('X-Tenant-ID', otherOwner)
+      .set('Cookie', cookie)
+      .expect(200);
+
+    const body = response.body as { id: string }[];
+    expect(body.map((connection) => connection.id)).toEqual([own.id]);
+    expect(listSpy).toHaveBeenCalledWith(owner);
+  });
+
+  it('creates a connection for the verified owner and lists it', async () => {
+    const writeCookies = [
+      cookie,
+      `__Host-synkron_context=${'c'.repeat(64)}`,
+      '__Host-synkron_csrf=csrf-test',
+    ].join('; ');
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/connections')
+      .set('Cookie', writeCookies)
+      .set('Origin', 'https://synkron.test')
+      .set('X-CSRF-Token', 'csrf-test')
+      .send({
+        name: '  Mis tareas  ',
+        base_url: 'https://tasks.example.com',
+        auth: { type: 'none' },
+      })
+      .expect(201)
+      .expect('Cache-Control', 'no-store');
+
+    const body = response.body as { id: string };
+
+    expect(body).toMatchObject({
+      name: 'Mis tareas',
+      base_url: 'https://tasks.example.com',
+      auth_type: 'none',
+      has_credentials: false,
+      enabled: true,
+    });
+    expect(body).not.toHaveProperty('credentials_encrypted');
+    expect(body).not.toHaveProperty('tenant_id');
+
+    const stored = await app.get(DatabaseService).query<{
+      tenant_id: string;
+      credentials_encrypted: string | null;
+    }>(
+      `SELECT tenant_id, credentials_encrypted
+       FROM sync.connections WHERE id = $1`,
+      [body.id],
+    );
+
+    expect(stored.rows).toEqual([
+      { tenant_id: owner, credentials_encrypted: null },
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect([body]);
+  });
+
+  it.each([
+    {
+      label: 'an owner supplied in the body',
+      extraOwner: true,
+      csrf: 'csrf-test',
+      apiStatus: 200,
+      expectedStatus: 422,
+    },
+    {
+      label: 'a missing CSRF token',
+      extraOwner: false,
+      csrf: undefined,
+      apiStatus: 200,
+      expectedStatus: 403,
+    },
+    {
+      label: 'authorization denied by the API',
+      extraOwner: false,
+      csrf: 'csrf-test',
+      apiStatus: 403,
+      expectedStatus: 403,
+    },
+  ])(
+    'rejects $label without storing a connection',
+    async ({ extraOwner, csrf, apiStatus, expectedStatus }) => {
+      fetchMock.mockResolvedValue(
+        apiStatus === 200
+          ? Response.json({
+              tenant_id: owner,
+              expires_at: new Date(Date.now() + 60000).toISOString(),
+            })
+          : new Response(null, { status: apiStatus }),
+      );
+
+      const query = request(app.getHttpServer())
+        .post('/api/v1/connections')
+        .set('Cookie', cookie)
+        .set('Origin', 'https://synkron.test');
+
+      if (csrf !== undefined) query.set('X-CSRF-Token', csrf);
+
+      await query
+        .send({
+          name: 'Mis tareas',
+          base_url: 'https://tasks.example.com',
+          auth: { type: 'none' },
+          ...(extraOwner ? { tenant_id: otherOwner } : {}),
+        })
+        .expect(expectedStatus);
+
+      const stored = await app.get(DatabaseService).query(
+        `SELECT id FROM sync.connections
+         WHERE tenant_id IN ($1, $2)`,
+        [owner, otherOwner],
+      );
+
+      expect(stored.rows).toHaveLength(0);
+    },
+  );
+
+  it('returns an empty list for an authenticated owner without connections', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect([]);
+  });
+});

@@ -728,9 +728,96 @@ describe('AppController (e2e)', () => {
         .expect(401);
     });
 
+    it('authorizes a write with a valid service, origin, CSRF token and session', async () => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      const response = await request(internalApp.getHttpServer())
+        .post('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .set('Origin', appOrigin)
+        .set('Cookie', session.context.cookies)
+        .set('X-CSRF-Token', session.context.token)
+        .expect(200)
+        .expect('Cache-Control', 'no-store');
+
+      const body = response.body as { tenant_id: string; expires_at: string };
+      expect(Object.keys(body).sort()).toEqual(['expires_at', 'tenant_id']);
+      expect(body.tenant_id).toBe(account.id);
+      expect(Date.parse(body.expires_at)).toBeGreaterThan(Date.now());
+      expect(response.headers['set-cookie']).toBeUndefined();
+    });
+
+    it.each([
+      { label: 'missing origin', origin: undefined, csrf: 'valid' },
+      {
+        label: 'foreign origin',
+        origin: 'https://foreign.example',
+        csrf: 'valid',
+      },
+      { label: 'missing CSRF token', origin: appOrigin, csrf: undefined },
+      { label: 'incorrect CSRF token', origin: appOrigin, csrf: 'invalid' },
+    ])('rejects write authorization with $label', async ({ origin, csrf }) => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      const query = request(internalApp.getHttpServer())
+        .post('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .set('Cookie', session.context.cookies);
+
+      if (origin !== undefined) query.set('Origin', origin);
+      if (csrf !== undefined) {
+        query.set(
+          'X-CSRF-Token',
+          csrf === 'valid' ? session.context.token : csrf,
+        );
+      }
+
+      await query.expect(403);
+    });
+
+    it('rejects write authorization without the service token', async () => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      await request(internalApp.getHttpServer())
+        .post('/internal/auth/session')
+        .set('Origin', appOrigin)
+        .set('Cookie', session.context.cookies)
+        .set('X-CSRF-Token', session.context.token)
+        .expect(403);
+    });
+
+    it('rejects write authorization with a revoked session despite valid CSRF', async () => {
+      const account = await createAccount();
+      const session = await loginAccount(account, account.context);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/logout')
+        .set('Origin', appOrigin)
+        .set('Cookie', session.context.cookies)
+        .set('X-CSRF-Token', session.context.token)
+        .send({})
+        .expect(204);
+
+      await request(internalApp.getHttpServer())
+        .post('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .set('Origin', appOrigin)
+        .set('Cookie', session.context.cookies)
+        .set('X-CSRF-Token', session.context.token)
+        .expect(401);
+    });
+
     it('does not expose the internal route on the public application', async () => {
       await request(app.getHttpServer())
         .get('/internal/auth/session')
+        .set('X-Synkron-Service-Token', serviceToken)
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .post('/internal/auth/session')
         .set('X-Synkron-Service-Token', serviceToken)
         .expect(404);
     });

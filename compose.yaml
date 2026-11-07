@@ -18,6 +18,8 @@ services:
       PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
       PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
       SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      AUTH_API_INTERNAL_URL: http://api:3003
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
     depends_on:
       sync-db:
         condition: service_healthy

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
-type ConnectionSummary = {
+export type ConnectionSummary = {
   id: string;
   name: string;
   base_url: string;
