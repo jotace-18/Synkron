@@ -131,6 +131,7 @@ jobs:
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e -- --runInBand
         env:
+          APP_ORIGIN: https://synkron.test
           PGHOST: 127.0.0.1
           PGPORT: "5432"
           PGDATABASE: api_test

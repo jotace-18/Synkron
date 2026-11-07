@@ -3,7 +3,7 @@ import * as argon2 from 'argon2';
 import { DatabaseError } from 'pg';
 import { DatabaseService } from '../database/database.service';
 
-type Account = {
+export type Account = {
   id: string;
   email: string;
   created_at: Date;
