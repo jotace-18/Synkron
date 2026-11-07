@@ -5,6 +5,7 @@ import { DatabaseService } from './database/database.service';
 import { ConnectionsService } from './connections/connections.service';
 import { SessionClientService } from './session-client/session-client.service';
 import { ConnectionsController } from './connections/connections.controller';
+import { CredentialsService } from './credentials/credentials.service';
 
 @Module({
   imports: [],
@@ -14,6 +15,7 @@ import { ConnectionsController } from './connections/connections.controller';
     DatabaseService,
     ConnectionsService,
     SessionClientService,
+    CredentialsService,
   ],
 })
 export class AppModule {}

@@ -20,6 +20,7 @@ services:
       SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
       AUTH_API_INTERNAL_URL: http://api:3003
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
     depends_on:
       sync-db:
         condition: service_healthy

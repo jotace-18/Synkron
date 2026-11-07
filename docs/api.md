@@ -86,6 +86,22 @@ Creación de conexión, `POST /api/v1/connections`:
 
 La respuesta muestra nombre, dirección sin datos sensibles, identificador, tipo de acceso y estado. `has_credentials` indica si hay credenciales guardadas; su contenido no se devuelve. La dirección se revisa al guardar y al conectar.
 
+Se admiten `auth: {"type":"none"}` y `auth: {"type":"bearer","token":"..."}`.
+Un token Bearer debe tener entre 1 y 4096 caracteres y seguir la sintaxis de
+[RFC 6750, sección 2.1](https://www.rfc-editor.org/rfc/rfc6750.html#section-2.1).
+No se recorta ni transforma. Credenciales ausentes, inválidas o campos adicionales
+producen `422`; `none` no admite un campo `token`.
+
+Sync guarda las credenciales Bearer cifradas con AES-256-GCM. Cada cifrado usa un
+IV aleatorio de 12 bytes y una etiqueta de autenticidad de 16 bytes, y queda ligado
+al propietario y al identificador de la conexión mediante datos autenticados.
+La columna `credentials_encrypted` contiene `v1.iv.tag.ciphertext`, con sus tres
+componentes binarios codificados en hexadecimal. La clave de 32 bytes se configura
+como 64 caracteres hexadecimales en `SYNC_CREDENTIALS_KEY`, únicamente en Sync;
+no se almacena en PostgreSQL. Cambiar o perder esa clave impide descifrar los
+valores existentes. Crear o listar una conexión no devuelve el token ni el cifrado
+y no realiza todavía peticiones a la aplicación externa.
+
 Creación de sincronización, `POST /api/v1/sync-definitions`:
 
 ```json

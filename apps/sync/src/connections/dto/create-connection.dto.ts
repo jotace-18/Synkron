@@ -1,6 +1,5 @@
 import { Transform, Type } from 'class-transformer';
 import {
-  Equals,
   IsBoolean,
   IsDefined,
   IsObject,
@@ -10,11 +9,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-
-class NoAuthDto {
-  @Equals('none')
-  type!: 'none';
-}
+import { BearerAuthDto, NoAuthDto } from './connection-auth.dto';
 
 export class CreateConnectionDto {
   @Transform(({ value }: { value: unknown }) =>
@@ -39,8 +34,17 @@ export class CreateConnectionDto {
   @IsDefined()
   @IsObject()
   @ValidateNested()
-  @Type(() => NoAuthDto)
-  auth!: NoAuthDto;
+  @Type(() => NoAuthDto, {
+    discriminator: {
+      property: 'type',
+      subTypes: [
+        { name: 'none', value: NoAuthDto },
+        { name: 'bearer', value: BearerAuthDto },
+      ],
+    },
+    keepDiscriminatorProperty: true,
+  })
+  auth!: NoAuthDto | BearerAuthDto;
 
   @IsBoolean()
   enabled: boolean = true;

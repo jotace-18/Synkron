@@ -33,6 +33,28 @@ describe('CreateConnectionDto', () => {
     expect(dto.enabled).toBe(false);
   });
 
+  it('accepts Bearer authentication and preserves the exact token', async () => {
+    const token = 'AbC09-._~+/==';
+    const dto = plainToInstance(CreateConnectionDto, {
+      ...validInput,
+      auth: { type: 'bearer', token },
+    });
+
+    expect(await validate(dto, validationOptions)).toHaveLength(0);
+    expect(dto.auth.type).toBe('bearer');
+    if (dto.auth.type !== 'bearer') throw new Error('Expected Bearer DTO');
+    expect(dto.auth.token).toBe(token);
+  });
+
+  it('accepts a token at the maximum supported length', async () => {
+    const dto = plainToInstance(CreateConnectionDto, {
+      ...validInput,
+      auth: { type: 'bearer', token: 'a'.repeat(4096) },
+    });
+
+    expect(await validate(dto, validationOptions)).toHaveLength(0);
+  });
+
   it.each([
     { label: 'a blank name', changes: { name: '   ' } },
     { label: 'a long name', changes: { name: 'a'.repeat(101) } },
@@ -44,7 +66,7 @@ describe('CreateConnectionDto', () => {
     },
     { label: 'missing authentication', changes: { auth: undefined } },
     {
-      label: 'unsupported authentication',
+      label: 'Bearer authentication without a token',
       changes: { auth: { type: 'bearer' } },
     },
     {
@@ -57,6 +79,37 @@ describe('CreateConnectionDto', () => {
       label: 'an owner supplied in the body',
       changes: { tenant_id: '11111111-1111-4111-8111-111111111111' },
     },
+    { label: 'unknown authentication', changes: { auth: { type: 'basic' } } },
+    {
+      label: 'an empty token',
+      changes: { auth: { type: 'bearer', token: '' } },
+    },
+    {
+      label: 'a numeric token',
+      changes: { auth: { type: 'bearer', token: 123 } },
+    },
+    {
+      label: 'whitespace in a token',
+      changes: { auth: { type: 'bearer', token: ' token ' } },
+    },
+    {
+      label: 'a line break in a token',
+      changes: { auth: { type: 'bearer', token: 'token\r\nInjected:value' } },
+    },
+    {
+      label: 'an oversized token',
+      changes: { auth: { type: 'bearer', token: 'a'.repeat(4097) } },
+    },
+    {
+      label: 'padding inside a token',
+      changes: { auth: { type: 'bearer', token: 'abc=def' } },
+    },
+    {
+      label: 'additional Bearer fields',
+      changes: { auth: { type: 'bearer', token: 'valid-token', extra: true } },
+    },
+    { label: 'null authentication', changes: { auth: null } },
+    { label: 'an authentication array', changes: { auth: [{ type: 'none' }] } },
   ])('rejects $label', async ({ changes }) => {
     const dto = plainToInstance(CreateConnectionDto, {
       ...validInput,

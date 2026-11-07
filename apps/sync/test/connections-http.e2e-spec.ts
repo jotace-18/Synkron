@@ -7,8 +7,9 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { ConnectionsService } from '../src/connections/connections.service';
 import { DatabaseService } from '../src/database/database.service';
+import { CredentialsService } from '../src/credentials/credentials.service';
 
-describe('Connections listing (HTTP)', () => {
+describe('Connections (HTTP)', () => {
   const cookie = `__Host-synkron_session=${'a'.repeat(64)}`;
   const settings = {
     AUTH_API_INTERNAL_URL: 'http://api:3003',
@@ -276,6 +277,128 @@ describe('Connections listing (HTTP)', () => {
       .expect(200)
       .expect([body]);
   });
+
+  it('creates and lists a Bearer connection without exposing its stored credentials', async () => {
+    const token = 'SENSITIVE_TEST_TOKEN.ABC_123-+/==';
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/connections')
+      .set(
+        'Cookie',
+        [
+          cookie,
+          `__Host-synkron_context=${'c'.repeat(64)}`,
+          '__Host-synkron_csrf=csrf-test',
+        ].join('; '),
+      )
+      .set('Origin', 'https://synkron.test')
+      .set('X-CSRF-Token', 'csrf-test')
+      .send({
+        name: '  Bearer connection  ',
+        base_url: 'https://tasks.example.com',
+        auth: { type: 'bearer', token },
+      })
+      .expect(201)
+      .expect('Cache-Control', 'no-store');
+
+    const body = response.body as { id: string };
+    expect(body).toMatchObject({
+      name: 'Bearer connection',
+      auth_type: 'bearer',
+      has_credentials: true,
+      enabled: true,
+    });
+    expect(body).not.toHaveProperty('auth');
+    expect(body).not.toHaveProperty('token');
+    expect(body).not.toHaveProperty('credentials_encrypted');
+    expect(JSON.stringify(body)).not.toContain(token);
+
+    const stored = await app.get(DatabaseService).query<{
+      tenant_id: string;
+      credentials_encrypted: string;
+    }>(
+      `SELECT tenant_id, credentials_encrypted
+       FROM sync.connections WHERE id = $1`,
+      [body.id],
+    );
+    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows[0].tenant_id).toBe(owner);
+    expect(stored.rows[0].credentials_encrypted).toMatch(/^v1\./);
+    expect(stored.rows[0].credentials_encrypted).not.toContain(token);
+    expect(
+      app
+        .get(CredentialsService)
+        .decrypt(stored.rows[0].credentials_encrypted, owner, body.id),
+    ).toBe(token);
+
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect([body]);
+
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        tenant_id: otherOwner,
+        expires_at: new Date(Date.now() + 60000).toISOString(),
+      }),
+    );
+    await request(app.getHttpServer())
+      .get('/api/v1/connections')
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect([]);
+  });
+
+  it.each([
+    { label: 'missing Bearer token', auth: { type: 'bearer' } },
+    { label: 'empty Bearer token', auth: { type: 'bearer', token: '' } },
+    {
+      label: 'whitespace in a Bearer token',
+      auth: { type: 'bearer', token: 'SENSITIVE_TEST_TOKEN with-space' },
+    },
+    {
+      label: 'a line break in a Bearer token',
+      auth: { type: 'bearer', token: 'SENSITIVE_TEST_TOKEN\r\nInjected:value' },
+    },
+    {
+      label: 'an oversized Bearer token',
+      auth: {
+        type: 'bearer',
+        token: `SENSITIVE_TEST_TOKEN${'a'.repeat(4096)}`,
+      },
+    },
+    {
+      label: 'an unknown authentication type',
+      auth: { type: 'basic', token: 'SENSITIVE_TEST_TOKEN' },
+    },
+    {
+      label: 'credentials on a connection without authentication',
+      auth: { type: 'none', token: 'SENSITIVE_TEST_TOKEN' },
+    },
+  ])(
+    'rejects $label without storing or echoing credentials',
+    async ({ auth }) => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/connections')
+        .set('Cookie', cookie)
+        .set('Origin', 'https://synkron.test')
+        .set('X-CSRF-Token', 'csrf-test')
+        .send({
+          name: 'Invalid connection',
+          base_url: 'https://tasks.example.com',
+          auth,
+        })
+        .expect(422);
+
+      expect(JSON.stringify(response.body)).not.toContain(
+        'SENSITIVE_TEST_TOKEN',
+      );
+      const stored = await app
+        .get(DatabaseService)
+        .query('SELECT id FROM sync.connections WHERE tenant_id = $1', [owner]);
+      expect(stored.rows).toHaveLength(0);
+    },
+  );
 
   it.each([
     {

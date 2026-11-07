@@ -41,6 +41,15 @@ export class ConnectionsController {
     @Req() request: AuthenticatedRequest,
     @Body() body: CreateConnectionDto,
   ): Promise<ConnectionSummary> {
+    if (body.auth.type === 'bearer') {
+      return this.connections.createWithBearer(request.tenantId, {
+        name: body.name,
+        base_url: body.base_url,
+        token: body.auth.token,
+        enabled: body.enabled,
+      });
+    }
+
     return this.connections.createWithoutAuth(request.tenantId, body);
   }
 }
