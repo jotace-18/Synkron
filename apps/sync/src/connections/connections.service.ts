@@ -30,4 +30,25 @@ export class ConnectionsService {
 
     return result.rows;
   }
+
+  async createWithoutAuth(
+    tenantId: string,
+    input: {
+      name: string;
+      base_url: string;
+      enabled?: boolean;
+    },
+  ): Promise<ConnectionSummary> {
+    const result = await this.database.query<ConnectionSummary>(
+      `INSERT INTO sync.connections
+         (tenant_id, name, base_url, auth_type, enabled)
+       VALUES ($1, $2, $3, 'none', $4)
+       RETURNING id, name, base_url, auth_type,
+                 credentials_encrypted IS NOT NULL AS has_credentials,
+                 enabled, created_at, updated_at`,
+      [tenantId, input.name.trim(), input.base_url, input.enabled ?? true],
+    );
+
+    return result.rows[0];
+  }
 }
