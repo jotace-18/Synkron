@@ -6,6 +6,16 @@ import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { DatabaseService } from '../src/database/database.service';
+import type { Assignment } from '../src/assignments/assignment.types';
+
+type AssignmentJson = Omit<
+  Assignment,
+  'due_at' | 'created_at' | 'updated_at'
+> & {
+  due_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 describe('Assignments (HTTP)', () => {
   let app: INestApplication<App>;
@@ -100,6 +110,262 @@ describe('Assignments (HTTP)', () => {
       .get(`${path}/${id}`)
       .set('Authorization', `Bearer ${credential}`);
   }
+
+  function updateAssignment(
+    id: string,
+    body: Record<string, unknown>,
+    credential = token,
+  ) {
+    return request(app.getHttpServer())
+      .patch(`${path}/${id}`)
+      .set('Authorization', `Bearer ${credential}`)
+      .send(body);
+  }
+
+  async function createForUpdate(
+    changes: Record<string, unknown> = {},
+    credential = token,
+  ): Promise<AssignmentJson> {
+    const created = await createAssignment(
+      { ...validInput, status: 'in_progress', grade: 8.75, ...changes },
+      credential,
+    ).expect(201);
+    const { id } = created.body as { id: string };
+    // Old fixed dates make timestamp assertions deterministic without sleeps.
+    await database.query(
+      `UPDATE academic.assignments
+       SET created_at = '2000-01-01T10:00:00Z',
+           updated_at = '2000-01-02T10:00:00Z'
+       WHERE id = $1`,
+      [id],
+    );
+    const details = await assignmentDetails(id, credential).expect(200);
+    return details.body as AssignmentJson;
+  }
+
+  async function assignmentSnapshot(
+    id: string,
+  ): Promise<Record<string, unknown>> {
+    const result = await database.query<{ snapshot: Record<string, unknown> }>(
+      'SELECT to_jsonb(a) AS snapshot FROM academic.assignments AS a WHERE id = $1',
+      [id],
+    );
+    return result.rows[0].snapshot;
+  }
+
+  it('updates status and grade through HTTP while preserving identity and all other details', async () => {
+    const before = await createForUpdate({
+      work_mode: 'group',
+      group_members: ['Ana', 'Luis'],
+      weight_percent: 30,
+      weight_basis: 'section',
+    });
+    const response = await updateAssignment(before.id, {
+      status: 'submitted',
+      grade: 9.25,
+    })
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+    const updated = response.body as AssignmentJson;
+
+    expect(updated).toEqual({
+      ...before,
+      status: 'submitted',
+      grade: 9.25,
+      updated_at: updated.updated_at,
+    });
+    expect(Date.parse(updated.updated_at)).toBeGreaterThan(
+      Date.parse(before.updated_at),
+    );
+    expect(updated).not.toHaveProperty('account_id');
+    expect(updated).not.toHaveProperty('token_hash');
+    await assignmentDetails(before.id).expect(200).expect(updated);
+    await listAssignments().expect(200).expect([updated]);
+  });
+
+  it('updates only the requested status without clearing the existing grade', async () => {
+    const before = await createForUpdate();
+    const response = await updateAssignment(before.id, {
+      status: 'submitted',
+    }).expect(200);
+    const updated = response.body as AssignmentJson;
+
+    expect(updated).toEqual({
+      ...before,
+      status: 'submitted',
+      updated_at: updated.updated_at,
+    });
+    expect(Date.parse(updated.updated_at)).toBeGreaterThan(
+      Date.parse(before.updated_at),
+    );
+    await assignmentDetails(before.id).expect(200).expect(updated);
+  });
+
+  it('updates a grade to zero without resetting the omitted status', async () => {
+    const before = await createForUpdate();
+    const response = await updateAssignment(before.id, { grade: 0 }).expect(
+      200,
+    );
+    const updated = response.body as AssignmentJson;
+
+    expect(updated).toEqual({
+      ...before,
+      grade: 0,
+      updated_at: updated.updated_at,
+    });
+    expect(Date.parse(updated.updated_at)).toBeGreaterThan(
+      Date.parse(before.updated_at),
+    );
+    await assignmentDetails(before.id).expect(200).expect(updated);
+  });
+
+  it('removes a grade with null while preserving the remaining assignment', async () => {
+    const before = await createForUpdate();
+    const response = await updateAssignment(before.id, { grade: null }).expect(
+      200,
+    );
+    const updated = response.body as AssignmentJson;
+
+    expect(updated).toEqual({
+      ...before,
+      grade: null,
+      updated_at: updated.updated_at,
+    });
+    expect(Date.parse(updated.updated_at)).toBeGreaterThan(
+      Date.parse(before.updated_at),
+    );
+    await assignmentDetails(before.id).expect(200).expect(updated);
+  });
+
+  it('preserves updated_at when repeating the same update', async () => {
+    const before = await createForUpdate();
+    const patch = { status: 'submitted', grade: 9.25 };
+    const first = await updateAssignment(before.id, patch).expect(200);
+
+    await updateAssignment(before.id, patch)
+      .expect(200)
+      .expect(first.body as object);
+    await assignmentDetails(before.id)
+      .expect(200)
+      .expect(first.body as object);
+  });
+
+  it('preserves updated_at when removing an already absent grade', async () => {
+    const before = await createForUpdate({ grade: null });
+
+    await updateAssignment(before.id, { grade: null })
+      .expect(200)
+      .expect(before);
+    await assignmentDetails(before.id).expect(200).expect(before);
+  });
+
+  it.each([
+    { label: 'empty update', patch: {} },
+    { label: 'null status', patch: { status: null } },
+    { label: 'unknown status', patch: { status: 'unknown' } },
+    { label: 'negative grade', patch: { grade: -0.01 } },
+    { label: 'grade above ten', patch: { grade: 10.01 } },
+    {
+      label: 'invalid grade alongside a valid status',
+      patch: { status: 'submitted', grade: 7.125 },
+    },
+    { label: 'numeric grade supplied as text', patch: { grade: '8.75' } },
+    {
+      label: 'client-supplied owner',
+      patch: {
+        status: 'submitted',
+        account_id: '11111111-1111-4111-8111-111111111111',
+      },
+    },
+    {
+      label: 'client-supplied ID',
+      patch: {
+        status: 'submitted',
+        id: '11111111-1111-4111-8111-111111111111',
+      },
+    },
+    {
+      label: 'client-supplied creation time',
+      patch: { status: 'submitted', created_at: '2026-11-24T22:59:00Z' },
+    },
+    {
+      label: 'client-supplied modification time',
+      patch: { status: 'submitted', updated_at: '2026-11-24T22:59:00Z' },
+    },
+    {
+      label: 'unsupported title update',
+      patch: { status: 'submitted', title: 'Another title' },
+    },
+  ])(
+    'rejects a PATCH with $label without modifying the stored assignment',
+    async ({ patch }) => {
+      const before = await createForUpdate();
+      const snapshot = await assignmentSnapshot(before.id);
+
+      await updateAssignment(before.id, patch).expect(422);
+      await expect(assignmentSnapshot(before.id)).resolves.toEqual(snapshot);
+    },
+  );
+
+  it('returns the same 404 for updates to foreign or nonexistent assignments and preserves foreign data', async () => {
+    const foreign = await createForUpdate({}, otherToken);
+    const snapshot = await assignmentSnapshot(foreign.id);
+    const denied = await updateAssignment(foreign.id, {
+      status: 'submitted',
+      grade: 0,
+    })
+      .set('X-Account-Id', otherAccountId)
+      .expect(404)
+      .expect({
+        statusCode: 404,
+        message: 'Entrega no encontrada',
+        error: 'Not Found',
+      });
+    const missing = await updateAssignment(randomUUID(), {
+      status: 'submitted',
+    }).expect(404);
+
+    expect(missing.body as unknown).toEqual(denied.body as unknown);
+    await expect(assignmentSnapshot(foreign.id)).resolves.toEqual(snapshot);
+    await assignmentDetails(foreign.id, otherToken).expect(200).expect(foreign);
+  });
+
+  it.each([
+    'not-a-uuid',
+    '11111111-1111-1111-8111-111111111111',
+    '00000000-0000-0000-0000-000000000000',
+  ])('rejects a PATCH with invalid UUID %s', async (id) => {
+    const before = await createForUpdate();
+    const snapshot = await assignmentSnapshot(before.id);
+
+    await updateAssignment(id, { status: 'submitted' }).expect(422);
+    await expect(assignmentSnapshot(before.id)).resolves.toEqual(snapshot);
+  });
+
+  it.each(['missing', 'unknown', 'disabled'])(
+    'rejects a PATCH with a %s credential before body validation or mutation',
+    async (kind) => {
+      const before = await createForUpdate();
+      const snapshot = await assignmentSnapshot(before.id);
+      let credential = token;
+      if (kind === 'unknown') credential = randomBytes(32).toString('hex');
+      if (kind === 'disabled') {
+        await database.query(
+          'UPDATE academic.accounts SET enabled = false WHERE id = $1',
+          [accountId],
+        );
+      }
+      const pending = updateAssignment(before.id, {}, credential);
+      if (kind === 'missing') pending.unset('Authorization');
+
+      await pending.expect(401).expect({
+        statusCode: 401,
+        message: 'Credencial académica no válida',
+        error: 'Unauthorized',
+      });
+      await expect(assignmentSnapshot(before.id)).resolves.toEqual(snapshot);
+    },
+  );
 
   it('returns the full public details of an owned assignment with consistent serialization', async () => {
     const created = await createAssignment({

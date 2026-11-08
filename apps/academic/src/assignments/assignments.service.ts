@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import type { Assignment } from './assignment.types';
 import type { CreateAssignmentDto } from './dto/create-assignment.dto';
+import type { UpdateAssignmentDto } from './dto/update-assignment.dto';
 
 @Injectable()
 export class AssignmentsService {
@@ -82,6 +87,66 @@ export class AssignmentsService {
        FROM academic.assignments
        WHERE account_id = $1 AND id = $2`,
       [accountId, id],
+    );
+
+    const assignment = result.rows[0];
+
+    if (!assignment) {
+      throw new NotFoundException('Entrega no encontrada');
+    }
+
+    return assignment;
+  }
+
+  async update(
+    accountId: string,
+    id: string,
+    input: UpdateAssignmentDto,
+  ): Promise<Assignment> {
+    const updateStatus = input.status !== undefined;
+    const updateGrade = input.grade !== undefined;
+
+    if (!updateStatus && !updateGrade) {
+      throw new UnprocessableEntityException(
+        'Indica estado o nota para actualizar',
+      );
+    }
+
+    const result = await this.database.query<Assignment>(
+      `UPDATE academic.assignments
+       SET
+         status = CASE
+           WHEN $3::boolean THEN $4::text
+           ELSE status
+         END,
+         grade = CASE
+           WHEN $5::boolean THEN $6::numeric
+           ELSE grade
+         END,
+         updated_at = CASE
+           WHEN
+             ($3::boolean AND status IS DISTINCT FROM $4::text)
+             OR ($5::boolean AND grade IS DISTINCT FROM $6::numeric)
+           THEN clock_timestamp()
+           ELSE updated_at
+         END
+       WHERE account_id = $1 AND id = $2
+       RETURNING
+         id, title, course_name, course_abbreviation,
+         section, mandatory, due_date::text, due_at, status,
+         work_mode, group_members,
+         weight_percent::double precision AS weight_percent,
+         weight_basis,
+         grade::double precision AS grade,
+         created_at, updated_at`,
+      [
+        accountId,
+        id,
+        updateStatus,
+        input.status ?? null,
+        updateGrade,
+        input.grade ?? null,
+      ],
     );
 
     const assignment = result.rows[0];

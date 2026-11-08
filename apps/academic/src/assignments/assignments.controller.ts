@@ -10,12 +10,14 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
 } from '@nestjs/common';
 import { BearerGuard, type AuthenticatedRequest } from '../auth/bearer.guard';
 import { AssignmentsService } from './assignments.service';
 import type { Assignment } from './assignment.types';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { ListAssignmentsDto } from './dto/list-assignments.dto';
+import { UpdateAssignmentDto } from './dto/update-assignment.dto';
 
 @Controller('api/v1/assignments')
 @UseGuards(BearerGuard)
@@ -54,5 +56,22 @@ export class AssignmentsController {
     id: string,
   ): Promise<Assignment> {
     return this.assignments.getById(request.accountId, id);
+  }
+
+  @Patch(':id')
+  @Header('Cache-Control', 'no-store')
+  update(
+    @Req() request: AuthenticatedRequest,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        version: '4',
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    id: string,
+    @Body() body: UpdateAssignmentDto,
+  ): Promise<Assignment> {
+    return this.assignments.update(request.accountId, id, body);
   }
 }

@@ -1,4 +1,7 @@
-import { NotFoundException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AssignmentsService } from './assignments.service';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
@@ -74,6 +77,41 @@ describe('AssignmentsService', () => {
 
     await expect(
       service.getById(accountId, '22222222-2222-4222-8222-222222222222'),
+    ).rejects.toBe(error);
+  });
+
+  it('rejects an empty update before querying PostgreSQL', async () => {
+    const pending = service.update(
+      accountId,
+      '22222222-2222-4222-8222-222222222222',
+      {},
+    );
+    await expect(pending).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(pending).rejects.toThrow(
+      'Indica estado o nota para actualizar',
+    );
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing scoped assignment as not found during an update', async () => {
+    query.mockResolvedValue({ rows: [] });
+    const pending = service.update(
+      accountId,
+      '22222222-2222-4222-8222-222222222222',
+      { status: 'submitted' },
+    );
+    await expect(pending).rejects.toBeInstanceOf(NotFoundException);
+    await expect(pending).rejects.toThrow('Entrega no encontrada');
+  });
+
+  it('propagates a database failure instead of reporting an update as completed', async () => {
+    const error = new Error('Database unavailable');
+    query.mockRejectedValue(error);
+
+    await expect(
+      service.update(accountId, '22222222-2222-4222-8222-222222222222', {
+        grade: 8.75,
+      }),
     ).rejects.toBe(error);
   });
 });

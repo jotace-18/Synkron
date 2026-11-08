@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { AssignmentsService } from '../src/assignments/assignments.service';
 import { CreateAssignmentDto } from '../src/assignments/dto/create-assignment.dto';
+import type { UpdateAssignmentDto } from '../src/assignments/dto/update-assignment.dto';
+import { NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../src/database/database.service';
 
 describe('AssignmentsService (integration)', () => {
@@ -62,6 +64,185 @@ describe('AssignmentsService (integration)', () => {
       ...changes,
     });
   }
+
+  async function createExistingAssignment(
+    changes: Record<string, unknown> = {},
+  ) {
+    const created = await assignments.create(accountId, createInput(changes));
+    // Fixed earlier dates make timestamp checks deterministic without sleeps.
+    await database.query(
+      `UPDATE academic.assignments
+       SET created_at = '2000-01-01T10:00:00Z',
+           updated_at = '2000-01-02T10:00:00Z'
+       WHERE account_id = $1 AND id = $2`,
+      [accountId, created.id],
+    );
+    return assignments.getById(accountId, created.id);
+  }
+
+  it('updates status and grade while preserving identity, creation time and other details', async () => {
+    const before = await createExistingAssignment({
+      course_abbreviation: 'CC',
+      work_mode: 'group',
+      group_members: ['Ana', 'Luis'],
+      weight_percent: 30,
+      weight_basis: 'section',
+    });
+    const updated = await assignments.update(accountId, before.id, {
+      status: 'submitted',
+      grade: 8.75,
+    });
+
+    expect(updated).toEqual({
+      ...before,
+      status: 'submitted',
+      grade: 8.75,
+      updated_at: updated.updated_at,
+    });
+    expect(updated.updated_at.getTime()).toBeGreaterThan(
+      before.updated_at.getTime(),
+    );
+    expect(updated).not.toHaveProperty('account_id');
+    await expect(assignments.getById(accountId, before.id)).resolves.toEqual(
+      updated,
+    );
+    const stored = await database.query<{ count: string }>(
+      'SELECT count(*) FROM academic.assignments WHERE account_id = $1',
+      [accountId],
+    );
+    expect(stored.rows[0].count).toBe('1');
+  });
+
+  it('changes only the status and keeps an omitted grade', async () => {
+    const before = await createExistingAssignment({ grade: 8.75 });
+    const updated = await assignments.update(accountId, before.id, {
+      status: 'in_progress',
+    });
+
+    expect(updated).toEqual({
+      ...before,
+      status: 'in_progress',
+      updated_at: updated.updated_at,
+    });
+    expect(updated.updated_at.getTime()).toBeGreaterThan(
+      before.updated_at.getTime(),
+    );
+    await expect(assignments.getById(accountId, before.id)).resolves.toEqual(
+      updated,
+    );
+  });
+
+  it('changes a grade to zero while preserving an omitted status', async () => {
+    const before = await createExistingAssignment({
+      status: 'in_progress',
+      grade: 8.75,
+    });
+    const updated = await assignments.update(accountId, before.id, {
+      grade: 0,
+    });
+
+    expect(updated).toEqual({
+      ...before,
+      grade: 0,
+      updated_at: updated.updated_at,
+    });
+    expect(updated.updated_at.getTime()).toBeGreaterThan(
+      before.updated_at.getTime(),
+    );
+    await expect(assignments.getById(accountId, before.id)).resolves.toEqual(
+      updated,
+    );
+  });
+
+  it('removes an existing grade with null while preserving the status', async () => {
+    const before = await createExistingAssignment({
+      status: 'submitted',
+      grade: 8.75,
+    });
+    const updated = await assignments.update(accountId, before.id, {
+      grade: null,
+    });
+
+    expect(updated).toEqual({
+      ...before,
+      grade: null,
+      updated_at: updated.updated_at,
+    });
+    expect(updated.updated_at.getTime()).toBeGreaterThan(
+      before.updated_at.getTime(),
+    );
+    await expect(assignments.getById(accountId, before.id)).resolves.toEqual(
+      updated,
+    );
+  });
+
+  it.each<{
+    label: string;
+    initial: Record<string, unknown>;
+    patch: UpdateAssignmentDto;
+  }>([
+    {
+      label: 'the same status and grade',
+      initial: { status: 'submitted', grade: 8.75 },
+      patch: { status: 'submitted', grade: 8.75 },
+    },
+    { label: 'an already absent grade', initial: {}, patch: { grade: null } },
+    {
+      label: 'an unchanged zero grade',
+      initial: { grade: 0 },
+      patch: { grade: 0 },
+    },
+  ])(
+    'preserves updated_at when receiving $label',
+    async ({ initial, patch }) => {
+      const before = await createExistingAssignment(initial);
+      await expect(
+        assignments.update(accountId, before.id, patch),
+      ).resolves.toEqual(before);
+      await expect(assignments.getById(accountId, before.id)).resolves.toEqual(
+        before,
+      );
+    },
+  );
+
+  it('returns the same not-found error for a foreign or nonexistent assignment and leaves the foreign data intact', async () => {
+    const before = await assignments.create(
+      otherAccountId,
+      createInput({ grade: 8.75 }),
+    );
+
+    for (const id of [before.id, randomUUID()]) {
+      const pending = assignments.update(accountId, id, {
+        status: 'submitted',
+        grade: 0,
+      });
+      await expect(pending).rejects.toBeInstanceOf(NotFoundException);
+      await expect(pending).rejects.toThrow('Entrega no encontrada');
+    }
+    await expect(
+      assignments.getById(otherAccountId, before.id),
+    ).resolves.toEqual(before);
+  });
+
+  it('preserves both changes when status and grade are updated concurrently', async () => {
+    const before = await createExistingAssignment();
+
+    await Promise.all([
+      assignments.update(accountId, before.id, { status: 'submitted' }),
+      assignments.update(accountId, before.id, { grade: 9.25 }),
+    ]);
+
+    const updated = await assignments.getById(accountId, before.id);
+    expect(updated).toEqual({
+      ...before,
+      status: 'submitted',
+      grade: 9.25,
+      updated_at: updated.updated_at,
+    });
+    expect(updated.updated_at.getTime()).toBeGreaterThan(
+      before.updated_at.getTime(),
+    );
+  });
 
   it('persists a minimal assignment for its account and returns its public fields', async () => {
     const result = await assignments.create(accountId, createInput());
