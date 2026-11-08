@@ -1,20 +1,45 @@
 # Synkron
 
-Synkron nace de la necesidad de mantener conectadas las herramientas que usamos a diario. Busca reunir su actividad, sincronizar información y automatizar acciones para reducir el trabajo de revisar y actualizar cada aplicación por separado.
+Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
-Es un proyecto en desarrollo. Las funciones descritas recogen el diseño previsto.
+Es un proyecto en desarrollo. La autenticación y la gestión básica de conexiones ya funcionan; el motor, las fuentes editables y el calendario descritos a continuación siguen pendientes de implementación.
 
 ## Qué permitirá hacer
 
-- Conectar servicios y elegir qué información compartir entre ellos.
-- Adaptar los datos cuando dos aplicaciones los guardan de forma distinta.
+- Conectar fuentes académicas, deportivas y de planes sociales y elegir qué actividades incorporar.
+- Adaptar sus campos y fechas a una representación común, conservando la procedencia y los detalles relevantes.
+- Consultar juntas las actividades sincronizadas en una agenda o calendario propio.
 - Detectar cambios durante las sincronizaciones y crear reglas para responder a ellos.
 - Recibir avisos y consultar qué ha cambiado, qué se ha completado y qué necesita atención.
 - Revisar el historial y el resultado de las operaciones desde un panel web.
 
-El uso personal es el punto de partida. Cada cuenta tendrá sus propias conexiones, reglas e historial, por lo que otras personas podrán utilizar la plataforma con sus herramientas y necesidades.
+Cada cuenta tendrá sus propias conexiones, actividades, reglas e historial. El motor será reutilizable con los servicios del proyecto personal o con otras fuentes compatibles; el calendario es una vista de esos datos y no condiciona los formatos de entrada.
 
-La primera versión se centrará en sincronizaciones iniciadas por el usuario y reglas que respondan a sus resultados y a los cambios detectados. La ejecución programada se añadirá después. Las conexiones se configurarán mediante las API que ofrezcan los servicios, sin depender de una aplicación concreta.
+La primera versión se centrará en sincronizaciones iniciadas por el usuario y reglas que respondan a sus resultados y a los cambios detectados. Sync consultará las fuentes y guardará las actividades en su propia base de datos. Cambiar un registro en el origen actualizará la actividad existente al volver a sincronizar. La ejecución programada se añadirá después.
+
+## Fuentes y vista centralizada
+
+Las tres fuentes de demostración son servicios independientes del motor:
+
+| Fuente | Información que aporta |
+|---|---|
+| Académico | Entregas, exámenes, sesiones de estudio o trabajo y eventos generales. |
+| Deporte | Gimnasio, fútbol, senderismo, carrera y otras actividades sencillas. |
+| Planes sociales | Quedadas con fecha, hora, ubicación y participantes opcionales. |
+
+Cada fuente permitirá introducir y actualizar datos propios, con persistencia. Una nota publicada después de un examen, un cambio de horario o una corrección de una sesión serán actualizaciones del registro original. Los campos y decisiones pendientes se recogen en [Servicios de origen](docs/servicios-origen.md).
+
+```mermaid
+flowchart LR
+    AC[Servicio académico] --> S[Sync]
+    DE[Servicio de deporte] --> S
+    PL[Servicio de planes sociales] --> S
+    S --> C[Actividades centralizadas]
+    C --> API[API de Synkron]
+    API --> F[Agenda / calendario]
+```
+
+Las actividades se crean y modifican en sus fuentes. Para la demostración habrá formularios sencillos de entrada; sus llamadas pasarán por un backend autorizado, sin entregar credenciales al navegador. La vista centralizada será de consulta. Synkron conserva la última información sincronizada, por lo que abrir el calendario no requiere volver a contactar con todas las fuentes.
 
 ## Cómo se organiza
 
@@ -22,7 +47,7 @@ Synkron se divide en tres servicios:
 
 | Servicio | Qué hace |
 |---|---|
-| **Sync** | Conecta las aplicaciones, adapta su información y ejecuta las sincronizaciones. |
+| **Sync** | Consulta las fuentes, adapta sus datos y mantiene las actividades centralizadas y las ejecuciones. |
 | **Automation** | Comprueba las reglas del usuario y pone en marcha las acciones que correspondan. |
 | **Monitoring** | Reúne los cambios, avisos y resultados para poder consultarlos. |
 
@@ -41,7 +66,7 @@ flowchart TB
     S <-->|AMQP: tareas y eventos| Q[(RabbitMQ)]
     A <-->|AMQP: eventos y acciones| Q
     Q -->|AMQP: cambios y resultados| M
-    S <-->|HTTPS / JSON| X["Servicios conectados"]
+    S -->|HTTP o HTTPS / JSON| X["Académico / deporte / planes"]
     S -->|SQL| DS[(PostgreSQL Sync)]
     A -->|SQL| DA[(PostgreSQL Automation)]
     M -->|SQL| DM[(PostgreSQL Monitoring)]
@@ -67,18 +92,21 @@ sequenceDiagram
     S-->>U: Confirmar que queda pendiente
     S->>Q: Añadir tarea
     Q->>S: Ejecutar tarea pendiente
-    S->>X: Leer, adaptar y enviar información
-    X-->>S: Resultado
-    S->>S: Guardar resultado y cambios detectados
+    S->>X: Consultar registros autorizados
+    X-->>S: Datos de la fuente
+    S->>S: Adaptar y guardar actividades nuevas o modificadas
+    S->>S: Guardar resultado y cambios pendientes de comunicar
     S->>Q: Comunicar cambios y resultado
     Q->>A: Comprobar reglas
     A->>Q: Solicitar acciones
     Q->>M: Actualizar actividad y avisos
+    U->>S: Consultar actividades centralizadas mediante la API
+    S-->>U: Datos para la agenda y el calendario
     U->>M: Consultar actividad
     M-->>U: Mostrar la información disponible
 ```
 
-La información del panel puede tardar un poco en actualizarse. Si una operación falla, se conserva el resultado para poder revisarlo. Repetir un envío sin crear duplicados también depende de lo que permita la aplicación de destino.
+Las actividades reflejan la última sincronización; el historial y los avisos pueden tardar un poco más en actualizarse al procesarse sus eventos. Si una operación falla, se conserva el resultado para revisarlo. Repetir una importación no debe duplicar las actividades ni sus avisos.
 
 ## Uso de la nube
 
@@ -121,19 +149,31 @@ Las rutas parten de `/api/v1`. Los datos se intercambian en JSON y el acceso se 
 | `GET`, `POST` | `/sync-definitions` | Consultar o definir sincronizaciones. |
 | `POST` | `/sync-definitions/{id}/runs` | Iniciar una sincronización. |
 | `GET` | `/sync-runs/{id}` | Consultar su estado y resultado. |
+| `GET` | `/activities` | Consultar actividades centralizadas; contrato pendiente de implementar. |
+| `GET` | `/activities/{id}` | Consultar el detalle y procedencia de una actividad; previsto. |
 | `GET`, `POST` | `/automations` | Consultar o crear reglas. |
 | `GET` | `/activity` | Consultar cambios y operaciones. |
 | `GET` | `/notifications` | Consultar avisos. |
 | `GET` | `/usage` | Consultar el uso de la plataforma. |
 
-Al crear una conexión se indican nombre, dirección y forma de acceso. Una sincronización relaciona origen, destino y campos que deben adaptarse. Una regla establece qué evento la activa, qué condiciones debe cumplir y qué acciones realizará.
+Al crear una conexión se indican nombre, dirección y forma de acceso. Una sincronización define la fuente y la correspondencia de campos con las actividades centralizadas. El destino inicial es interno a Sync y no requiere una segunda conexión externa. Una regla establece qué evento la activa, qué condiciones debe cumplir y qué acciones realizará. El [contrato API](docs/api.md) distingue las rutas disponibles de las previstas; `/activities` representa las actividades personales y `/activity` el historial de Monitoring.
+
+## Estado y cierre de implementación
+
+Actualmente hay API de cuentas y sesiones, Sync con creación y listado paginado de conexiones sin autenticación o Bearer cifrado, prueba de conexión limitada a destinos autorizados, sus PostgreSQL independientes y una API ficticia estática de tareas. Las imágenes, la persistencia de las bases actuales y las comprobaciones de CI están preparadas para esos componentes.
+
+Quedan por implementar las tres fuentes editables, las actividades centralizadas, el motor y sus ejecuciones, RabbitMQ, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API ficticia actual es un punto de partida y no constituye el servicio académico terminado.
+
+El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 
 ## Trabajo en el repositorio
 
-`main` mantiene la versión estable del proyecto. Cada cambio se prepara en una rama aparte y se incorpora mediante una pull request, donde se revisa qué se ha modificado y cómo se ha comprobado.
+`develop` es la rama de trabajo y `main` mantiene la versión estable. Los cambios se comprueban en CI y las incorporaciones a `main` se revisan mediante pull request.
 
 Los mensajes de commit llevan un prefijo que indica el tipo de cambio: `feat:` para nuevas funciones, `fix:` para correcciones, `docs:` para documentación y `refactor:` para reorganizar código sin cambiar su funcionamiento.
 
 ## Documentación
 
 Los [casos de uso](docs/casos-de-uso.md) y los [requisitos](docs/requisitos.md) describen las funciones previstas. La [arquitectura](docs/arquitectura.md), las [decisiones de diseño](docs/decisiones.md) y la [API](docs/api.md) recogen el detalle de funcionamiento.
+
+Los [servicios de origen](docs/servicios-origen.md) describen las entradas acordadas y los aspectos por concretar. El [backlog](docs/backlog.md) recoge los trabajos necesarios para completar la aplicación.

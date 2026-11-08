@@ -4,7 +4,7 @@ El diseño de Synkron busca que las sincronizaciones, las reglas y el seguimient
 
 ## ADR-001. Separación de responsabilidades
 
-Sync se ocupa de conectar servicios y sincronizar información. Automation comprueba las reglas y solicita acciones. Monitoring reúne los cambios, resultados y avisos.
+Sync conecta las fuentes y mantiene las actividades centralizadas y las ejecuciones. Automation comprueba las reglas y solicita acciones. Monitoring reúne el historial de cambios, resultados y avisos. El calendario consulta las actividades de Sync mediante la entrada API.
 
 Esta separación permite modificar una parte sin concentrar toda la lógica en la misma aplicación. También permite dedicar más recursos a las sincronizaciones cuando aumenta el trabajo. El panel utiliza una entrada API común para acceder a las funciones de cada servicio.
 
@@ -28,7 +28,9 @@ Cada backend solo accede a su propia base de datos. Los servicios intercambian i
 
 Las solicitudes y los mensajes tienen identificadores que permiten reconocer lo que ya se ha procesado. La comparación con revisiones anteriores ayuda a distinguir los datos nuevos de los que no han cambiado.
 
-Al enviar información a otra aplicación también se depende de sus capacidades. Si pudo guardar un dato pero no respondió, el envío solo se repite automáticamente cuando pueda hacerse sin duplicarlo. En otro caso, se conserva el resultado incierto para revisión.
+El destino inicial es la base de Sync. La identidad de una actividad conserva propietario, conexión, colección o tipo de recurso e identificador externo. Las transacciones y las restricciones que se definan impedirán que repetir una importación cree otra actividad. La actividad y su evento pendiente de cambio se guardan juntos.
+
+Si en una ampliación se envía información a otra aplicación, también se dependerá de sus capacidades. Si pudo guardar un dato pero no respondió, el envío solo podrá repetirse cuando se reconozca la operación. Ese caso no forma parte del primer destino interno.
 
 El historial permite seguir estas situaciones y conocer qué parte de una operación llegó a completarse.
 
@@ -54,4 +56,48 @@ Los servicios utilizan NestJS con TypeScript. Su organización en módulos permi
 
 El panel utiliza React con TypeScript y Vite. React permite organizar las pantallas en componentes y TypeScript ayuda a comprobar los datos que manejan tanto el panel como los servicios. Vite prepara el entorno de desarrollo y genera los archivos del panel para su publicación.
 
-Synkron dispone de su propio panel y API para gestionar conexiones, sincronizaciones, reglas y actividad. Las aplicaciones conectadas intercambian información con Synkron mediante sus API, sin compartir sus bases de datos ni formar parte de su despliegue.
+Synkron dispone de panel y API para gestionar conexiones, sincronizaciones, reglas, historial y una vista centralizada de actividades. Las fuentes intercambian datos por sus API, con persistencia independiente. En la demostración local sus implementaciones de ejemplo se incluirán en Compose para poder reproducir el recorrido completo.
+
+## ADR-007. Centralización de actividades de varias fuentes
+
+La demostración se organiza en tres servicios de origen: académico, deporte y planes sociales. Cada uno conserva su modelo y permite introducir y actualizar datos. Sync los consulta, transforma los campos seleccionados y mantiene actividades consultables en su propia base. El destino inicial no requiere otra aplicación ni una conexión externa adicional.
+
+El frontend ofrece una agenda o calendario de consulta sobre esa colección. Los formularios de entrada alimentan los servicios de origen. Las correcciones se hacen en la fuente y se reflejan al sincronizar; no se incluye escritura de vuelta desde el calendario en el alcance inicial.
+
+Esta organización conserva el motor como módulo reutilizable de integración. Los detalles de un examen o entrenamiento pertenecen a su servicio; el motor adapta contratos y reconoce actualizaciones. La publicación de una nota no crea otro examen, y un cambio de fecha no duplica un plan.
+
+Se mantienen separados los contratos de entrada, la representación común y la presentación. Los campos confirmados y las decisiones todavía abiertas figuran en [Servicios de origen](servicios-origen.md). Los colores y la abreviatura de una asignatura no se guardan como sustitutos de los datos semánticos.
+
+Hevy se contempla para el proyecto personal futuro; la integración con su API no se implementa ahora. Strava se ha utilizado como referencia del tipo de datos de carrera, sin acordar un conector actual. La planificación automática de entrenamientos tampoco se deduce de que una actividad sea frecuente.
+
+## ADR-008. Cierre funcional del Hito 2
+
+El objetivo de cierre es tener implementado el alcance inicial acordado: fuentes editables, Sync, Automation, Monitoring, autenticación, frontend y su integración. El trabajo se verificará por incrementos, pero una primera sincronización visible es un checkpoint intermedio.
+
+Además de la funcionalidad se completarán persistencia, migraciones, seguridad, pruebas, imágenes, orquestación local, CI y publicación en GHCR. Las ampliaciones expresamente posteriores u opcionales siguen separadas. El trabajo de infraestructura y despliegue vendrá después; no se añade CD al flujo actual.
+
+## ADR-009. Modelo híbrido de actividades
+
+Sync almacenará una parte común de cada actividad en columnas de PostgreSQL y
+los detalles específicos en un campo `details` JSONB, validado según el tipo.
+Identidad, propietario, procedencia, título e información temporal permitirán
+consultas conjuntas; las notas académicas, el entrenamiento o los participantes
+se conservarán sin convertirlos en campos obligatorios para todos los tipos.
+
+Este modelo permite consultar la agenda de varias fuentes y ampliar detalles de
+un tipo sin cambiar el significado de los demás. JSONB no implica admitir campos
+arbitrarios ni guardar la respuesta completa de origen. El backend seleccionará
+y validará lo permitido para cada tipo, manteniendo secretos fuera de actividades
+y eventos.
+
+Una restricción de identidad y la comparación del contenido deben distinguir
+creación, actualización y ausencia de cambios. La huella incluirá los datos
+normalizados relevantes; no considerará un cambio de contenido la mera fecha de
+la última sincronización. Actividad y evento pendiente se guardarán juntos.
+
+Se mantendrán diferenciadas las fechas sin hora, los instantes y los intervalos,
+y el significado de vencimiento frente a comienzo. Los valores de estado no se
+reducen automáticamente a un booleano común para todos los tipos. Las columnas,
+restricciones temporales, relaciones y esquemas de `details` se cerrarán antes
+de implementar las migraciones. Esta decisión es de diseño y aún no está aplicada
+en el código.

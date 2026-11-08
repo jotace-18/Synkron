@@ -11,10 +11,10 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 | RF-01 | Crear una cuenta con correo y contraseña, iniciar sesión y cerrarla invalidándola en el servidor. | Inicial |
 | RF-02 | Añadir, consultar, modificar y desactivar conexiones propias. | Inicial |
 | RF-03 | Probar una conexión sin mostrar credenciales ni acceder a direcciones prohibidas. | Inicial |
-| RF-04 | Elegir origen, destino y relación entre campos de una sincronización. | Inicial |
+| RF-04 | Elegir fuente, recursos y correspondencia de campos para incorporar actividades a la colección central de Sync. | Inicial |
 | RF-05 | Ejecutar sincronizaciones manuales en segundo plano. | Inicial |
 | RF-06 | Adaptar nombres de campos, rutas y tipos básicos de datos. | Inicial |
-| RF-07 | Reconocer datos ya procesados y evitar duplicados según lo que permita el destino. | Inicial |
+| RF-07 | Reconocer datos ya procesados y actualizar la actividad central existente sin duplicarla al repetir solicitudes o mensajes. | Inicial |
 | RF-08 | Guardar estado, duración, cantidades procesadas y errores. | Inicial |
 | RF-09 | Comunicar resultados y cambios mediante eventos con una versión de formato. | Inicial |
 | RF-10 | Crear, modificar, activar y desactivar reglas. | Inicial |
@@ -29,6 +29,16 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 | RF-19 | Enviar peticiones a través de conexiones autorizadas. | Después |
 | RF-20 | Cancelar o reintentar manualmente cuando el estado lo permita. | Opcional |
 | RF-21 | Detectar datos nuevos o modificados y comunicar `data.changed` después de confirmar su escritura. | Inicial |
+| RF-22 | Consultar juntas las actividades propias de distintas fuentes en una agenda o calendario, con filtros y detalle de procedencia. | Inicial |
+| RF-23 | Disponer de fuentes académica, deportiva y de planes sociales editables y persistentes para demostrar el recorrido completo. | Inicial |
+| RF-24 | Conservar los detalles necesarios de cada tipo y las relaciones de origen al normalizar actividades, incluidas actualizaciones posteriores de notas. | Inicial |
+| RF-25 | Sincronizar hacia destinos externos además de la colección central. | Después |
+
+El destino inicial es interno a Sync. No se requiere una segunda conexión externa
+para importar actividades. Los tipos y campos de las tres fuentes se describen en
+[Servicios de origen](servicios-origen.md); las decisiones marcadas como pendientes
+se cerrarán antes de implementar sus validaciones. Este alcance está definido
+funcionalmente, pero todavía no está implementado.
 
 ## Información
 
@@ -36,7 +46,7 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 |---|---|
 | RI-01 | Identificador, propietario, fechas y estado de cada recurso. |
 | RI-02 | Nombre, dirección, tipo de acceso, estado y última prueba de una conexión. Nunca su secreto completo. |
-| RI-03 | Origen, destino, campos, control de duplicados, límites y programación de una sincronización. |
+| RI-03 | Fuente, colección o tipo de recurso, correspondencias con actividades centrales, control de duplicados, límites y programación cuando se añada. |
 | RI-04 | Estado, fechas, duración, intento, cantidades, referencia de seguimiento y error de una ejecución. |
 | RI-05 | Evento de origen, condiciones, acciones ordenadas y resultado de una regla. |
 | RI-06 | Actividad por usuario, tipo, estado y periodo. |
@@ -48,8 +58,14 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 | RI-12 | Instantes guardados en UTC y mostrados en la zona horaria del usuario. |
 | RI-13 | Referencia del registro modificado, tipo de cambio, campos afectados, fecha y ejecución de origen. |
 | RI-14 | Identificador y correo de la cuenta, y fechas de creación, última actividad y caducidad de la sesión. Sin contraseñas ni identificadores secretos de sesión. |
+| RI-15 | Actividad central: propietario, identidad, fuente y recurso externo, título, información temporal, tipo, estado cuando corresponda, detalles autorizados y última sincronización. |
+| RI-16 | Datos académicos, deportivos y sociales definidos en los contratos de origen, sin reducirlos a las etiquetas que muestra el calendario. |
 
-El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y uso. Cada vista mostrará solo los datos de la cuenta.
+El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, historial,
+avisos, uso y una vista conjunta de actividades personales. La colección de
+actividades de Sync es distinta del historial operativo de Monitoring. Cada vista
+mostrará solo los datos de la cuenta. Los formularios de demostración introducirán
+y actualizarán datos en las fuentes; la agenda central inicial será de consulta.
 
 ## Comunicación
 
@@ -88,6 +104,9 @@ El panel reunirá conexiones, sincronizaciones, ejecuciones, reglas, actividad y
 | RD-13 | Permitir el borrado o anonimización conforme al RGPD. | Después |
 | RD-14 | Conservar referencias y huellas del contenido para reconocer cambios entre revisiones. | Inicial |
 | RD-15 | Guardar cuentas y sesiones en tablas propias del componente de acceso; exigir correos únicos y registrar caducidad e invalidación de las sesiones. | Inicial |
+| RD-16 | Guardar las actividades centrales en Sync y reconocer la procedencia por propietario, conexión, colección/tipo e ID externo, sin confundir recursos de distintas fuentes. | Inicial |
+| RD-17 | Guardar juntos la actividad nueva o modificada y el evento pendiente que comunica el cambio. | Inicial |
+| RD-18 | Distinguir valores desconocidos de cero; las notas opcionales admiten como máximo dos decimales y pueden actualizarse sobre el recurso existente. | Inicial |
 
 ## Seguridad y funcionamiento
 
@@ -119,9 +138,19 @@ La cuenta se obtiene del acceso verificado, no de un campo que se pueda cambiar 
 
 La sesión se renueva con un identificador nuevo al iniciar sesión. Su caducidad inicial es de 30 minutos sin actividad y un máximo de 12 horas desde su creación, comprobados en el servidor. Cerrar sesión invalida el acceso para nuevas peticiones, pero no cancela tareas ya aceptadas. Si el componente de acceso no puede verificar la sesión, se rechaza la petición.
 
-Una misma solicitud con la misma clave identifica la ejecución existente; si cambia su contenido, se rechaza por conflicto. El control de duplicados abarca distintas ejecuciones de la misma sincronización y destino.
+Una misma solicitud con la misma clave identifica la ejecución existente; si cambia su contenido, se rechaza por conflicto. El control de duplicados abarca las solicitudes, los mensajes y las actividades importadas en ejecuciones sucesivas. Una actividad conserva su identidad aunque cambie su fecha, título o nota.
 
-Los cambios se detectan en cada revisión. Al principio serán manuales; la programación se añadirá después. No se incluyen borrados ni conectores propios de aplicaciones concretas.
+Los cambios se detectan en cada revisión. Al principio serán manuales; la programación se añadirá después. La colección central es el destino inicial y conserva la última información sincronizada. No se incluyen propagación de borrados, edición de vuelta desde el calendario ni conectores reales de Hevy o Strava en este alcance.
 
-El historial distingue entre pedir una acción y completarla. Si no se sabe si un destino guardó un dato, solo se repite cuando sea seguro. Alojar en la UE no sustituye los controles de acceso, conservación y borrado.
+El historial distingue entre pedir una acción y completarla. En el destino interno se utilizan transacciones y restricciones para reconocer lo ya guardado. Si se incorpora escritura a destinos externos, se deberá tratar también el resultado incierto de los envíos. Alojar en la UE no sustituye los controles de acceso, conservación y borrado.
+
+## Cierre del Hito 2
+
+La entrega debe completar la implementación funcional inicial: tres fuentes
+editables, actividades centralizadas, Sync, Automation, Monitoring, cuentas y
+sesiones, frontend y comunicación entre componentes. También requiere pruebas,
+persistencia, migraciones, imágenes, Compose reproducible y CI con publicación
+en GHCR. Los checkpoints parciales no cierran el hito. Las funciones posteriores
+u opcionales conservan su prioridad y la infraestructura y el despliegue se
+trabajan después. En este hito se mantiene solo CI, sin CD.
 

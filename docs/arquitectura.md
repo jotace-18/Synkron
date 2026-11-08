@@ -6,7 +6,7 @@ Los diagramas generales están en el [README](../README.md). Este documento expl
 
 | Servicio | Trabajo y datos propios |
 |---|---|
-| Sync | Conexiones, sincronizaciones, comparación de datos y resultados. |
+| Sync | Conexiones, importaciones, actividades centralizadas, comparación de datos y resultados. |
 | Automation | Reglas, condiciones, acciones y su seguimiento. |
 | Monitoring | Cambios, historial, avisos y estadísticas. |
 | Acceso y cuentas | Registro, comprobación de contraseñas y sesiones propias, incluido en la entrada API de NestJS. |
@@ -28,18 +28,35 @@ Esta separación permite gestionar cada base por separado, aunque el host y otro
 
 Cada cuenta tendrá sus propios recursos. El campo interno `tenant_id` identifica a su propietario.
 
+## Fuentes y actividades centralizadas
+
+Académico, deporte y planes sociales son tres servicios de origen, descritos en [Servicios de origen](servicios-origen.md). Pueden ser módulos del proyecto personal o servicios independientes. Son distintos de los tres componentes internos Sync, Automation y Monitoring. Las fuentes de demostración se levantarán junto al sistema con persistencia propia; Synkron solo utilizará sus API y nunca consultará sus bases directamente.
+
+El destino inicial de las sincronizaciones es una colección interna de actividades, almacenada en PostgreSQL de Sync. El frontend consulta esa colección a través de la API general, con el propietario comprobado. Monitoring conserva el historial y los avisos; no es el almacén principal de los compromisos académicos, entrenamientos o planes.
+
+Cada actividad debe conservar título, información temporal, tipo, estado cuando corresponda y los detalles específicos necesarios, además de propietario, fuente, identidad externa y referencia de sincronización. Se utilizará un modelo híbrido: columnas comunes para identidad, permisos, fechas y consultas conjuntas, y un campo `details` de tipo JSONB con validación según el tipo de actividad. Solo se conservarán los detalles autorizados necesarios, no la respuesta completa de cada fuente. Los nombres exactos, restricciones y esquema físico se cerrarán antes de la migración, según [ADR-009](decisiones.md#adr-009-modelo-híbrido-de-actividades).
+
+La identidad del registro debe distinguir propietario, conexión de origen, colección o tipo de recurso e identificador externo. Un examen y una entrega con el mismo ID externo no se confunden, ni dos actividades de fuentes diferentes. La representación central puede ser actualizada por nuevas sincronizaciones del mismo registro sin crear otra actividad. La resolución de varias configuraciones que importen el mismo recurso se cerrará antes de implementar sus restricciones de persistencia.
+
+La fuente conserva la responsabilidad del dato. Una nota posterior actualiza el examen o entrega existente; un cambio de horario actualiza la misma actividad. Una sesión de estudio relacionada con una entrega es otro recurso con su propio horario: completarla no entrega la práctica. La sincronización debe conservar esa relación y sus referencias de origen sin utilizar claves foráneas entre bases.
+
+Los instantes con hora se normalizan a UTC y se muestran en la zona del usuario. Una fecha sin hora mantiene su significado de día, sin inventar una hora límite. Las reglas exactas para fechas, duración y zonas se concretarán en el contrato común antes de implementar el calendario.
+
+El calendario será una vista de consulta sobre la última información importada. Los formularios de demostración crean y modifican datos en los servicios de origen, mediante acceso autorizado; no escriben directamente en la colección central ni exponen sus credenciales al navegador. El motor no depende de los colores, etiquetas o composición visual del calendario.
+
 ```mermaid
 erDiagram
     CONNECTION ||--o{ SYNC_DEFINITION : source
-    CONNECTION ||--o{ SYNC_DEFINITION : target
     SYNC_DEFINITION ||--o{ FIELD_MAPPING : contains
     SYNC_DEFINITION ||--o{ SYNC_RUN : creates
     SYNC_DEFINITION ||--o{ RECORD_FINGERPRINT : tracks
+    CONNECTION ||--o{ CENTRAL_ACTIVITY : supplies
+    CENTRAL_ACTIVITY ||--o{ RECORD_FINGERPRINT : compares
     SYNC_RUN ||--o{ RUN_ATTEMPT : attempts
     SYNC_RUN ||--o{ OUTBOX_EVENT : emits
 ```
 
-Este modelo corresponde a Sync. Guarda las conexiones, la relación entre campos, las ejecuciones y una referencia del contenido ya procesado. Esa referencia permite distinguir datos nuevos, modificados y sin cambios entre revisiones.
+Este modelo conceptual corresponde a Sync. Guarda conexiones de origen, correspondencias de campos, ejecuciones, actividades centralizadas y referencias del contenido procesado. Estas permiten distinguir registros nuevos, modificados y sin cambios. El diagrama no representa todavía tablas o migraciones implementadas para las actividades.
 
 ## Sincronización y mensajes
 
@@ -47,7 +64,7 @@ Sync guarda la solicitud antes de aceptarla y deja pendiente el mensaje que perm
 
 RabbitMQ reparte las tareas entre los procesos de Sync. Automation y Monitoring reciben por separado los eventos que les interesan. Cada servicio registra los mensajes procesados para no repetir sus efectos. Si debe pedir otra acción, guarda también esa petición antes de dar el mensaje por terminado.
 
-Al confirmar un dato nuevo o modificado en el destino, Sync comunica `data.changed`. Incluye la referencia del registro y los campos afectados, sin copiar todo el contenido personal. Los eventos `sync.completed` y `sync.failed` indican el resultado de la sincronización.
+Sync adapta los registros de origen y guarda las actividades nuevas o modificadas en su propia base. La actualización de una actividad y el evento pendiente que la comunica se guardan en la misma transacción. Solo después de confirmar esa escritura se publica `data.changed`, con referencias de procedencia y campos afectados, sin copiar el contenido personal completo. Los eventos `sync.completed` y `sync.failed` indican el resultado de la sincronización.
 
 Automation comprueba las reglas del usuario. La acción `notify` pide a Monitoring que guarde un aviso; `start_sync` pide a Sync otra sincronización de la misma cuenta. Las acciones conservan su origen y tienen un límite de encadenamiento para evitar bucles.
 
@@ -72,9 +89,17 @@ stateDiagram-v2
 
 Los estados básicos son pendiente (`queued`), en curso (`running`), completada (`completed`) y fallida (`failed`). La espera de reintento (`retry_wait`) se añadirá con esa función.
 
-Si una aplicación guarda un dato pero se pierde su respuesta, repetir el envío podría duplicarlo. Solo se repetirá automáticamente si el destino permite reconocer la operación o actualizar el mismo registro. En otro caso se guarda el error `external_outcome_unknown` para revisión.
+En el flujo inicial el destino es PostgreSQL de Sync: una restricción de identidad y las transacciones permitirán reconocer las actividades ya guardadas tras una interrupción. Una lectura incompleta del origen no equivale a una confirmación de escritura de nuevas actividades.
+
+Enviar datos a destinos externos queda como ampliación. Si se incorpora, deberá contemplar el caso en que el destino guarda un dato pero se pierde su respuesta. Solo será seguro repetir el envío cuando el destino reconozca la operación; el estado `external_outcome_unknown` se reserva para esa ampliación.
 
 Una sincronización incompleta puede haber cambiado parte de los datos. No se presupone que todos esos cambios puedan deshacerse. Los reintentos tendrán límite y esperas entre intentos; los mensajes que sigan fallando se apartarán para revisar su causa.
+
+## Estado de implementación y entrega
+
+El código actual cubre cuentas y sesiones, conexiones, cifrado y prueba acotada de destinos autorizados. Existe una fuente ficticia estática de tareas. Los componentes de centralización, fuentes editables, mensajería, reglas, historial y calendario descritos aquí son el diseño pendiente.
+
+El Hito 2 se cerrará con el alcance funcional inicial completo, no solo con la base de contenedores o una demostración parcial. El entorno deberá iniciar sus backends, bases, fuentes, RabbitMQ y frontend de forma reproducible; CI validará y publicará las imágenes en GHCR. Terraform y despliegue se trabajan después.
 
 ## Acceso y funcionamiento
 

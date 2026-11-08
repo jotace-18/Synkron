@@ -4,6 +4,19 @@ El panel se comunicará con Synkron mediante esta API. Las rutas empiezan por `/
 
 Los identificadores y direcciones de este documento son ficticios.
 
+## Estado del contrato
+
+Están disponibles las rutas de autenticación de la API y la creación, listado
+paginado y prueba de conexiones en Sync. En local se accede a API por el puerto
+3002 y a Sync por el 3001. El encaminamiento de todas las rutas bajo una entrada
+pública común, las actividades, sincronizaciones, reglas, historial y calendario
+siguen pendientes. Las operaciones nuevas de este documento son diseño previsto,
+no endpoints ya implementados.
+
+El destino inicial de una sincronización es la colección de actividades de Sync.
+Las tres fuentes se describen en [Servicios de origen](servicios-origen.md). Sus
+contratos de entrada son distintos de la representación común y de la vista.
+
 ## Operaciones
 
 | Método | Ruta sin prefijo | Resultado previsto |
@@ -20,6 +33,8 @@ Los identificadores y direcciones de este documento son ficticios.
 | GET / PATCH | `/sync-definitions/{id}` | `200` detalle o cambio. |
 | POST | `/sync-definitions/{id}/runs` | `202`, ejecución pendiente y `Location`. |
 | GET | `/sync-runs/{id}` | `200`, estado guardado por Sync. |
+| GET | `/activities` | `200`, actividades personales centralizadas; previsto. |
+| GET | `/activities/{id}` | `200`, detalle, datos específicos y procedencia; previsto. |
 | GET / POST | `/automations` | `200` listado / `201` regla. |
 | GET / PATCH | `/automations/{id}` | `200` detalle o cambio. |
 | GET | `/automation-runs/{id}` | `200`, detalle de regla y acciones. |
@@ -27,7 +42,7 @@ Los identificadores y direcciones de este documento son ficticios.
 | GET | `/usage` | `200`, agregados por periodo. |
 | GET | `/notifications` | `200`, notificaciones del usuario. |
 
-`Location` indica la dirección donde consultar el recurso creado. Los listados tendrán páginas; la actividad se podrá filtrar por tipo, estado y fechas con `type`, `status`, `from` y `to`. Las fechas y horas se guardarán en UTC.
+`Location` indica la dirección donde consultar el recurso creado. Los listados tendrán páginas; el historial se podrá filtrar por tipo, estado y fechas con `type`, `status`, `from` y `to`. Los instantes con hora se guardarán en UTC y se mostrarán en la zona del usuario; una fecha sin hora conservará su significado de día, sin inventar una hora.
 
 Cada servicio tendrá además `/healthz` para comprobar su funcionamiento.
 
@@ -69,7 +84,14 @@ Los intentos de inicio de sesión se cuentan en PostgreSQL por correo normalizad
 
 Las rutas de CSRF, registro e inicio de sesión no requieren una sesión autenticada. El resto de rutas de datos sí la requieren. Sin sesión válida se devuelve `401`; un recurso ajeno devuelve `404` y una comprobación CSRF fallida, `403`. Una contraseña incorrecta y un correo inexistente producen el mismo error de acceso. Al superar el límite de intentos se responde `429` con `Retry-After`.
 
-Cada servicio verifica la sesión mediante el componente de acceso y comprueba a quién pertenece el recurso. La verificación interna no es una ruta pública de `/api/v1` y no acepta un propietario elegido por el cliente. Las contraseñas, cookies y tokens CSRF no se incluyen en los registros técnicos. Estos contratos describen el funcionamiento previsto, no una implementación disponible.
+Cada servicio debe verificar la sesión mediante el componente de acceso y comprobar a quién pertenece el recurso. API y Sync ya utilizan esta comunicación interna. No es una ruta pública de `/api/v1` y no acepta un propietario elegido por el cliente. Las contraseñas, cookies y tokens CSRF no se incluyen en los registros técnicos.
+
+En la entrada interna de API, sin publicación del puerto 3003 en el host,
+`GET /internal/auth/session` verifica el servicio y la sesión. Su variante `POST`
+comprueba además origen y CSRF para autorizar escrituras. Devuelve solo `tenant_id`
+y `expires_at`. Sync utiliza `SYNC_AUTH_SERVICE_TOKEN` para identificarse; esa
+credencial no se entrega al frontend. Los demás servicios aún deben incorporar
+su autorización al implementarse.
 
 ## Datos que se envían
 
@@ -127,22 +149,58 @@ contados durante la lectura, también cuando no hay `Content-Length` fiable.
 Una credencial que no puede descifrarse produce `503` sin contactar con el destino.
 El resultado se devuelve en esta petición; guardar la última prueba queda pendiente.
 
-Creación de sincronización, `POST /api/v1/sync-definitions`:
+Creación de sincronización, `POST /api/v1/sync-definitions` (propuesta de contrato
+para la siguiente implementación):
 
 ```json
 {
-  "name": "Sincronizar mis tareas",
+  "name": "Centralizar entregas académicas",
   "source_connection_id": "11111111-1111-4111-8111-111111111111",
-  "target_connection_id": "22222222-2222-4222-8222-222222222222",
-  "source": {"method": "GET", "path": "/tasks", "records_path": "items"},
-  "target": {"method": "PUT", "path_template": "/entries/{external_id}"},
-  "mappings": {"id": "external_id", "title": "title", "due_at": "due_at"},
+  "source": {
+    "method": "GET",
+    "path": "/assignments",
+    "records_path": "items",
+    "resource_type": "academic.assignment"
+  },
+  "target": {"type": "central_activities"},
+  "mappings": {"id": "external_id", "title": "title", "due_at": "scheduled_for"},
   "deduplication_key": "id",
   "enabled": true
 }
 ```
 
-El destino de prueba permite actualizar una entrada por su identificador sin crear otra. En `path_template` solo se sustituyen valores comprobados; no se puede cambiar el dominio ni el protocolo. El formato exacto de selección y conversión de campos está pendiente.
+El destino es interno y no requiere `target_connection_id` ni una ruta HTTP de
+escritura externa. Este contrato sustituye el ejemplo anterior de transferencia
+entre dos aplicaciones; esa ruta de sincronizaciones aún no está implementada.
+Los nombres `resource_type` y `scheduled_for` son una propuesta de representación,
+no un esquema cerrado. Antes de implementar se fijarán tipos, estados, fechas,
+conversiones, relaciones y detalles específicos admitidos.
+
+El propietario se obtiene de la sesión comprobada y la procedencia de la conexión
+y colección configuradas. La ruta de lectura debe conservar el origen autorizado;
+la configuración no puede convertirla en una llamada a otro servidor. Al
+reimportar un recurso se actualiza su actividad central, sin duplicarla.
+
+## Consulta de actividades centralizadas (prevista)
+
+`GET /api/v1/activities` reunirá las actividades propias de las tres fuentes.
+Permitirá seleccionar un intervalo temporal, fuente y tipo; la forma concreta
+de filtros y paginación se cerrará con el modelo común. El detalle
+`GET /api/v1/activities/{id}` conservará la procedencia, la referencia externa,
+los datos comunes y los detalles de origen autorizados.
+
+La colección pertenece a Sync. `/activities` no es `/activity`: esta última ruta
+representa el historial de cambios y operaciones de Monitoring. El calendario
+consulta lo ya sincronizado y no vuelve a leer todas las fuentes al abrirse.
+Una actividad ajena devuelve `404`; el cliente no puede elegir `tenant_id`.
+La creación y modificación de compromisos se realizan en las fuentes. No se
+define un POST/PATCH público sobre la colección central para editar el origen.
+
+Los endpoints de creación y modificación de académico, deporte y planes son
+contratos de esas fuentes, todavía por concretar. Los formularios de demostración
+usarán un backend autorizado y no recibirán los secretos de sus conexiones.
+
+## Ejecuciones y reglas (previstas)
 
 Solicitud de ejecución: `POST /api/v1/sync-definitions/{id}/runs`, cuerpo `{}`, cabecera `Idempotency-Key: tareas-001`.
 
@@ -186,31 +244,47 @@ Los mensajes no incluyen contraseñas ni el contenido personal completo.
 
 El resultado de una sincronización incluye su identificador, estado y cantidades leídas, escritas y omitidas. Si falla, añade la causa del error sin datos sensibles.
 
-También se emitirá `data.changed` al confirmar un registro nuevo o modificado en el destino:
+También se emitirá `data.changed` al confirmar una actividad nueva o modificada
+en la colección de Sync. La actividad y el evento pendiente se guardan juntos:
 
 ```json
 {
   "sync_run_id": "33333333-3333-4333-8333-333333333333",
-  "record_id": "42",
+  "activity_id": "22222222-2222-4222-8222-222222222222",
+  "source_connection_id": "11111111-1111-4111-8111-111111111111",
+  "resource_type": "academic.assignment",
+  "external_id": "42",
   "change_type": "updated",
-  "changed_fields": ["title", "due_at"]
+  "changed_fields": ["grade"]
 }
 ```
 
-Este es el contenido de `payload`, acompañado de los campos anteriores. El cambio se detecta al sincronizar; no se revisa continuamente ni se propagan borrados en la primera versión.
+Este es un ejemplo previsto de `payload`, acompañado de los campos anteriores.
+Identifica el cambio de una nota sin incluir su valor, participantes ni el contenido
+completo del registro. El cambio se detecta al sincronizar; no se revisa
+continuamente ni se propagan borrados en la primera versión.
 
 ## Errores
 
-Los errores usan el mismo formato, con código y una explicación sin datos sensibles. Los principales son `401` para acceso no válido, `403` para comprobación CSRF fallida, `404` para un recurso inexistente o ajeno, `409` para conflicto, `422` para configuración incorrecta y `429` para exceso de intentos o peticiones. Se devuelven como `application/problem+json`:
+El formato común previsto es Problem Details, con código y explicación sin datos
+sensibles. Su unificación sigue pendiente: los endpoints actuales devuelven los
+errores estándar de NestJS. Los principales estados son `401` para acceso no
+válido, `403` para origen, CSRF o destino rechazado, `404` para un recurso
+inexistente o ajeno, `409` para conflicto, `422` para entrada incorrecta, `429`
+para exceso de intentos y `503` si no puede comprobarse una dependencia. El
+contrato final utilizará `application/problem+json`:
 
 ```json
 {
   "type": "about:blank",
   "title": "Configuración inválida",
   "status": 422,
-  "detail": "La conexión destino no está habilitada.",
+  "detail": "La conexión de origen no está habilitada.",
   "code": "connection_disabled"
 }
 ```
 
-Aceptar la solicitud con `202` indica que queda pendiente, no que haya terminado correctamente. Los fallos posteriores se consultan en la ejecución. El código `external_outcome_unknown` indica que no se conoce el resultado de un envío y repetirlo podría duplicar información.
+Aceptar la solicitud con `202` indica que queda pendiente, no que haya terminado
+correctamente. Los fallos posteriores se consultan en la ejecución. El código
+`external_outcome_unknown` se reserva para una ampliación de escritura hacia
+destinos externos; el flujo inicial confirma sus actividades dentro de Sync.

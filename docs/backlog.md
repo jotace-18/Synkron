@@ -2,7 +2,20 @@
 
 Estas historias resumen las funciones y el trabajo de desarrollo. El seguimiento actualizado está en las [Issues](https://github.com/jotace-18/Synkron/issues) y en el [tablero de GitHub](https://github.com/users/jotace-18/projects/1).
 
-Todas son de prioridad inicial. US-01 a US-13 se sitúan en el Hito 2; US-14 en el 3; US-15 en el 4 y US-16 en el 5.
+Esta revisión del diseño no modifica el seguimiento remoto. La correspondencia
+de las nuevas historias y cambios de alcance con Issues y Project deberá revisarse
+al actualizar ese seguimiento.
+
+US-01 a US-13 y US-17 a US-19 forman parte de la implementación inicial que debe
+quedar completa en el Hito 2. US-14 corresponde a infraestructura, US-15 al
+despliegue posterior y US-16 a la validación de funcionamiento y rendimiento,
+con comprobaciones básicas desde el desarrollo y medidas finales en despliegue.
+El flujo actual incluye CI, sin CD.
+
+Las tareas marcadas solo acreditan su alcance concreto. La autenticación y las
+operaciones actuales de conexiones están probadas; esto no cierra el frontend,
+los demás servicios ni el hito. El alcance de entrada se detalla en
+[Servicios de origen](servicios-origen.md).
 
 ## US-01 — Registrarse e iniciar sesión
 
@@ -20,9 +33,9 @@ Criterios de aceptación:
 Tareas:
 
 - [x] Definir cuentas propias y sesiones en PostgreSQL (ADR-005).
-- [ ] Crear registro e inicio de sesión con contraseñas protegidas.
-- [ ] Crear cierre de sesión y comprobación de la cuenta actual.
-- [ ] Probar acceso, expiración, cierre de sesión, CSRF y ausencia de secretos.
+- [x] Crear registro e inicio de sesión con contraseñas protegidas en la API.
+- [x] Crear cierre de sesión y comprobación de la cuenta actual.
+- [x] Probar acceso, expiración, cierre de sesión, CSRF y ausencia de secretos en el backend.
 
 ## US-02 — Mantener separados los datos de cada cuenta
 
@@ -38,7 +51,8 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Aplicar autorización en cada servicio.
+- [x] Aplicar autorización de sesiones y propiedad a las operaciones actuales de API y Sync.
+- [ ] Extender la autorización a las actividades, Automation, Monitoring y las fuentes editables.
 - [ ] Comprobar la cuenta propietaria en los mensajes internos.
 - [ ] Probar lecturas y escrituras cruzadas.
 
@@ -56,9 +70,10 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Preparar las tablas para guardar conexiones.
-- [ ] Implementar API y protección de secretos.
-- [ ] Probar validaciones y autorización.
+- [x] Preparar las tablas y migraciones para guardar conexiones.
+- [x] Crear y listar conexiones propias, con paginación y cifrado de Bearer.
+- [x] Probar validaciones y autorización de esas operaciones.
+- [ ] Añadir detalle, edición y desactivación, conservando historial y permisos.
 
 ## US-04 — Comprobar una conexión
 
@@ -74,26 +89,28 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Comprobar la resolución del dominio y las direcciones permitidas.
-- [ ] Añadir la ruta de comprobación con respuesta sin datos sensibles.
-- [ ] Probar fallos, esperas excesivas y bloqueo de direcciones internas.
+- [x] Aplicar una lista explícita de orígenes controlados de Docker.
+- [x] Añadir la ruta de comprobación con respuesta sin datos sensibles.
+- [x] Probar fallos, límites de tiempo y tamaño, redirecciones y destinos fuera de la lista.
+- [ ] Guardar la fecha y el resultado de la última prueba.
+- [ ] Completar la política de resolución y direcciones antes de admitir dominios públicos arbitrarios.
 
 ## US-05 — Configurar una sincronización
 
 Requisitos: RF-04, RF-06, RF-21; RI-03, RI-13; RD-14; CU-04.
 
-Como usuario, quiero relacionar origen, destino y campos para adaptar formatos sin escribir código.
+Como usuario, quiero relacionar una fuente y sus campos con las actividades centrales de Synkron sin escribir código.
 
 Criterios de aceptación:
 
-- Origen y destino pertenecen al usuario.
-- La relación entre campos conserva el título y la fecha de una tarea en el formato del destino.
+- La conexión de origen pertenece al usuario y el destino es la colección central de Sync.
+- La relación entre campos conserva título, información temporal, procedencia y detalles necesarios de cada tipo.
 - Comparar con una revisión anterior distingue información nueva, modificada y sin cambios.
 - Configuraciones no válidas se rechazan antes de ejecutar.
 
 Tareas:
 
-- [ ] Definir el formato admitido y los datos de la sincronización.
+- [ ] Cerrar el contrato común de actividad, identidad, relaciones y definición de importación.
 - [ ] Implementar correspondencias de campos y comparación de contenido.
 - [ ] Probar rutas, tipos y referencias inválidas.
 
@@ -125,13 +142,14 @@ Criterios de aceptación:
 
 - La misma clave y contenido devuelven la ejecución existente; otro contenido con esa clave se rechaza.
 - Dos procesos simultáneos o un mensaje repetido no realizan la misma acción dos veces.
-- El destino de pruebas permite actualizar por identificador; si un envío no se puede repetir con seguridad, queda pendiente de revisión.
+- Reimportar el mismo recurso actualiza su actividad central; un examen y una entrega o dos fuentes distintas no se confunden por compartir un ID externo.
+- Las actividades y los avisos no se duplican por repetir mensajes o ejecuciones.
 
 Tareas:
 
-- [ ] Definir cómo identificar las solicitudes y cuánto conservar sus claves.
+- [ ] Definir identidad de solicitudes y actividades, conflictos entre configuraciones y conservación de claves.
 - [ ] Registrar mensajes procesados y controlar ejecuciones simultáneas.
-- [ ] Probar mensajes repetidos y respuestas perdidas después de guardar un dato.
+- [ ] Probar mensajes repetidos, concurrencia e interrupciones después de guardar actividades.
 
 ## US-08 — Revisar resultados y errores
 
@@ -209,11 +227,11 @@ Tareas:
 
 Requisitos: RF-14, RF-15; RI-06 a RI-08; CU-09, CU-13.
 
-Como usuario, quiero ver actividad y consumo para supervisar mis integraciones.
+Como usuario, quiero ver el historial y consumo para supervisar mis integraciones.
 
 Criterios de aceptación:
 
-- La vista muestra cambios personales, sincronizaciones y avisos, y filtra por periodo, tipo y estado.
+- La vista muestra el historial de cambios, sincronizaciones y avisos, y filtra por periodo, tipo y estado. La colección de actividades del calendario se consulta por separado en Sync.
 - Las estadísticas coinciden con las operaciones realizadas, incluso con mensajes repetidos.
 - El panel indica cuándo la actividad todavía se está actualizando.
 
@@ -231,17 +249,20 @@ Como desarrollador, quiero levantar y verificar el sistema para trabajar sobre u
 
 Criterios de aceptación:
 
-- Un comando inicia los backends, el frontend, RabbitMQ, una instancia de PostgreSQL por backend y las aplicaciones simuladas con redes y volúmenes.
+- Un comando inicia los backends, el frontend, RabbitMQ, una instancia de PostgreSQL por backend y las tres fuentes de demostración editables con su persistencia, redes y volúmenes.
 - Cada backend solo accede a su base, con credenciales, migraciones y volumen persistente independientes.
-- Las imágenes separan preparación y ejecución y usan un usuario sin permisos de administrador.
+- Las imágenes que requieren compilación separan preparación y ejecución; todas usan un usuario sin permisos de administrador.
 - La comprobación automática (CI) revisa el código, ejecuta pruebas y publica las imágenes con su versión en GitHub Container Registry.
 
 Tareas:
 
-- [ ] Crear Dockerfiles, Compose y env de ejemplo.
-- [ ] Configurar las bases de Sync, Automation, Monitoring y acceso con redes privadas, credenciales, migraciones y volúmenes propios.
-- [ ] Añadir revisiones de código y pruebas automáticas.
-- [ ] Comprobar que los datos se conservan y las imágenes se construyen y publican sin secretos.
+- [x] Crear Dockerfiles, Compose y env para API, Sync y la fuente estática actual.
+- [x] Configurar las bases de API y Sync con redes privadas, roles y volúmenes propios.
+- [x] Añadir CI de pruebas y construcción para esos componentes y la API ficticia actual.
+- [ ] Incorporar Automation, Monitoring, RabbitMQ, frontend y las tres fuentes editables.
+- [ ] Completar sus bases, migraciones y configuración sin compartir credenciales.
+- [ ] Publicar todas las imágenes necesarias en GHCR identificadas por SHA o versión.
+- [ ] Verificar arranque y migraciones desde copia limpia, persistencia y ausencia de secretos.
 
 ## US-14 — Preparar el alojamiento
 
@@ -297,7 +318,75 @@ Tareas:
 - [ ] Crear carga reproducible con escenario y datos documentados.
 - [ ] Analizar resultados y publicar release al completar el proyecto.
 
-## Ampliaciones después del primer flujo
+## US-17 — Mantener las tres fuentes de actividades
 
-Revisiones programadas (RF-16), reintentos (RF-17), recuperación de mensajes fallidos (RF-18) y acciones HTTP (RF-19) tendrán historias propias. La cancelación (RF-20) es opcional. Guardar las solicitudes, controlar duplicados y mostrar fallos forma parte de la versión inicial.
+Requisitos: RF-23, RF-24; RI-16; CU-15, CU-17.
+
+Como usuario, quiero introducir y actualizar datos académicos, deportivos y
+sociales en sus servicios para alimentar Synkron con actividades propias.
+
+Criterios de aceptación:
+
+- Académico permite entregas, exámenes, sesiones de estudio/trabajo y eventos generales con los campos descritos en el contrato de origen.
+- Deporte conserva los datos comunes y los específicos de gimnasio, fútbol, senderismo y carrera; otros deportes admiten un registro sencillo.
+- Planes sociales admite título, fecha/hora, ubicación y participantes opcionales; las propuestas adicionales se cierran antes de implementarse.
+- Los datos persisten al reiniciar. Solo se exponen los registros autorizados por cuenta o credencial.
+- Cada registro mantiene su ID al modificarse. Las notas opcionales pueden añadirse después con máximo dos decimales.
+- Las sesiones de estudio pueden relacionarse con entregas o exámenes, sin compartir su estado de finalización.
+
+Tareas:
+
+- [ ] Cerrar validaciones y estados pendientes de [Servicios de origen](servicios-origen.md).
+- [ ] Implementar persistencia y API de creación, modificación y lectura de cada fuente.
+- [ ] Añadir formularios de entrada sencillos y acceso autorizado sin secretos en el navegador.
+- [ ] Probar cambios, permisos, notas desconocidas/cero y persistencia.
+
+## US-18 — Centralizar y actualizar actividades
+
+Requisitos: RF-04, RF-06, RF-07, RF-21, RF-24; RI-15; RD-16, RD-17; CU-05, CU-17.
+
+Como usuario, quiero reunir las actividades de mis fuentes y conservar sus
+actualizaciones y procedencia para consultarlas en un espacio común.
+
+Criterios de aceptación:
+
+- Sync guarda las actividades en su propia base, con propietario, fuente, recurso externo y detalles autorizados.
+- Modificar un horario, una nota o los datos de una sesión actualiza la misma actividad central.
+- Dos recursos distintos con el mismo ID externo no se mezclan; repetir una revisión sin cambios no genera nuevas actividades ni avisos.
+- Cada cambio y su evento pendiente se guardan juntos antes de comunicarse.
+- Se distinguen fechas sin hora de instantes con zona, sin inventar horarios desconocidos.
+
+Tareas:
+
+- [ ] Definir el contrato común y el esquema de persistencia, sin perder detalles de origen.
+- [ ] Implementar correspondencias, identidad, comparación y actualización transaccional.
+- [ ] Añadir lectura autenticada y paginada de actividades propias.
+- [ ] Probar dos fuentes, actualizaciones, relaciones, repeticiones y accesos cruzados.
+
+## US-19 — Consultar la agenda y el calendario
+
+Requisitos: RF-22; RI-12, RI-15, RI-16; RIC-11; CU-16.
+
+Como usuario, quiero ver juntas mis actividades académicas, deportivas y sociales
+para consultar mis compromisos y su procedencia.
+
+Criterios de aceptación:
+
+- La vista reúne las actividades de la cuenta y permite filtrar por periodo, fuente y tipo.
+- El detalle conserva la información necesaria de cada tipo y sus relaciones.
+- Abrir la vista consulta lo ya centralizado, sin leer de nuevo todas las fuentes.
+- La vista inicial es de consulta; las modificaciones se hacen en el origen y llegan al sincronizar.
+- Títulos, abreviaturas, colores e intensidad representan los datos semánticos sin sustituirlos. La presentación concreta se fija al implementar el frontend.
+- Conexiones, ejecuciones, reglas, historial y avisos también disponen de sus vistas funcionales.
+
+Tareas:
+
+- [ ] Completar React, API general, sesiones y origen HTTPS común.
+- [ ] Implementar agenda/calendario, filtros, detalles y estados de carga/error.
+- [ ] Conectar las vistas de gestión, ejecución, reglas y seguimiento.
+- [ ] Probar desde el navegador creación en fuente, importación, consulta conjunta y actualización posterior.
+
+## Ampliaciones posteriores
+
+Revisiones programadas (RF-16), reintentos (RF-17), recuperación de mensajes fallidos (RF-18), acciones HTTP (RF-19) y sincronización hacia destinos externos (RF-25) tendrán historias propias. La cancelación de ejecuciones (RF-20) es opcional y distinta de modificar el estado de un compromiso en su fuente. Hevy y Strava no se integran ahora. Guardar solicitudes, centralizar actividades, controlar duplicados y mostrar fallos forma parte de la implementación inicial que debe completarse en el Hito 2.
 
