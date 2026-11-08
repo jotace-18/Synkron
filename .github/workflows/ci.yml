@@ -152,6 +152,44 @@ jobs:
           PGUSER: api_test
           PGPASSWORD: ci-only-password
 
+  academic:
+    name: Comprobar Académico
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: apps/academic
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/academic/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar formato
+        run: npx --no-install prettier --check "src/**/*.ts" "test/**/*.ts"
+
+      - name: Comprobar lint
+        run: npx --no-install eslint "{src,apps,libs,test}/**/*.ts" --max-warnings=0
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Ejecutar pruebas unitarias
+        run: npm test -- --runInBand
+
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e -- --runInBand
+
   task-api:
     name: Comprobar API de tareas simulada
     runs-on: ubuntu-latest
