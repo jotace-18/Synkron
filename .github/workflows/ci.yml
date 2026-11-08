@@ -157,6 +157,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: academic_test
+          POSTGRES_USER: academic_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - "127.0.0.1:5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U academic_test -d academic_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     defaults:
       run:
         working-directory: apps/academic
@@ -189,6 +204,12 @@ jobs:
 
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e -- --runInBand
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGDATABASE: academic_test
+          PGUSER: academic_test
+          PGPASSWORD: ci-only-password
 
   task-api:
     name: Comprobar API de tareas simulada
