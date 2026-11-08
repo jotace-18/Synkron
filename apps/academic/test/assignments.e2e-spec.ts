@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DatabaseService } from '../src/database/database.service';
 
@@ -43,8 +43,13 @@ describe('Assignments table (integration)', () => {
     database = module.get(DatabaseService);
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     accountId = randomUUID();
+    await database.query(
+      `INSERT INTO academic.accounts (id, name, token_hash)
+       VALUES ($1, 'Assignments test', $2)`,
+      [accountId, randomBytes(32).toString('hex')],
+    );
   });
 
   afterEach(async () => {
@@ -52,6 +57,9 @@ describe('Assignments table (integration)', () => {
       'DELETE FROM academic.assignments WHERE account_id = $1',
       [accountId],
     );
+    await database.query('DELETE FROM academic.accounts WHERE id = $1', [
+      accountId,
+    ]);
   });
 
   afterAll(async () => {
@@ -100,6 +108,20 @@ describe('Assignments table (integration)', () => {
       ],
     );
   }
+
+  it('rejects an assignment belonging to an account that does not exist', async () => {
+    await expect(
+      database.query(
+        `INSERT INTO academic.assignments (
+           account_id, title, course_name, section, mandatory, due_date
+         ) VALUES ($1, 'Entrega', 'Cloud Computing', 'practice', true, '2026-11-24')`,
+        [randomUUID()],
+      ),
+    ).rejects.toMatchObject({
+      code: '23503',
+      constraint: 'assignments_account_fk',
+    });
+  });
 
   it('creates a pending individual assignment with unknown grade and weight by default', async () => {
     const result = await database.query<StoredAssignment>(

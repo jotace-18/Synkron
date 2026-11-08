@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Test, TestingModule } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { AssignmentsService } from '../src/assignments/assignments.service';
@@ -21,9 +21,20 @@ describe('AssignmentsService (integration)', () => {
     assignments = module.get(AssignmentsService);
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     accountId = randomUUID();
     otherAccountId = randomUUID();
+    await database.query(
+      `INSERT INTO academic.accounts (id, name, token_hash)
+       VALUES ($1, 'Assignments service test A', $2),
+              ($3, 'Assignments service test B', $4)`,
+      [
+        accountId,
+        randomBytes(32).toString('hex'),
+        otherAccountId,
+        randomBytes(32).toString('hex'),
+      ],
+    );
   });
 
   afterEach(async () => {
@@ -31,6 +42,10 @@ describe('AssignmentsService (integration)', () => {
       'DELETE FROM academic.assignments WHERE account_id IN ($1, $2)',
       [accountId, otherAccountId],
     );
+    await database.query('DELETE FROM academic.accounts WHERE id IN ($1, $2)', [
+      accountId,
+      otherAccountId,
+    ]);
   });
 
   afterAll(async () => {
