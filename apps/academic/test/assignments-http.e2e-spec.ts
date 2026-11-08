@@ -7,7 +7,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/configure-app';
 import { DatabaseService } from '../src/database/database.service';
 
-describe('Assignments creation (HTTP)', () => {
+describe('Assignments (HTTP)', () => {
   let app: INestApplication<App>;
   let database: DatabaseService;
   let accountId: string;
@@ -84,6 +84,157 @@ describe('Assignments creation (HTTP)', () => {
     );
     expect(result.rows[0].count).toBe('0');
   }
+
+  function listAssignments(
+    query: Record<string, unknown> = {},
+    credential = token,
+  ) {
+    return request(app.getHttpServer())
+      .get(path)
+      .set('Authorization', `Bearer ${credential}`)
+      .query(query);
+  }
+
+  async function seedAssignments(
+    owner: string,
+    count: number,
+    createdAt: string,
+  ): Promise<string[]> {
+    const result = await database.query<{ id: string }>(
+      `INSERT INTO academic.assignments (
+         account_id, title, course_name, section, mandatory,
+         due_date, created_at
+       ) SELECT $1, 'Entrega ' || n, 'Cloud Computing', 'practice', true,
+                '2026-11-24'::date, $3::timestamptz
+         FROM generate_series(1, $2::integer) AS n
+       RETURNING id`,
+      [owner, count, createdAt],
+    );
+    return result.rows.map((row) => row.id);
+  }
+
+  it('returns an empty list for an account without assignments', async () => {
+    await listAssignments()
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect([]);
+  });
+
+  it('lists the created assignment with the same public representation', async () => {
+    const created = await createAssignment({
+      ...validInput,
+      mandatory: false,
+      grade: 0,
+      weight_percent: 0,
+      weight_basis: 'course',
+    }).expect(201);
+
+    await listAssignments()
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect([created.body as unknown]);
+
+    await listAssignments({}, otherToken).expect(200).expect([]);
+  });
+
+  it('paginates only owned assignments in creation order with stable ID tie-breaking', async () => {
+    const olderIds = await seedAssignments(
+      accountId,
+      1,
+      '2026-11-01T10:00:00Z',
+    );
+    const newerIds = await seedAssignments(
+      accountId,
+      4,
+      '2026-11-02T10:00:00Z',
+    );
+    const foreignIds = await seedAssignments(
+      otherAccountId,
+      3,
+      '2026-11-03T10:00:00Z',
+    );
+    const expectedIds = [...newerIds.sort().reverse(), ...olderIds];
+
+    async function page(offset: number): Promise<string[]> {
+      const response = await listAssignments({ limit: 2, offset }).expect(200);
+      const rows = response.body as { id: string }[];
+      return rows.map((row) => row.id);
+    }
+
+    const firstPage = await page(0);
+    const secondPage = await page(2);
+    const thirdPage = await page(4);
+    expect(firstPage).toEqual(expectedIds.slice(0, 2));
+    expect(secondPage).toEqual(expectedIds.slice(2, 4));
+    expect(thirdPage).toEqual(expectedIds.slice(4));
+    expect([...firstPage, ...secondPage, ...thirdPage]).toEqual(expectedIds);
+    expect(new Set([...firstPage, ...secondPage, ...thirdPage]).size).toBe(5);
+    await expect(page(0)).resolves.toEqual(firstPage);
+    await expect(page(5)).resolves.toEqual([]);
+
+    const foreignResponse = await listAssignments({}, otherToken).expect(200);
+    const foreignRows = foreignResponse.body as { id: string }[];
+    expect(foreignRows.map((row) => row.id)).toEqual(
+      foreignIds.sort().reverse(),
+    );
+  });
+
+  it('defaults to 20 results and accepts the maximum limit of 50', async () => {
+    await seedAssignments(accountId, 21, '2026-11-02T10:00:00Z');
+
+    const defaultResponse = await listAssignments().expect(200);
+    const maximumResponse = await listAssignments({
+      limit: '50',
+      offset: '0',
+    }).expect(200);
+    const defaultRows = defaultResponse.body as { id: string }[];
+    const maximumRows = maximumResponse.body as { id: string }[];
+
+    expect(defaultRows).toHaveLength(20);
+    expect(maximumRows).toHaveLength(21);
+    expect(defaultRows).toEqual(maximumRows.slice(0, 20));
+  });
+
+  it.each([
+    { label: 'zero limit', query: { limit: '0' } },
+    { label: 'excessive limit', query: { limit: '51' } },
+    { label: 'fractional limit', query: { limit: '1.5' } },
+    { label: 'non-numeric limit', query: { limit: 'invalid' } },
+    { label: 'negative offset', query: { offset: '-1' } },
+    { label: 'fractional offset', query: { offset: '0.5' } },
+    { label: 'non-numeric offset', query: { offset: 'invalid' } },
+    { label: 'unsafe offset', query: { offset: '9007199254740992' } },
+    { label: 'repeated limit', query: { limit: ['1', '2'] } },
+    { label: 'repeated offset', query: { offset: ['0', '1'] } },
+    {
+      label: 'client-supplied owner',
+      query: { account_id: '11111111-1111-4111-8111-111111111111' },
+    },
+    { label: 'unknown query parameter', query: { unexpected: 'true' } },
+  ])('rejects a list query with $label', async ({ query }) => {
+    await listAssignments(query).expect(422);
+  });
+
+  it.each(['missing', 'unknown', 'disabled'])(
+    'rejects a %s credential before validating list parameters',
+    async (kind) => {
+      let credential = token;
+      if (kind === 'unknown') credential = randomBytes(32).toString('hex');
+      if (kind === 'disabled') {
+        await database.query(
+          'UPDATE academic.accounts SET enabled = false WHERE id = $1',
+          [accountId],
+        );
+      }
+      const pending = listAssignments({ limit: '0' }, credential);
+      if (kind === 'missing') pending.unset('Authorization');
+      await pending.expect(401).expect({
+        statusCode: 401,
+        message: 'Credencial académica no válida',
+        error: 'Unauthorized',
+      });
+    },
+  );
 
   it('creates a normalized assignment with defaults and no private account fields', async () => {
     const response = await createAssignment()

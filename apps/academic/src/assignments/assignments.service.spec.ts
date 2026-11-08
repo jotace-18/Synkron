@@ -48,4 +48,12 @@ describe('AssignmentsService', () => {
     await expect(service.create(accountId, createInput())).rejects.toBe(error);
     expect(query).toHaveBeenCalledTimes(1);
   });
+
+  it('propagates a database failure instead of reporting an empty assignment list', async () => {
+    const error = new Error('Database unavailable');
+    query.mockRejectedValue(error);
+
+    await expect(service.list(accountId)).rejects.toBe(error);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
 });

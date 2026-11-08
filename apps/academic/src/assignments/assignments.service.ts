@@ -7,6 +7,26 @@ import type { CreateAssignmentDto } from './dto/create-assignment.dto';
 export class AssignmentsService {
   constructor(private readonly database: DatabaseService) {}
 
+  async list(accountId: string, limit = 20, offset = 0): Promise<Assignment[]> {
+    const result = await this.database.query<Assignment>(
+      `SELECT
+         id, title, course_name, course_abbreviation,
+         section, mandatory, due_date::text, due_at, status,
+         work_mode, group_members,
+         weight_percent::double precision AS weight_percent,
+         weight_basis,
+         grade::double precision AS grade,
+         created_at, updated_at
+       FROM academic.assignments
+       WHERE account_id = $1
+       ORDER BY created_at DESC, id DESC
+       LIMIT $2 OFFSET $3`,
+      [accountId, limit, offset],
+    );
+
+    return result.rows;
+  }
+
   async create(
     accountId: string,
     input: CreateAssignmentDto,
