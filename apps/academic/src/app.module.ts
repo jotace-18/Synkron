@@ -5,10 +5,11 @@ import { DatabaseService } from './database/database.service';
 import { AssignmentsService } from './assignments/assignments.service';
 import { AuthService } from './auth/auth.service';
 import { BearerGuard } from './auth/bearer.guard';
+import { AssignmentsController } from './assignments/assignments.controller';
 
 @Module({
   imports: [],
-  controllers: [AppController],
+  controllers: [AppController, AssignmentsController],
   providers: [
     AppService,
     DatabaseService,

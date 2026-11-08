@@ -17,6 +17,7 @@ import {
   type AuthenticatedRequest,
 } from '../src/auth/bearer.guard';
 import { DatabaseService } from '../src/database/database.service';
+import { configureApp } from '../src/configure-app';
 
 // This controller exists only in the test module, not in the application.
 @Controller('__test__/auth')
@@ -48,6 +49,7 @@ describe('BearerGuard (HTTP)', () => {
       providers: [AppService, DatabaseService, AuthService, BearerGuard],
     }).compile();
     app = module.createNestApplication();
+    configureApp(app);
     await app.init();
     database = app.get(DatabaseService);
   });
