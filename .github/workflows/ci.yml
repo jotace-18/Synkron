@@ -214,7 +214,7 @@ jobs:
 
   docker:
     name: Comprobar imagen de ${{ matrix.service }}
-    needs: [sync, api, task-api]
+    needs: [sync, api, academic, task-api]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -226,6 +226,8 @@ jobs:
             context: apps/sync
           - service: api
             context: apps/api
+          - service: academic
+            context: apps/academic
           - service: task-api
             context: fixtures/task-api
 
