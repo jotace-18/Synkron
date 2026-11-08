@@ -110,7 +110,8 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Cerrar el contrato común de actividad, identidad, relaciones y definición de importación.
+- [x] Documentar parte común, identidad y formas temporales de las actividades.
+- [ ] Cerrar los detalles por tipo, relaciones y definición de importación.
 - [ ] Implementar correspondencias de campos y comparación de contenido.
 - [ ] Probar rutas, tipos y referencias inválidas.
 
@@ -337,6 +338,9 @@ Criterios de aceptación:
 Tareas:
 
 - [ ] Cerrar validaciones y estados pendientes de [Servicios de origen](servicios-origen.md).
+- [x] Implementar la API académica de entregas: validación, autorización por cuenta, creación, listado, detalle y edición completa.
+- [x] Implementar borrado lógico de entregas y exportación autenticada con marcas de borrado para Sync.
+- [x] Validar la migración de borrado y los nuevos escenarios de ciclo de vida contra PostgreSQL en el entorno local.
 - [ ] Implementar persistencia y API de creación, modificación y lectura de cada fuente.
 - [ ] Añadir formularios de entrada sencillos y acceso autorizado sin secretos en el navegador.
 - [ ] Probar cambios, permisos, notas desconocidas/cero y persistencia.
@@ -358,8 +362,11 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Definir el contrato común y el esquema de persistencia, sin perder detalles de origen.
+- [x] Documentar campos comunes y reglas temporales en [Modelo de actividades](modelo-actividades.md).
+- [ ] Crear y probar la migración de actividades y sus restricciones de identidad/propiedad.
+- [ ] Cerrar los esquemas de detalles y relaciones de cada tipo.
 - [ ] Implementar correspondencias, identidad, comparación y actualización transaccional.
+- [ ] Interpretar las marcas de borrado de las fuentes y retirar su representación de la vista central.
 - [ ] Añadir lectura autenticada y paginada de actividades propias.
 - [ ] Probar dos fuentes, actualizaciones, relaciones, repeticiones y accesos cruzados.
 

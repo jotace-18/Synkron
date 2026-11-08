@@ -10,11 +10,12 @@ import type { Assignment } from '../src/assignments/assignment.types';
 
 type AssignmentJson = Omit<
   Assignment,
-  'due_at' | 'created_at' | 'updated_at'
+  'due_at' | 'created_at' | 'updated_at' | 'deleted_at'
 > & {
   due_at: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 };
 
 describe('Assignments (HTTP)', () => {

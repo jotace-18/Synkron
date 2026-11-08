@@ -17,8 +17,11 @@ módulos propios. No son los componentes internos Sync, Automation y Monitoring.
 Cada fuente mantiene sus datos y persistencia, permite introducir y modificar
 registros y ofrece una API de acceso autorizado. Synkron no lee sus bases de datos.
 
-La API estática actual `fixtures/task-api` es un punto de partida para comprobar
-conexiones. Todavía no implementa estos tres servicios editables.
+La API estática `fixtures/task-api` permite comprobar conexiones. El backend
+`apps/academic` implementa la colección editable de entregas, con PostgreSQL,
+autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
+describen las rutas disponibles. Los demás recursos académicos, las fuentes de
+deporte y planes sociales y los formularios de entrada siguen pendientes.
 
 ## Fuente académica
 
@@ -32,15 +35,22 @@ conexiones. Todavía no implementa estos tres servicios editables.
 | Obligatoriedad | Obligatoria u opcional. |
 | Ponderación | Opcional, si se conoce. |
 | Vencimiento | Fecha y hora límite cuando se conozcan; se debe admitir una fecha sin hora. |
-| Estado de entrega | Debe conservarse; valores concretos por cerrar. |
+| Estado de entrega | Pendiente, en preparación o entregada (`pending`, `in_progress`, `submitted`). |
 | Modalidad | Individual o grupal. |
-| Integrantes | Lista de nombres para trabajos grupales; reglas de obligatoriedad por concretar. |
-| Nota | Opcional y actualizable posteriormente, con máximo dos decimales. |
+| Integrantes | Lista opcional de nombres para grupos; vacía para una entrega individual. |
+| Nota | Opcional y actualizable posteriormente, de 0 a 10 con máximo dos decimales. |
 
 La ausencia de nota o ponderación no equivale a un cero. Una nota publicada
-después se incorpora a la misma entrega, manteniendo su identificador. La escala
-de calificaciones y la base de la ponderación —nota final o bloque de evaluación—
-se concretarán antes de validar esos campos.
+después se incorpora a la misma entrega, manteniendo su identificador. La
+ponderación conserva un porcentaje de 0 a 100 y su referencia: nota final de la
+asignatura (`course`) o parte correspondiente (`section`). Se admiten ambas formas
+sin calcular equivalencias automáticamente. La condición de vencida se deriva
+del plazo y del estado, sin sustituir los tres estados de progreso.
+
+La edición conserva los campos omitidos y valida la combinación final de
+vencimiento, modalidad/integrantes y ponderación en una operación atómica. El
+borrado marca `deleted_at`: las consultas normales ocultan el registro y la
+exportación autenticada conserva esa marca para el futuro motor de Sync.
 
 ### Exámenes
 
@@ -156,8 +166,9 @@ Los campos de origen, la representación central y la vista son contratos
 distintos. Sync conservará una parte común para identificar y situar la actividad
 en el tiempo y su procedencia mediante columnas comunes, y los detalles necesarios
 de cada tipo en `details` JSONB con validación específica, según
-[ADR-009](decisiones.md#adr-009-modelo-híbrido-de-actividades). El esquema final de
-actividades, sus relaciones y filtros todavía debe cerrarse.
+[ADR-009](decisiones.md#adr-009-modelo-híbrido-de-actividades). La parte común y las
+reglas temporales figuran en [Modelo de actividades](modelo-actividades.md).
+Los detalles de cada tipo, sus relaciones y los filtros todavía deben cerrarse.
 
 El calendario mostrará juntas las actividades autorizadas del usuario y permitirá
 consultar su detalle. Para el contenido académico se contempla resumir título,

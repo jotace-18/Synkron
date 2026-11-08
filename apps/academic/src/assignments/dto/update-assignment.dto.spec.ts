@@ -6,6 +6,60 @@ import { UpdateAssignmentDto } from './update-assignment.dto';
 describe('UpdateAssignmentDto', () => {
   const options = { whitelist: true, forbidNonWhitelisted: true };
 
+  it.each([
+    { due_date: '2026-12-01' },
+    { due_date: null, due_at: '2026-12-01T18:00:00+01:00' },
+    { due_at: null },
+    { work_mode: 'group' },
+    { group_members: [] },
+    { weight_percent: 0 },
+    { weight_basis: 'section' },
+    { weight_percent: null, weight_basis: null },
+  ])(
+    'validates supplied values without requiring omitted paired fields (%j)',
+    async (input) => {
+      const dto = plainToInstance(UpdateAssignmentDto, input);
+      expect(await validate(dto, options)).toHaveLength(0);
+      expect(dto.status).toBeUndefined();
+      expect(dto.grade).toBeUndefined();
+    },
+  );
+
+  it('trims group members while retaining their order and punctuation', async () => {
+    const dto = plainToInstance(UpdateAssignmentDto, {
+      group_members: [' Ana, María ', " O'Neil "],
+    });
+    expect(await validate(dto, options)).toHaveLength(0);
+    expect(dto.group_members).toEqual(['Ana, María', "O'Neil"]);
+  });
+
+  it.each([
+    { input: { due_date: '2026-02-30' }, property: 'due_date' },
+    { input: { due_date: '0000-01-01' }, property: 'due_date' },
+    { input: { due_date: '01/12/2026' }, property: 'due_date' },
+    { input: { due_date: '2026-12-01T18:00:00Z' }, property: 'due_date' },
+    { input: { due_at: '2026-12-01T18:00:00' }, property: 'due_at' },
+    { input: { due_at: '2026-02-30T18:00:00Z' }, property: 'due_at' },
+    { input: { due_at: '2026-12-01' }, property: 'due_at' },
+    { input: { work_mode: null }, property: 'work_mode' },
+    { input: { work_mode: 'unknown' }, property: 'work_mode' },
+    { input: { group_members: null }, property: 'group_members' },
+    { input: { group_members: 'Ana' }, property: 'group_members' },
+    { input: { group_members: ['   '] }, property: 'group_members' },
+    { input: { group_members: [123] }, property: 'group_members' },
+    { input: { weight_percent: -1 }, property: 'weight_percent' },
+    { input: { weight_percent: 101 }, property: 'weight_percent' },
+    { input: { weight_percent: '30' }, property: 'weight_percent' },
+    { input: { weight_percent: Infinity }, property: 'weight_percent' },
+    { input: { weight_basis: 'unknown' }, property: 'weight_basis' },
+  ])('rejects malformed $property', async ({ input, property }) => {
+    const errors = await validate(
+      plainToInstance(UpdateAssignmentDto, input),
+      options,
+    );
+    expect(errors.map((error) => error.property)).toContain(property);
+  });
+
   it('accepts normalized metadata without assigning defaults to omitted status or grade', async () => {
     const dto = plainToInstance(UpdateAssignmentDto, {
       title: ' Nueva entrega ',
@@ -121,7 +175,7 @@ describe('UpdateAssignmentDto', () => {
     },
   );
 
-  it.each(['account_id', 'id', 'created_at', 'unexpected'])(
+  it.each(['account_id', 'id', 'created_at', 'deleted_at', 'unexpected'])(
     'rejects client-supplied field %s',
     async (property) => {
       const dto = plainToInstance(UpdateAssignmentDto, {

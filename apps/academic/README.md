@@ -1,98 +1,189 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Servicio académico
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Agenda académica de origen de Synkron, con NestJS y PostgreSQL. La API de entregas
+permite crear, consultar, editar todos sus datos y eliminar registros conservando
+una marca para sincronizar el borrado. Exámenes, sesiones de trabajo, eventos
+generales y formularios de entrada se incorporarán después.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Preparación local
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+Desde la raíz de Synkron, usa la versión de Node de `.nvmrc`, instala dependencias
+y configura las variables `ACADEMIC_DB_*` de `.env.example` en `.env`.
 
 ```bash
-$ npm install
+npm --prefix apps/academic ci
+docker compose up -d --wait academic-db
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/academic:/app" \
+  academic npm run migrate:up
+docker compose up -d --build --wait academic
+curl -i http://127.0.0.1:3101/healthz
 ```
 
-## Compile and run the project
+Las migraciones se aplican antes de arrancar la versión nueva. PostgreSQL tiene
+esquema `academic`, volumen persistente, red privada y usuario de aplicación.
+El healthcheck devuelve `200` con `database: "up"`, o `503` si la conexión falla.
+
+## Cuenta de demostración
+
+Genera una credencial con `openssl rand -hex 32` y guárdala en `.env` como
+`ACADEMIC_DEMO_TOKEN`; el marcador de `.env.example` es ficticio. Es una credencial
+de la cuenta académica, distinta de la sesión de Synkron. El servidor guarda
+únicamente su SHA-256 y rechaza cuentas deshabilitadas con el mismo `401` que una
+credencial desconocida. El token no se devuelve en las respuestas.
+
+Este comando crea la cuenta desde la raíz del repositorio. Repetirlo con el mismo
+token conserva el ID y no reactiva una cuenta deshabilitada:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+set -o pipefail
+node --env-file=.env <<'NODE' | docker compose exec -T academic-db sh -c 'PGPASSWORD="$ACADEMIC_DB_PASSWORD" psql -h 127.0.0.1 -P pager=off -U "$ACADEMIC_DB_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'
+const { createHash } = require('node:crypto');
+const token = process.env.ACADEMIC_DEMO_TOKEN;
+if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+  throw new Error('ACADEMIC_DEMO_TOKEN debe contener 64 caracteres hexadecimales');
+}
+const hash = createHash('sha256').update(token).digest('hex');
+process.stdout.write(`
+  INSERT INTO academic.accounts (name, token_hash)
+  VALUES ('Cuenta académica de demostración', '${hash}')
+  ON CONFLICT (token_hash)
+  DO UPDATE SET token_hash = EXCLUDED.token_hash
+  RETURNING id, name, enabled;
+`);
+NODE
 ```
 
-## Run tests
+Las rutas de datos exigen `Authorization: Bearer <token>`; `/healthz` es público.
+
+## Rutas de entregas
+
+| Método | Ruta | Resultado |
+|---|---|---|
+| `POST` | `/api/v1/assignments` | `201` con la entrega creada. |
+| `GET` | `/api/v1/assignments` | `200`, array paginado de entregas activas propias. |
+| `GET` | `/api/v1/assignments/export` | `200`, array paginado que incluye las marcas de borrado propias. |
+| `GET` | `/api/v1/assignments/:id` | `200` con el detalle activo propio. |
+| `PATCH` | `/api/v1/assignments/:id` | `200` con la entrega actualizada. |
+| `DELETE` | `/api/v1/assignments/:id` | `204`, sin cuerpo. |
+
+Listados y exportación aceptan `limit` entre 1 y 50 (20 por defecto) y `offset`
+entre 0 y `Number.MAX_SAFE_INTEGER` (0 por defecto). Ordenan por
+`created_at DESC, id DESC`, filtran por cuenta antes de paginar y devuelven `[]`
+al superar el último resultado. No mantienen una instantánea entre peticiones;
+las inserciones concurrentes pueden desplazar páginas.
+
+Las respuestas correctas llevan `Cache-Control: no-store`. Los IDs deben ser
+UUID v4. Un ID o datos inválidos producen `422`; una entrega ajena e inexistente
+devuelven el mismo `404`. El propietario procede del guard. No se admiten
+`account_id`, `id`, `created_at`, `updated_at` o `deleted_at` en el cuerpo.
+
+## Campos y reglas
+
+| Campo | Regla |
+|---|---|
+| `title` | Obligatorio; texto no vacío, máximo 200 caracteres. |
+| `course_name` | Obligatorio; máximo 150 caracteres. |
+| `course_abbreviation` | Opcional, máximo 20 caracteres; `null` si se desconoce. |
+| `section` | `theory`, `practice` o `seminar`. |
+| `mandatory` | Booleano real. |
+| `due_date` / `due_at` | Exclusivamente fecha `YYYY-MM-DD` o instante ISO con zona explícita. |
+| `status` | `pending`, `in_progress` o `submitted`; creación por defecto `pending`. |
+| `work_mode` | `individual` o `group`; creación por defecto `individual`. |
+| `group_members` | Nombres opcionales para grupos; lista vacía para individual; por defecto `[]`. |
+| `weight_percent` / `weight_basis` | Porcentaje 0–100 y referencia `course` o `section`, o ambos `null`. |
+| `grade` | Opcional; 0–10, máximo dos decimales. |
+
+Los textos y nombres se recortan y se rechazan los vacíos. Las notas no se
+redondean y los números no se aceptan como cadenas. Un cero es un dato conocido,
+distinto de `null`. La regla de dos decimales corresponde a notas, no a porcentajes.
+No se calculan medias ni equivalencias entre ponderación de bloque y asignatura.
+
+Una fecha sin hora conserva el día sin inventar medianoche o 23:59. Los instantes
+se devuelven en UTC. La condición de vencida se deriva del plazo, la zona de
+visualización y el estado; no sustituye al progreso como estado persistido.
+
+Creación mínima:
+
+```json
+{
+  "title": "Preparar la entrega",
+  "course_name": "Cloud Computing",
+  "course_abbreviation": "CC",
+  "section": "practice",
+  "mandatory": true,
+  "due_date": "2026-12-01"
+}
+```
+
+## Edición parcial
+
+Todos los campos de negocio son editables. Omitir un campo conserva su valor;
+`null` solo retira un dato nullable. La petición vacía produce `422`. PostgreSQL
+comprueba la combinación final de campos en la misma operación: un error no
+modifica ningún dato enviado. Las actualizaciones de campos independientes
+conservan sus cambios concurrentes sin reescribir una copia antigua de la fila.
+
+Cambiar de día a instante requiere limpiar la representación anterior:
+
+```json
+{
+  "due_date": null,
+  "due_at": "2026-12-01T18:00:00+01:00"
+}
+```
+
+Cambiar de un grupo con integrantes a individual requiere vaciar la lista:
+
+```json
+{
+  "work_mode": "individual",
+  "group_members": []
+}
+```
+
+Para retirar una ponderación se envían ambos campos como `null`. Si ya existe
+una referencia, se puede modificar solo el porcentaje y conservarla. Una nota
+posterior mantiene el ID y `created_at`. `updated_at` avanza solo al cambiar el
+contenido; repetir valores o expresar el mismo instante con otro desplazamiento
+conserva esa fecha.
+
+## Borrado y exportación para Sync
+
+`DELETE` establece `deleted_at` y actualiza `updated_at`. Repetir una eliminación
+propia devuelve `204` conservando las fechas. La fila mantiene su ID y datos;
+no se expone restauración ni purga en este alcance.
+
+Las entregas eliminadas desaparecen del listado normal; detalle y edición
+devuelven `404`. La exportación conserva la última versión de todas las entregas
+propias: `deleted_at: null` en activas y una fecha en eliminadas. No es un
+historial de todos los cambios ni un feed incremental por cursor.
+
+Sync debe leer el array raíz de `/api/v1/assignments/export` y reflejar las marcas
+de borrado en su colección central. Ese motor sigue pendiente; el servicio
+proporciona el contrato de origen. La integración autorizará el origen
+`http://academic:3000` en `SYNC_ALLOWED_CONNECTION_ORIGINS` y utilizará una
+conexión Bearer guardada en Sync.
+
+## Comprobaciones
+
+Desde la raíz:
 
 ```bash
-# unit tests
-$ npm run test
+npm --prefix apps/academic run lint
+npm --prefix apps/academic run build
+npm --prefix apps/academic test -- --runInBand
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d --wait academic-db
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/academic:/app" \
+  academic npm run migrate:up
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/academic:/app" \
+  academic npm run test:e2e -- --runInBand
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Las pruebas crean cuentas y entregas temporales y limpian solo sus registros.
+Comprueban permisos, formatos, cambios simultáneos, consistencia de datos,
+borrado y exportación con PostgreSQL real. CI aplica todas las migraciones sobre
+una base vacía y ejecuta las suites antes de comprobar la imagen Docker.

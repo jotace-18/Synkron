@@ -95,9 +95,25 @@ creación, actualización y ausencia de cambios. La huella incluirá los datos
 normalizados relevantes; no considerará un cambio de contenido la mera fecha de
 la última sincronización. Actividad y evento pendiente se guardarán juntos.
 
-Se mantendrán diferenciadas las fechas sin hora, los instantes y los intervalos,
+Se mantienen diferenciadas las fechas sin hora, los instantes y los intervalos,
 y el significado de vencimiento frente a comienzo. Los valores de estado no se
-reducen automáticamente a un booleano común para todos los tipos. Las columnas,
-restricciones temporales, relaciones y esquemas de `details` se cerrarán antes
-de implementar las migraciones. Esta decisión es de diseño y aún no está aplicada
-en el código.
+reducen automáticamente a un booleano común para todos los tipos. Las columnas
+comunes, identidad y restricciones temporales se concretan en
+[Modelo de actividades](modelo-actividades.md). Relaciones y esquemas de `details`
+se cerrarán con cada tipo de origen. Esta decisión es de diseño y aún no está
+aplicada en el código.
+
+## ADR-010. Borrado de entregas y exportación de su estado
+
+Las entregas académicas se eliminan mediante una marca `deleted_at`. El listado,
+detalle y edición habituales trabajan con registros activos; la exportación
+autenticada conserva también las marcas de borrado de la cuenta. Se mantiene el
+ID y se actualiza `updated_at` al eliminar, para que una sincronización posterior
+pueda reconocer la retirada sin interpretar una página incompleta como un borrado.
+Repetir la eliminación propia conserva las fechas y devuelve `204`.
+
+La exportación ofrece la última versión de cada entrega mediante paginación,
+no un historial de eventos ni una instantánea entre peticiones. El borrado lógico
+y su contrato de origen están implementados en académico. El motor de Sync debe
+incorporar después la interpretación de esas marcas y su efecto en el calendario.
+No se añade una política de purga o restauración a este alcance inicial.

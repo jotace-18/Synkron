@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Post,
@@ -8,6 +9,7 @@ import {
   Req,
   UseGuards,
   HttpStatus,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -42,6 +44,19 @@ export class AssignmentsController {
     return this.assignments.list(request.accountId, query.limit, query.offset);
   }
 
+  @Get('export')
+  @Header('Cache-Control', 'no-store')
+  exportForSync(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: ListAssignmentsDto,
+  ): Promise<Assignment[]> {
+    return this.assignments.exportForSync(
+      request.accountId,
+      query.limit,
+      query.offset,
+    );
+  }
+
   @Get(':id')
   @Header('Cache-Control', 'no-store')
   getById(
@@ -73,5 +88,22 @@ export class AssignmentsController {
     @Body() body: UpdateAssignmentDto,
   ): Promise<Assignment> {
     return this.assignments.update(request.accountId, id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Header('Cache-Control', 'no-store')
+  remove(
+    @Req() request: AuthenticatedRequest,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        version: '4',
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    id: string,
+  ): Promise<void> {
+    return this.assignments.remove(request.accountId, id);
   }
 }

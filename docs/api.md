@@ -6,16 +6,28 @@ Los identificadores y direcciones de este documento son ficticios.
 
 ## Estado del contrato
 
-Están disponibles las rutas de autenticación de la API y la creación, listado
-paginado y prueba de conexiones en Sync. En local se accede a API por el puerto
-3002 y a Sync por el 3001. El encaminamiento de todas las rutas bajo una entrada
+Están disponibles las rutas de autenticación de la API, la creación, listado
+paginado y prueba de conexiones en Sync y la API de entregas de académico. En
+local se accede a API por el puerto 3002, a Sync por el 3001 y a académico por el
+3101. El encaminamiento de todas las rutas bajo una entrada
 pública común, las actividades, sincronizaciones, reglas, historial y calendario
-siguen pendientes. Las operaciones nuevas de este documento son diseño previsto,
-no endpoints ya implementados.
+siguen pendientes. Las operaciones indicadas como previstas en este documento
+son diseño y todavía no están implementadas.
 
 El destino inicial de una sincronización es la colección de actividades de Sync.
 Las tres fuentes se describen en [Servicios de origen](servicios-origen.md). Sus
 contratos de entrada son distintos de la representación común y de la vista.
+
+## Servicio académico de origen
+
+El backend académico se accede en local por `http://127.0.0.1:3101`, con una
+credencial Bearer propia de la cuenta académica. Su colección `/api/v1/assignments`
+admite creación y listado, detalle y edición por ID y borrado lógico. La ruta
+`GET /api/v1/assignments/export` devuelve un array paginado que incluye registros
+eliminados con `deleted_at`, para que Sync pueda reconocer su retirada. El
+[contrato de entregas](../apps/academic/README.md) detalla campos, permisos,
+paginación, actualizaciones parciales y preparación local. La aplicación de esos
+cambios al calendario central requiere el motor de sincronización pendiente.
 
 ## Operaciones
 
@@ -160,10 +172,11 @@ para la siguiente implementación):
     "method": "GET",
     "path": "/assignments",
     "records_path": "items",
-    "resource_type": "academic.assignment"
+    "collection": "assignments"
   },
-  "target": {"type": "central_activities"},
-  "mappings": {"id": "external_id", "title": "title", "due_at": "scheduled_for"},
+  "target": {"type": "central_activities", "activity_type": "academic.assignment"},
+  "mappings": {"id": "external_id", "title": "title"},
+  "schedule": {"role": "deadline", "field": "due_at"},
   "deduplication_key": "id",
   "enabled": true
 }
@@ -172,9 +185,11 @@ para la siguiente implementación):
 El destino es interno y no requiere `target_connection_id` ni una ruta HTTP de
 escritura externa. Este contrato sustituye el ejemplo anterior de transferencia
 entre dos aplicaciones; esa ruta de sincronizaciones aún no está implementada.
-Los nombres `resource_type` y `scheduled_for` son una propuesta de representación,
-no un esquema cerrado. Antes de implementar se fijarán tipos, estados, fechas,
-conversiones, relaciones y detalles específicos admitidos.
+El modelo de destino se concreta en [Modelo de actividades](modelo-actividades.md):
+`type`, `schedule`, `status` y `details` validados. `schedule` sustituye al nombre
+provisional `scheduled_for`. La regla temporal del ejemplo ilustra cómo seleccionar
+el vencimiento de origen; el DTO completo de configuración y sus conversiones aún
+se cerrarán al implementar las definiciones.
 
 El propietario se obtiene de la sesión comprobada y la procedencia de la conexión
 y colección configuradas. La ruta de lectura debe conservar el origen autorizado;
@@ -185,9 +200,15 @@ reimportar un recurso se actualiza su actividad central, sin duplicarla.
 
 `GET /api/v1/activities` reunirá las actividades propias de las tres fuentes.
 Permitirá seleccionar un intervalo temporal, fuente y tipo; la forma concreta
-de filtros y paginación se cerrará con el modelo común. El detalle
+de filtros y paginación se cerrará al implementar la consulta. El detalle
 `GET /api/v1/activities/{id}` conservará la procedencia, la referencia externa,
 los datos comunes y los detalles de origen autorizados.
+
+Las actividades devolverán `schedule` con `kind`, `role`, `date`, `at` y `end_at`.
+Una fecha sin hora usa `kind:date`; un instante conocido usa `kind:instant`; un
+intervalo con final conocido usa `kind:interval`. Los campos no aplicables son
+`null`, los instantes se devuelven en UTC y las fechas sin hora no se convierten
+en medianoche. `tenant_id` y `content_hash` son internos y no se exponen.
 
 La colección pertenece a Sync. `/activities` no es `/activity`: esta última ruta
 representa el historial de cambios y operaciones de Monitoring. El calendario
@@ -252,7 +273,8 @@ en la colección de Sync. La actividad y el evento pendiente se guardan juntos:
   "sync_run_id": "33333333-3333-4333-8333-333333333333",
   "activity_id": "22222222-2222-4222-8222-222222222222",
   "source_connection_id": "11111111-1111-4111-8111-111111111111",
-  "resource_type": "academic.assignment",
+  "source_collection": "assignments",
+  "activity_type": "academic.assignment",
   "external_id": "42",
   "change_type": "updated",
   "changed_fields": ["grade"]

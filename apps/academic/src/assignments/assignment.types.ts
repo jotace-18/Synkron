@@ -15,4 +15,5 @@ export interface Assignment {
   grade: number | null;
   created_at: Date;
   updated_at: Date;
+  deleted_at: Date | null;
 }

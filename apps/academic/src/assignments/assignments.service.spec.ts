@@ -114,4 +114,63 @@ describe('AssignmentsService', () => {
       }),
     ).rejects.toBe(error);
   });
+
+  it.each([
+    'assignments_deadline_valid',
+    'assignments_group_members_valid',
+    'assignments_weight_valid',
+  ])(
+    'reports the known consistency failure %s as 422 without database details',
+    async (constraint) => {
+      query.mockRejectedValue({
+        code: '23514',
+        constraint,
+        detail: 'Private SQL row and internal schema information',
+      });
+
+      const pending = service.update(
+        accountId,
+        '22222222-2222-4222-8222-222222222222',
+        { grade: 0 },
+      );
+      await expect(pending).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      await expect(pending).rejects.not.toThrow('Private SQL');
+    },
+  );
+
+  it('does not disguise unexpected PostgreSQL failures as validation failures', async () => {
+    const error = { code: '42P08', detail: 'Unexpected SQL type error' };
+    query.mockRejectedValue(error);
+    await expect(
+      service.update(accountId, '22222222-2222-4222-8222-222222222222', {
+        grade: 0,
+      }),
+    ).rejects.toBe(error);
+  });
+
+  it('rejects deleting a missing scoped assignment', async () => {
+    query.mockResolvedValue({ rows: [] });
+    const pending = service.remove(
+      accountId,
+      '22222222-2222-4222-8222-222222222222',
+    );
+    await expect(pending).rejects.toBeInstanceOf(NotFoundException);
+    await expect(pending).rejects.toThrow('Entrega no encontrada');
+  });
+
+  it('propagates a database error during deletion', async () => {
+    const error = new Error('Database unavailable');
+    query.mockRejectedValue(error);
+    await expect(
+      service.remove(accountId, '22222222-2222-4222-8222-222222222222'),
+    ).rejects.toBe(error);
+  });
+
+  it('propagates a database error during export', async () => {
+    const error = new Error('Database unavailable');
+    query.mockRejectedValue(error);
+    await expect(service.exportForSync(accountId)).rejects.toBe(error);
+  });
 });

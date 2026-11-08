@@ -160,9 +160,9 @@ Al crear una conexión se indican nombre, dirección y forma de acceso. Una sinc
 
 ## Estado y cierre de implementación
 
-Actualmente hay API de cuentas y sesiones, Sync con creación y listado paginado de conexiones sin autenticación o Bearer cifrado, prueba de conexión limitada a destinos autorizados, sus PostgreSQL independientes y una API ficticia estática de tareas. Las imágenes, la persistencia de las bases actuales y las comprobaciones de CI están preparadas para esos componentes.
+Actualmente hay API de cuentas y sesiones, Sync con creación y listado paginado de conexiones sin autenticación o Bearer cifrado, prueba de conexión limitada a destinos autorizados, sus PostgreSQL independientes y una API ficticia estática de tareas. El [servicio académico](apps/academic/README.md) incorpora su propio PostgreSQL y una API autenticada de entregas con creación, consultas, edición completa, borrado lógico y exportación para Sync. Hay imágenes y comprobaciones de CI para estos backends. La migración de borrado y los escenarios de ciclo de vida de entregas también se han validado en el entorno local.
 
-Quedan por implementar las tres fuentes editables, las actividades centralizadas, el motor y sus ejecuciones, RabbitMQ, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API ficticia actual es un punto de partida y no constituye el servicio académico terminado.
+Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, las actividades centralizadas, el motor y sus ejecuciones, RabbitMQ, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
 
 El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 
@@ -177,3 +177,6 @@ Los mensajes de commit llevan un prefijo que indica el tipo de cambio: `feat:` p
 Los [casos de uso](docs/casos-de-uso.md) y los [requisitos](docs/requisitos.md) describen las funciones previstas. La [arquitectura](docs/arquitectura.md), las [decisiones de diseño](docs/decisiones.md) y la [API](docs/api.md) recogen el detalle de funcionamiento.
 
 Los [servicios de origen](docs/servicios-origen.md) describen las entradas acordadas y los aspectos por concretar. El [backlog](docs/backlog.md) recoge los trabajos necesarios para completar la aplicación.
+
+El [modelo común de actividades](docs/modelo-actividades.md) define identidad,
+campos compartidos y reglas temporales para la próxima implementación.

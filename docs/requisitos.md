@@ -40,6 +40,11 @@ para importar actividades. Los tipos y campos de las tres fuentes se describen e
 se cerrarán antes de implementar sus validaciones. Este alcance está definido
 funcionalmente, pero todavía no está implementado.
 
+La parte común, identidad y reglas temporales se concretan en
+[Modelo de actividades](modelo-actividades.md), con columnas compartidas y
+detalles JSONB validados por tipo. Su esquema no equivale todavía a una migración
+o a un endpoint disponible.
+
 ## Información
 
 | Código | Información que se necesita |
