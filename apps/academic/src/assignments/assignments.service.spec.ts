@@ -88,7 +88,7 @@ describe('AssignmentsService', () => {
     );
     await expect(pending).rejects.toBeInstanceOf(UnprocessableEntityException);
     await expect(pending).rejects.toThrow(
-      'Indica estado o nota para actualizar',
+      'Indica al menos un campo para actualizar',
     );
     expect(query).not.toHaveBeenCalled();
   });

@@ -6,6 +6,82 @@ import { UpdateAssignmentDto } from './update-assignment.dto';
 describe('UpdateAssignmentDto', () => {
   const options = { whitelist: true, forbidNonWhitelisted: true };
 
+  it('accepts normalized metadata without assigning defaults to omitted status or grade', async () => {
+    const dto = plainToInstance(UpdateAssignmentDto, {
+      title: ' Nueva entrega ',
+      course_name: ' Diseño de Software ',
+      course_abbreviation: ' DES ',
+      section: 'seminar',
+      mandatory: false,
+    });
+    expect(await validate(dto, options)).toHaveLength(0);
+    expect(dto).toMatchObject({
+      title: 'Nueva entrega',
+      course_name: 'Diseño de Software',
+      course_abbreviation: 'DES',
+      section: 'seminar',
+      mandatory: false,
+    });
+    expect(dto.status).toBeUndefined();
+    expect(dto.grade).toBeUndefined();
+  });
+
+  it('keeps omitted metadata undefined when updating only a grade', async () => {
+    const dto = plainToInstance(UpdateAssignmentDto, { grade: 0 });
+    expect(await validate(dto, options)).toHaveLength(0);
+    expect(dto.title).toBeUndefined();
+    expect(dto.course_name).toBeUndefined();
+    expect(dto.course_abbreviation).toBeUndefined();
+    expect(dto.section).toBeUndefined();
+    expect(dto.mandatory).toBeUndefined();
+  });
+
+  it('accepts null to remove a course abbreviation', async () => {
+    const dto = plainToInstance(UpdateAssignmentDto, {
+      course_abbreviation: null,
+    });
+    expect(await validate(dto, options)).toHaveLength(0);
+    expect(dto.course_abbreviation).toBeNull();
+    expect(dto.course_name).toBeUndefined();
+  });
+
+  it.each([
+    { label: 'blank title', input: { title: '   ' }, property: 'title' },
+    { label: 'null title', input: { title: null }, property: 'title' },
+    {
+      label: 'oversized title',
+      input: { title: 'a'.repeat(201) },
+      property: 'title',
+    },
+    {
+      label: 'null course',
+      input: { course_name: null },
+      property: 'course_name',
+    },
+    {
+      label: 'blank abbreviation',
+      input: { course_abbreviation: '   ' },
+      property: 'course_abbreviation',
+    },
+    { label: 'null section', input: { section: null }, property: 'section' },
+    {
+      label: 'null mandatory flag',
+      input: { mandatory: null },
+      property: 'mandatory',
+    },
+    {
+      label: 'string mandatory flag',
+      input: { mandatory: 'false' },
+      property: 'mandatory',
+    },
+  ])('rejects $label', async ({ input, property }) => {
+    const errors = await validate(
+      plainToInstance(UpdateAssignmentDto, input),
+      options,
+    );
+    expect(errors.map((error) => error.property)).toContain(property);
+  });
+
   it.each(['pending', 'in_progress', 'submitted'])(
     'accepts status %s without clearing an omitted grade',
     async (status) => {

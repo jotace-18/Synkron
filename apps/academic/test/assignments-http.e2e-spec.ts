@@ -153,6 +153,66 @@ describe('Assignments (HTTP)', () => {
     return result.rows[0].snapshot;
   }
 
+  it('updates descriptive fields and a false mandatory flag while preserving omitted fields', async () => {
+    const before = await createForUpdate({ course_abbreviation: 'CC' });
+    const response = await updateAssignment(before.id, {
+      title: "  Nueva entrega del equipo 'A'  ",
+      course_name: ' Diseño de Software ',
+      course_abbreviation: ' DES ',
+      section: 'seminar',
+      mandatory: false,
+    })
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+    const updated = response.body as AssignmentJson;
+
+    expect(updated).toEqual({
+      ...before,
+      title: "Nueva entrega del equipo 'A'",
+      course_name: 'Diseño de Software',
+      course_abbreviation: 'DES',
+      section: 'seminar',
+      mandatory: false,
+      updated_at: updated.updated_at,
+    });
+    expect(Date.parse(updated.updated_at)).toBeGreaterThan(
+      Date.parse(before.updated_at),
+    );
+    await assignmentDetails(before.id).expect(200).expect(updated);
+    await listAssignments().expect(200).expect([updated]);
+  });
+
+  it('removes a course abbreviation without modifying other fields', async () => {
+    const before = await createForUpdate({ course_abbreviation: 'CC' });
+    const response = await updateAssignment(before.id, {
+      course_abbreviation: null,
+    }).expect(200);
+    const updated = response.body as AssignmentJson;
+
+    expect(updated).toEqual({
+      ...before,
+      course_abbreviation: null,
+      updated_at: updated.updated_at,
+    });
+    expect(Date.parse(updated.updated_at)).toBeGreaterThan(
+      Date.parse(before.updated_at),
+    );
+    await assignmentDetails(before.id).expect(200).expect(updated);
+  });
+
+  it('preserves updated_at when descriptive fields normalize to their existing values', async () => {
+    const before = await createForUpdate();
+
+    await updateAssignment(before.id, {
+      title: `  ${before.title}  `,
+      mandatory: before.mandatory,
+      course_abbreviation: null,
+    })
+      .expect(200)
+      .expect(before);
+    await assignmentDetails(before.id).expect(200).expect(before);
+  });
+
   it('updates status and grade through HTTP while preserving identity and all other details', async () => {
     const before = await createForUpdate({
       work_mode: 'group',
@@ -293,8 +353,8 @@ describe('Assignments (HTTP)', () => {
       patch: { status: 'submitted', updated_at: '2026-11-24T22:59:00Z' },
     },
     {
-      label: 'unsupported title update',
-      patch: { status: 'submitted', title: 'Another title' },
+      label: 'blank title alongside a valid status',
+      patch: { status: 'submitted', title: '   ' },
     },
   ])(
     'rejects a PATCH with $label without modifying the stored assignment',

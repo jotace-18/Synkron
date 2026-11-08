@@ -103,30 +103,49 @@ export class AssignmentsService {
     id: string,
     input: UpdateAssignmentDto,
   ): Promise<Assignment> {
-    const updateStatus = input.status !== undefined;
-    const updateGrade = input.grade !== undefined;
+    const fieldTypes = {
+      title: 'text',
+      course_name: 'text',
+      course_abbreviation: 'text',
+      section: 'text',
+      mandatory: 'boolean',
+      status: 'text',
+      grade: 'numeric',
+    } as const;
+    const fields = (
+      Object.keys(fieldTypes) as (keyof typeof fieldTypes)[]
+    ).filter((field) => input[field] !== undefined);
 
-    if (!updateStatus && !updateGrade) {
+    if (fields.length === 0) {
       throw new UnprocessableEntityException(
-        'Indica estado o nota para actualizar',
+        'Indica al menos un campo para actualizar',
       );
     }
+
+    const parameters = fields.map(
+      (field, index) => `$${index + 3}::${fieldTypes[field]}`,
+    );
+
+    const assignments = fields.map(
+      (field, index) => `${field} = ${parameters[index]}`,
+    );
+
+    const differences = fields.map(
+      (field, index) => `${field} IS DISTINCT FROM ${parameters[index]}`,
+    );
+
+    const values: unknown[] = [
+      accountId,
+      id,
+      ...fields.map((field) => input[field]),
+    ];
 
     const result = await this.database.query<Assignment>(
       `UPDATE academic.assignments
        SET
-         status = CASE
-           WHEN $3::boolean THEN $4::text
-           ELSE status
-         END,
-         grade = CASE
-           WHEN $5::boolean THEN $6::numeric
-           ELSE grade
-         END,
+         ${assignments.join(', ')},
          updated_at = CASE
-           WHEN
-             ($3::boolean AND status IS DISTINCT FROM $4::text)
-             OR ($5::boolean AND grade IS DISTINCT FROM $6::numeric)
+           WHEN ${differences.join(' OR ')}
            THEN clock_timestamp()
            ELSE updated_at
          END
@@ -139,14 +158,7 @@ export class AssignmentsService {
          weight_basis,
          grade::double precision AS grade,
          created_at, updated_at`,
-      [
-        accountId,
-        id,
-        updateStatus,
-        input.status ?? null,
-        updateGrade,
-        input.grade ?? null,
-      ],
+      values,
     );
 
     const assignment = result.rows[0];
