@@ -7,6 +7,9 @@ import {
   Query,
   Req,
   UseGuards,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { BearerGuard, type AuthenticatedRequest } from '../auth/bearer.guard';
 import { AssignmentsService } from './assignments.service';
@@ -35,5 +38,21 @@ export class AssignmentsController {
     @Query() query: ListAssignmentsDto,
   ): Promise<Assignment[]> {
     return this.assignments.list(request.accountId, query.limit, query.offset);
+  }
+
+  @Get(':id')
+  @Header('Cache-Control', 'no-store')
+  getById(
+    @Req() request: AuthenticatedRequest,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        version: '4',
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    id: string,
+  ): Promise<Assignment> {
+    return this.assignments.getById(request.accountId, id);
   }
 }

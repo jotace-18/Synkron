@@ -95,6 +95,81 @@ describe('Assignments (HTTP)', () => {
       .query(query);
   }
 
+  function assignmentDetails(id: string, credential = token) {
+    return request(app.getHttpServer())
+      .get(`${path}/${id}`)
+      .set('Authorization', `Bearer ${credential}`);
+  }
+
+  it('returns the full public details of an owned assignment with consistent serialization', async () => {
+    const created = await createAssignment({
+      ...validInput,
+      due_date: null,
+      due_at: '2026-11-24T23:59:00+01:00',
+      work_mode: 'group',
+      group_members: ['Ana', 'Luis'],
+      grade: 0,
+      weight_percent: 30,
+      weight_basis: 'section',
+    }).expect(201);
+    const body = created.body as { id: string };
+
+    const details = await assignmentDetails(body.id)
+      .expect(200)
+      .expect('Cache-Control', 'no-store')
+      .expect(created.body as Record<string, unknown>);
+    expect(details.body as unknown).not.toHaveProperty('account_id');
+    expect(details.body as unknown).not.toHaveProperty('token_hash');
+  });
+
+  it('returns the same 404 for a foreign assignment and a nonexistent one', async () => {
+    const created = await createAssignment(validInput, otherToken).expect(201);
+    const body = created.body as { id: string };
+    const foreign = await assignmentDetails(body.id)
+      .set('X-Account-Id', otherAccountId)
+      .expect(404)
+      .expect({
+        statusCode: 404,
+        message: 'Entrega no encontrada',
+        error: 'Not Found',
+      });
+    const missing = await assignmentDetails(randomUUID()).expect(404);
+    expect(missing.body as unknown).toEqual(foreign.body as unknown);
+
+    await assignmentDetails(body.id, otherToken)
+      .expect(200)
+      .expect(created.body as Record<string, unknown>);
+  });
+
+  it.each([
+    'not-a-uuid',
+    '11111111-1111-1111-8111-111111111111',
+    '00000000-0000-0000-0000-000000000000',
+  ])('rejects an invalid assignment UUID (%s)', async (id) => {
+    await assignmentDetails(id).expect(422);
+  });
+
+  it.each(['missing', 'unknown', 'disabled'])(
+    'requires a valid credential before parsing a detail ID (%s)',
+    async (kind) => {
+      let credential = token;
+      if (kind === 'unknown') credential = randomBytes(32).toString('hex');
+      if (kind === 'disabled') {
+        await database.query(
+          'UPDATE academic.accounts SET enabled = false WHERE id = $1',
+          [accountId],
+        );
+      }
+      const pending = assignmentDetails('not-a-uuid', credential);
+      if (kind === 'missing') pending.unset('Authorization');
+      await pending.expect(401).expect({
+        statusCode: 401,
+        message: 'Credencial académica no válida',
+        error: 'Unauthorized',
+      });
+    },
+  );
+
   async function seedAssignments(
     owner: string,
     count: number,

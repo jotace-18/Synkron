@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AssignmentsService } from './assignments.service';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
@@ -55,5 +56,24 @@ describe('AssignmentsService', () => {
 
     await expect(service.list(accountId)).rejects.toBe(error);
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a missing scoped assignment as not found', async () => {
+    const id = '22222222-2222-4222-8222-222222222222';
+    query.mockResolvedValue({ rows: [] });
+
+    const pending = service.getById(accountId, id);
+    await expect(pending).rejects.toBeInstanceOf(NotFoundException);
+    await expect(pending).rejects.toThrow('Entrega no encontrada');
+    expect(query.mock.calls[0][1]).toEqual([accountId, id]);
+  });
+
+  it('propagates a database failure instead of reporting an assignment as missing', async () => {
+    const error = new Error('Database unavailable');
+    query.mockRejectedValue(error);
+
+    await expect(
+      service.getById(accountId, '22222222-2222-4222-8222-222222222222'),
+    ).rejects.toBe(error);
   });
 });

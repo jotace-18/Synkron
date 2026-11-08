@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import type { Assignment } from './assignment.types';
 import type { CreateAssignmentDto } from './dto/create-assignment.dto';
@@ -67,5 +67,29 @@ export class AssignmentsService {
     );
 
     return result.rows[0];
+  }
+
+  async getById(accountId: string, id: string): Promise<Assignment> {
+    const result = await this.database.query<Assignment>(
+      `SELECT
+         id, title, course_name, course_abbreviation,
+         section, mandatory, due_date::text, due_at, status,
+         work_mode, group_members,
+         weight_percent::double precision AS weight_percent,
+         weight_basis,
+         grade::double precision AS grade,
+         created_at, updated_at
+       FROM academic.assignments
+       WHERE account_id = $1 AND id = $2`,
+      [accountId, id],
+    );
+
+    const assignment = result.rows[0];
+
+    if (!assignment) {
+      throw new NotFoundException('Entrega no encontrada');
+    }
+
+    return assignment;
   }
 }
