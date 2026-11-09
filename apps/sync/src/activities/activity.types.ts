@@ -61,3 +61,8 @@ export type ActivityImport =
       source_updated_at: string | null;
       source_deleted_at: string;
     };
+
+export interface ActivitySaveResult {
+  id: string;
+  outcome: 'created' | 'updated' | 'unchanged';
+}
