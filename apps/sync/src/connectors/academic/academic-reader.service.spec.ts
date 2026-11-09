@@ -347,4 +347,132 @@ describe('AcademicReaderService', () => {
     await expect(pending).rejects.toBeInstanceOf(BadGatewayException);
     expect(body.locked).toBe(false);
   });
+
+  describe('readAll', () => {
+    function assignments(count: number): AcademicAssignmentSource[] {
+      return Array.from({ length: count }, (_, index) => ({
+        ...assignment(),
+        id: `d1903b29-d126-4c48-9bbf-${index.toString(16).padStart(12, '0')}`,
+      }));
+    }
+
+    function respondWithPages(records: AcademicAssignmentSource[]): void {
+      for (let offset = 0; offset <= records.length; offset += 20) {
+        fetchMock.mockResolvedValueOnce(
+          Response.json(records.slice(offset, offset + 20)),
+        );
+      }
+    }
+
+    it.each([0, 1, 19, 20, 21, 40, 41])(
+      'reads %s assignments in order and stops after the first short page',
+      async (count) => {
+        const records = assignments(count);
+        respondWithPages(records);
+
+        await expect(service.readAll(address, token)).resolves.toEqual(records);
+
+        const requests = Math.floor(count / 20) + 1;
+        expect(fetchMock).toHaveBeenCalledTimes(requests);
+        fetchMock.mock.calls.forEach(([url, options], index) => {
+          expect(url).toEqual(
+            new URL(`${address}?limit=20&offset=${index * 20}`),
+          );
+          expect(options?.headers).toEqual({
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          });
+        });
+      },
+    );
+
+    it('rejects duplicate IDs inside a short page instead of returning duplicate data', async () => {
+      fetchMock.mockResolvedValueOnce(
+        Response.json([assignment(), assignment()]),
+      );
+      await expect(service.readAll(address, token)).rejects.toThrow(
+        'Academic devolvió entregas repetidas durante la paginación',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('recognizes an existing UUID when it reappears on another page in uppercase', async () => {
+      const records = assignments(20);
+      fetchMock.mockResolvedValueOnce(Response.json(records));
+      fetchMock.mockResolvedValueOnce(
+        Response.json([{ ...records[0], id: records[0].id.toUpperCase() }]),
+      );
+      await expect(service.readAll(address, token)).rejects.toThrow(
+        'Academic devolvió entregas repetidas durante la paginación',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops if the source ignores offsets and repeats the same full page', async () => {
+      const records = assignments(20);
+      fetchMock.mockImplementation(() =>
+        Promise.resolve(Response.json(records)),
+      );
+      await expect(service.readAll(address, token)).rejects.toThrow(
+        'Academic devolvió entregas repetidas durante la paginación',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([401, 403, 500])(
+      'rejects the entire read when a later page responds with HTTP %s',
+      async (status) => {
+        fetchMock.mockResolvedValueOnce(Response.json(assignments(20)));
+        fetchMock.mockResolvedValueOnce(
+          new Response('private contents', { status }),
+        );
+        await expect(service.readAll(address, token)).rejects.toThrow(
+          'Academic no devolvió una página de entregas',
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it('does not turn a later network failure into a successful partial result', async () => {
+      fetchMock.mockResolvedValueOnce(Response.json(assignments(20)));
+      fetchMock.mockRejectedValueOnce(new Error(`private token: ${token}`));
+      await expect(service.readAll(address, token)).rejects.toThrow(
+        'No se pudo leer la página de entregas de Academic',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('validates records on later pages and rejects the complete read if one is invalid', async () => {
+      fetchMock.mockResolvedValueOnce(Response.json(assignments(20)));
+      fetchMock.mockResolvedValueOnce(
+        Response.json([{ ...assignment(), grade: 11 }]),
+      );
+      await expect(service.readAll(address, token)).rejects.toThrow(
+        'Academic devolvió una entrega con estructura inválida',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('accepts a short final page at the maximum permitted page count', async () => {
+      const records = assignments(1999);
+      respondWithPages(records);
+      await expect(service.readAll(address, token)).resolves.toEqual(records);
+      expect(fetchMock).toHaveBeenCalledTimes(100);
+    });
+
+    it('fails at the page limit without fetching more pages or returning truncated data', async () => {
+      respondWithPages(assignments(2000));
+      await expect(service.readAll(address, token)).rejects.toThrow(
+        'La lectura académica supera el límite de páginas permitido',
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(100);
+    });
+
+    it('preserves the destination policy before sending credentials or requesting any page', async () => {
+      await expect(
+        service.readAll('http://api:3003/internal/auth/session', token),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });

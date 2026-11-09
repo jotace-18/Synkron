@@ -7,6 +7,46 @@ import { parseAcademicAssignment } from './assignment-source.validator';
 export class AcademicReaderService {
   constructor(private readonly targets: ConnectionTargetPolicyService) {}
 
+  async readAll(
+    address: string,
+    token: string,
+  ): Promise<AcademicAssignmentSource[]> {
+    const limit = 20;
+    const maxPages = 100;
+    const assignments: AcademicAssignmentSource[] = [];
+    const seenIds = new Set<string>();
+
+    for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
+      const page = await this.readPage(
+        address,
+        token,
+        limit,
+        pageIndex * limit,
+      );
+
+      for (const assignment of page) {
+        const identity = assignment.id.toLowerCase();
+
+        if (seenIds.has(identity)) {
+          throw new BadGatewayException(
+            'Academic devolvió entregas repetidas durante la paginación',
+          );
+        }
+
+        seenIds.add(identity);
+        assignments.push(assignment);
+      }
+
+      if (page.length < limit) {
+        return assignments;
+      }
+    }
+
+    throw new BadGatewayException(
+      'La lectura académica supera el límite de páginas permitido',
+    );
+  }
+
   async readPage(
     address: string,
     token: string,
