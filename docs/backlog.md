@@ -368,7 +368,7 @@ Tareas:
 - [x] Implementar la correspondencia de entregas académicas, la identidad común, la huella y la actualización transaccional por actividad.
 - [x] Guardar las marcas explícitas de retirada y permitir la reactivación conservando la identidad central.
 - [x] Integrar conexión guardada, lectura paginada, validación, transformación y persistencia de entregas; comprobar la primera importación y su repetición con Academic real.
-- [ ] Completar la demostración manual de actualización y retirada con Academic real.
+- [x] Completar la demostración manual de actualización y retirada con Academic real, conservando el mismo ID y comprobando la repetición sin cambios.
 - [ ] Ampliar las correspondencias a las demás colecciones y fuentes.
 - [ ] Guardar cada cambio y su evento pendiente juntos mediante outbox.
 - [ ] Excluir las actividades retiradas de la futura consulta de actividades activas.

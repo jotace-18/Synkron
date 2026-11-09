@@ -210,9 +210,10 @@ Las consultas de actividades activas deberán filtrar `deleted_at IS NULL`.
 
 El resultado contiene `connection_id`, `read`, `created`, `updated`, `unchanged`,
 `retired` e `ignored`; no devuelve credenciales ni las entregas completas. La
-primera importación y su repetición se han comprobado con Academic real. Las
-actualizaciones, retiradas y reactivaciones tienen pruebas de integración; su
-demostración manual con Academic queda pendiente.
+primera importación, su repetición, la edición y la retirada se han comprobado
+con Academic real, conservando el mismo ID central. La demostración utiliza una
+entrega temporal que queda retirada en ambas bases. La reactivación está cubierta
+por pruebas de integración.
 
 Cada actividad se guarda en su propia transacción. Si falla la lectura o la
 validación no se empieza a guardar; si falla la persistencia durante el lote,
