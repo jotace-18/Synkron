@@ -47,3 +47,17 @@ export interface ActivityInput {
   details: Record<string, JsonValue>;
   source_updated_at: string | null;
 }
+
+export type ActivityImport =
+  | {
+      action: 'upsert';
+      activity: ActivityInput;
+    }
+  | {
+      action: 'retire';
+      source_connection_id: string;
+      source_collection: string;
+      external_id: string;
+      source_updated_at: string | null;
+      source_deleted_at: string;
+    };
