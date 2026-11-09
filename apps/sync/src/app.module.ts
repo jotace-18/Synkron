@@ -8,6 +8,8 @@ import { SessionClientService } from './session-client/session-client.service';
 import { ConnectionsController } from './connections/connections.controller';
 import { CredentialsService } from './credentials/credentials.service';
 import { ConnectionProbeService } from './connections/connection-probe.service';
+import { ActivitiesService } from './activities/activities.service';
+import { AcademicReaderService } from './connectors/academic/academic-reader.service';
 
 @Module({
   imports: [],
@@ -20,6 +22,8 @@ import { ConnectionProbeService } from './connections/connection-probe.service';
     SessionClientService,
     CredentialsService,
     ConnectionProbeService,
+    ActivitiesService,
+    AcademicReaderService,
   ],
 })
 export class AppModule {}
