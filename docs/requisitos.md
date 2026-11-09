@@ -145,7 +145,7 @@ La sesión se renueva con un identificador nuevo al iniciar sesión. Su caducida
 
 Una misma solicitud con la misma clave identifica la ejecución existente; si cambia su contenido, se rechaza por conflicto. El control de duplicados abarca las solicitudes, los mensajes y las actividades importadas en ejecuciones sucesivas. Una actividad conserva su identidad aunque cambie su fecha, título o nota.
 
-Los cambios se detectan en cada revisión. Al principio serán manuales; la programación se añadirá después. La colección central es el destino inicial y conserva la última información sincronizada. No se incluyen propagación de borrados, edición de vuelta desde el calendario ni conectores reales de Hevy o Strava en este alcance.
+Los cambios se detectan en cada revisión. Al principio serán manuales; la programación se añadirá después. La colección central es el destino inicial y conserva la última información sincronizada. Las retiradas se propagan a partir de marcas explícitas de las fuentes, conservando la identidad central; no se deducen de registros ausentes en una respuesta. No se incluyen edición de vuelta desde el calendario ni conectores reales de Hevy o Strava en este alcance.
 
 El historial distingue entre pedir una acción y completarla. En el destino interno se utilizan transacciones y restricciones para reconocer lo ya guardado. Si se incorpora escritura a destinos externos, se deberá tratar también el resultado incierto de los envíos. Alojar en la UE no sustituye los controles de acceso, conservación y borrado.
 

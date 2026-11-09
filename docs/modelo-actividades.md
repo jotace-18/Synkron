@@ -1,16 +1,17 @@
 # Modelo común de actividades
 
-Contrato de trabajo para la próxima implementación. Todavía no existe la tabla
-de actividades ni una ruta de consulta que aplique este modelo. Las necesidades
-de cada fuente se describen en [Servicios de origen](servicios-origen.md).
+La tabla de actividades, su persistencia y la importación interna de entregas
+académicas están implementadas. Las consultas públicas, las ejecuciones y los
+eventos siguen pendientes. Las necesidades de cada fuente se describen en
+[Servicios de origen](servicios-origen.md).
 
 ## Parte común y detalles
 
-Sync guardará la parte común en `sync.activities` y los detalles específicos en
+Sync guarda la parte común en `sync.activities` y los detalles específicos en
 `details`, un objeto JSONB validado según `type`. La parte común permite consultar
 juntas las actividades sin exigir a un entrenamiento los campos de un examen.
 
-| Campo interno | Tipo previsto | Regla |
+| Campo interno | Tipo | Regla |
 |---|---|---|
 | `id` | UUID | Identidad de Synkron, generada por el backend. |
 | `tenant_id` | UUID | Propietario obtenido del acceso comprobado. |
@@ -31,11 +32,11 @@ juntas las actividades sin exigir a un entrenamiento los campos de un examen.
 | `last_synced_at` | `timestamptz` | Última importación correcta de ese recurso. |
 | `created_at` | `timestamptz` | Creación del registro central. |
 | `updated_at` | `timestamptz` | Última modificación de su contenido central. |
+| `deleted_at` | `timestamptz`, nullable | Instante de retirada comunicado por la fuente; `null` si está activa. |
 
-La conexión deberá pertenecer a `tenant_id`, también mediante integridad en la
-base. Al crear la migración se añadirá la clave compuesta necesaria en conexiones
-para referenciar propietario y conexión juntos. No hay claves foráneas hacia las
-bases de datos de las fuentes.
+La conexión pertenece a `tenant_id`, también mediante integridad en la base.
+Una clave foránea compuesta referencia propietario y conexión juntos. No hay
+claves foráneas hacia las bases de datos de las fuentes.
 
 Las referencias a ejecuciones y sus eventos se incorporarán al implementar las
 tablas de ejecuciones y outbox. El calendario no consulta esos eventos para
@@ -74,7 +75,7 @@ La identidad externa se reconoce por:
 tenant_id + source_connection_id + source_collection + external_id
 ```
 
-La tabla tendrá una restricción única sobre esa combinación. `external_id` se
+La tabla tiene una restricción única sobre esa combinación. `external_id` se
 conserva como texto: no se supone que todas las fuentes utilicen UUID, ni se
 cambian mayúsculas o ceros iniciales.
 
@@ -170,21 +171,54 @@ con el contrato deportivo.
 
 ## Comparación y cambios
 
-La huella compara título, tipo, datos temporales, estado, detalles y referencias
-normalizados. La normalización debe hacer estable el orden de claves de objetos
-y las representaciones temporales. No ordena listas cuyos elementos tengan un
-orden significativo. Se excluyen ID central, marcas de sincronización y fechas
-técnicas para que releer no simule un cambio de contenido.
+La huella compara título, tipo, datos temporales, estado y detalles normalizados.
+El orden de claves de los objetos no afecta al resultado; los instantes llegan
+normalizados a UTC. Se conserva el orden de las listas. La identidad del origen
+se comprueba por separado. Se excluyen ID central, marcas de sincronización y
+fechas técnicas para que releer no simule un cambio de contenido.
 
 `source_updated_at` ayuda al seguimiento, pero no sustituye la comparación si la
-fuente no ofrece una versión fiable. `updated_at` central solo cambia si cambia
-el contenido; `last_synced_at` puede avanzar aunque el contenido sea igual.
+fuente no ofrece una versión fiable. `updated_at` central cambia si cambia el
+contenido o el estado activo/retirado; `last_synced_at` puede avanzar aunque el
+contenido sea igual.
 
 Cada actualización y su evento pendiente se guardarán en una transacción. Una
 nota añadida después mantiene el mismo examen o entrega. Los eventos contienen
 referencias y nombres de campos modificados, no la nota ni el contenido personal
 completo. Los cambios de formato de correspondencias también deberán provocar
 una comparación explícita, sin duplicar identidades.
+
+## Importación interna de entregas
+
+`AcademicImportService.run` recupera la conexión guardada del propietario,
+comprueba que está habilitada y descifra su credencial Bearer. Lee todas las
+páginas del export académico y valida y transforma los registros antes de la
+primera escritura. La colección lógica es `assignments` y el tipo normalizado
+es `academic.assignment`.
+
+Los detalles permitidos son asignatura, abreviatura, parte, obligatoriedad,
+modalidad de trabajo, integrantes, ponderación con su referencia y nota. No se
+copia arbitrariamente la respuesta del origen. Un vencimiento sin hora conserva
+el día; un vencimiento con hora se convierte en un instante UTC.
+
+Una marca explícita de borrado produce una retirada: conserva ID, contenido y
+huella, y registra `deleted_at` con el instante comunicado por la fuente.
+Repetirla solo refresca el seguimiento. Si nunca existió la actividad central,
+se ignora esa retirada sin fabricar un registro. Una entrega que vuelve a
+llegar activa se reactiva con el mismo ID, aunque su huella no haya cambiado.
+Las consultas de actividades activas deberán filtrar `deleted_at IS NULL`.
+
+El resultado contiene `connection_id`, `read`, `created`, `updated`, `unchanged`,
+`retired` e `ignored`; no devuelve credenciales ni las entregas completas. La
+primera importación y su repetición se han comprobado con Academic real. Las
+actualizaciones, retiradas y reactivaciones tienen pruebas de integración; su
+demostración manual con Academic queda pendiente.
+
+Cada actividad se guarda en su propia transacción. Si falla la lectura o la
+validación no se empieza a guardar; si falla la persistencia durante el lote,
+se propaga el error y las actividades anteriores ya confirmadas permanecen.
+El reintento reconoce las identidades existentes. Este servicio es interno:
+todavía no crea trabajos, historial de ejecuciones ni eventos de outbox.
 
 ## Relaciones y límites de responsabilidad
 
@@ -199,7 +233,7 @@ propietario viene del acceso comprobado. La creación y edición se realizan en
 las fuentes; la colección central la modifica el motor de Sync. El backend
 filtra las actividades propias antes de paginar y de devolver detalles.
 
-Quedan para las próximas implementaciones los esquemas de `details`, los valores
-de estado por tipo, el contrato completo de correspondencias, las consultas y
-filtros temporales y las tablas de definiciones/ejecuciones. Este documento cierra
-la parte común y las combinaciones temporales, no implementa esas funciones.
+Quedan para las próximas implementaciones los esquemas de `details` y los estados
+de los demás tipos, el contrato completo de correspondencias, las consultas y
+filtros temporales y las tablas de definiciones/ejecuciones. La implementación
+actual cubre la parte común y el recorrido interno de las entregas académicas.

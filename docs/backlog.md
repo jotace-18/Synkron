@@ -363,10 +363,15 @@ Criterios de aceptación:
 Tareas:
 
 - [x] Documentar campos comunes y reglas temporales en [Modelo de actividades](modelo-actividades.md).
-- [ ] Crear y probar la migración de actividades y sus restricciones de identidad/propiedad.
+- [x] Crear y probar la migración de actividades y sus restricciones de identidad/propiedad.
 - [ ] Cerrar los esquemas de detalles y relaciones de cada tipo.
-- [ ] Implementar correspondencias, identidad, comparación y actualización transaccional.
-- [ ] Interpretar las marcas de borrado de las fuentes y retirar su representación de la vista central.
+- [x] Implementar la correspondencia de entregas académicas, la identidad común, la huella y la actualización transaccional por actividad.
+- [x] Guardar las marcas explícitas de retirada y permitir la reactivación conservando la identidad central.
+- [x] Integrar conexión guardada, lectura paginada, validación, transformación y persistencia de entregas; comprobar la primera importación y su repetición con Academic real.
+- [ ] Completar la demostración manual de actualización y retirada con Academic real.
+- [ ] Ampliar las correspondencias a las demás colecciones y fuentes.
+- [ ] Guardar cada cambio y su evento pendiente juntos mediante outbox.
+- [ ] Excluir las actividades retiradas de la futura consulta de actividades activas.
 - [ ] Añadir lectura autenticada y paginada de actividades propias.
 - [ ] Probar dos fuentes, actualizaciones, relaciones, repeticiones y accesos cruzados.
 
