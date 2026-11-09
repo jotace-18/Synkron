@@ -2,16 +2,25 @@ import type { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { ActivitiesService } from './activities.service';
 import { activityContentHash } from './activity-content-hash';
-import type { ActivityInput, ActivitySaveResult } from './activity.types';
+import type {
+  ActivityInput,
+  ActivityRetirement,
+  ActivityRetirementResult,
+  ActivitySaveResult,
+} from './activity.types';
 
-describe('ActivitiesService.save', () => {
+describe('ActivitiesService', () => {
   const tenantId = '11111111-1111-4111-8111-111111111111';
   const storedId = '33333333-3333-4333-8333-333333333333';
   const query = jest.fn<Promise<{ rows: unknown[] }>, [string, unknown[]?]>();
   const client = { query } as unknown as PoolClient;
   const transaction = jest.fn<
-    Promise<ActivitySaveResult>,
-    [(connection: PoolClient) => Promise<ActivitySaveResult>]
+    Promise<ActivitySaveResult | ActivityRetirementResult>,
+    [
+      (
+        connection: PoolClient,
+      ) => Promise<ActivitySaveResult | ActivityRetirementResult>,
+    ]
   >();
   let service: ActivitiesService;
 
@@ -80,7 +89,13 @@ describe('ActivitiesService.save', () => {
   it('returns unchanged with the original ID and refreshes only synchronization metadata', async () => {
     const input = activity();
     query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
-      rows: [{ id: storedId, content_hash: activityContentHash(input) }],
+      rows: [
+        {
+          id: storedId,
+          content_hash: activityContentHash(input),
+          deleted_at: null,
+        },
+      ],
     });
 
     await expect(service.save(tenantId, input)).resolves.toEqual({
@@ -103,7 +118,7 @@ describe('ActivitiesService.save', () => {
 
   it('returns updated with the original ID when business content changes', async () => {
     query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
-      rows: [{ id: storedId, content_hash: 'old-hash' }],
+      rows: [{ id: storedId, content_hash: 'old-hash', deleted_at: null }],
     });
 
     await expect(service.save(tenantId, activity())).resolves.toEqual({
@@ -149,6 +164,7 @@ describe('ActivitiesService.save', () => {
             {
               id: storedId,
               content_hash: sameHash ? activityContentHash(input) : 'old-hash',
+              deleted_at: null,
             },
           ],
         })
@@ -161,5 +177,115 @@ describe('ActivitiesService.save', () => {
     const error = new Error('Commit failed');
     transaction.mockRejectedValueOnce(error);
     await expect(service.save(tenantId, activity())).rejects.toBe(error);
+  });
+
+  it.each([true, false])(
+    'reactivates a retired activity even if its hash is unchanged: %s',
+    async (sameHash) => {
+      const input = activity();
+      query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+        rows: [
+          {
+            id: storedId,
+            content_hash: sameHash ? activityContentHash(input) : 'old-hash',
+            deleted_at: new Date('2026-11-09T12:00:00Z'),
+          },
+        ],
+      });
+      await expect(service.save(tenantId, input)).resolves.toEqual({
+        id: storedId,
+        outcome: 'updated',
+      });
+      expect(query.mock.calls[2][0]).toMatch(/deleted_at\s*=\s*NULL/);
+    },
+  );
+
+  describe('retire', () => {
+    function retirement(): ActivityRetirement {
+      return {
+        action: 'retire',
+        source_connection_id: activity().source_connection_id,
+        source_collection: 'assignments',
+        external_id: '001',
+        source_updated_at: '2026-11-09T12:00:00.000Z',
+        source_deleted_at: '2026-11-09T12:00:00.000Z',
+      };
+    }
+
+    it('returns not_found without inventing an activity for an unknown source identity', async () => {
+      await expect(service.retire(tenantId, retirement())).resolves.toEqual({
+        id: null,
+        outcome: 'not_found',
+      });
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(query.mock.calls[0][1]).toEqual([
+        tenantId,
+        activity().source_connection_id,
+        'assignments',
+        '001',
+      ]);
+      expect(query.mock.calls[0][0]).toContain('FOR UPDATE');
+    });
+
+    it('retires the scoped activity using the source deletion time and preserves its ID', async () => {
+      query.mockResolvedValueOnce({
+        rows: [{ id: storedId, deleted_at: null }],
+      });
+      const input = retirement();
+      await expect(service.retire(tenantId, input)).resolves.toEqual({
+        id: storedId,
+        outcome: 'retired',
+      });
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(query.mock.calls[1][1]).toEqual([
+        storedId,
+        tenantId,
+        input.source_deleted_at,
+        input.source_updated_at,
+      ]);
+      expect(query.mock.calls[1][0]).not.toMatch(/content_hash\s*=/);
+    });
+
+    it('refreshes tracking without changing an existing deletion mark or modification time', async () => {
+      query.mockResolvedValueOnce({
+        rows: [{ id: storedId, deleted_at: new Date('2026-11-09T12:00:00Z') }],
+      });
+      await expect(service.retire(tenantId, retirement())).resolves.toEqual({
+        id: storedId,
+        outcome: 'unchanged',
+      });
+      expect(query.mock.calls[1][1]).toEqual([
+        storedId,
+        tenantId,
+        retirement().source_updated_at,
+      ]);
+      expect(query.mock.calls[1][0]).not.toMatch(/\bdeleted_at\s*=/);
+      expect(query.mock.calls[1][0]).not.toMatch(/\bupdated_at\s*=/);
+    });
+
+    it('propagates a failed retirement lookup', async () => {
+      const error = new Error('Lookup failed');
+      query.mockRejectedValueOnce(error);
+      await expect(service.retire(tenantId, retirement())).rejects.toBe(error);
+    });
+
+    it.each([null, new Date('2026-11-09T12:00:00Z')])(
+      'does not report retirement success after a failed write (previous deletion: %s)',
+      async (deleted_at) => {
+        const error = new Error('Write failed');
+        query
+          .mockResolvedValueOnce({ rows: [{ id: storedId, deleted_at }] })
+          .mockRejectedValueOnce(error);
+        await expect(service.retire(tenantId, retirement())).rejects.toBe(
+          error,
+        );
+      },
+    );
+
+    it('propagates a retirement transaction failure', async () => {
+      const error = new Error('Commit failed');
+      transaction.mockRejectedValueOnce(error);
+      await expect(service.retire(tenantId, retirement())).rejects.toBe(error);
+    });
   });
 });

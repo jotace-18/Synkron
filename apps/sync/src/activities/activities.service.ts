@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { activityContentHash } from './activity-content-hash';
-import type { ActivityInput, ActivitySaveResult } from './activity.types';
+import type {
+  ActivityInput,
+  ActivityRetirement,
+  ActivityRetirementResult,
+  ActivitySaveResult,
+} from './activity.types';
 
 @Injectable()
 export class ActivitiesService {
@@ -55,8 +60,9 @@ export class ActivitiesService {
       const existing = await client.query<{
         id: string;
         content_hash: string;
+        deleted_at: Date | null;
       }>(
-        `SELECT id, content_hash
+        `SELECT id, content_hash, deleted_at
          FROM sync.activities
          WHERE tenant_id = $1
            AND source_connection_id = $2
@@ -71,7 +77,7 @@ export class ActivitiesService {
         throw new Error('No se pudo recuperar la actividad existente');
       }
 
-      if (stored.content_hash === hash) {
+      if (stored.content_hash === hash && stored.deleted_at === null) {
         await client.query(
           `UPDATE sync.activities
            SET source_updated_at = $3::timestamptz,
@@ -95,6 +101,7 @@ export class ActivitiesService {
              details = $13::jsonb,
              source_updated_at = $14::timestamptz,
              content_hash = $15,
+             deleted_at = NULL,
              updated_at = clock_timestamp(),
              last_synced_at = clock_timestamp()
          WHERE tenant_id = $1
@@ -105,5 +112,65 @@ export class ActivitiesService {
       );
       return { id: stored.id, outcome: 'updated' };
     });
+  }
+
+  async retire(
+    tenantId: string,
+    retirement: ActivityRetirement,
+  ): Promise<ActivityRetirementResult> {
+    return this.database.transaction<ActivityRetirementResult>(
+      async (client) => {
+        const existing = await client.query<{
+          id: string;
+          deleted_at: Date | null;
+        }>(
+          `SELECT id, deleted_at
+         FROM sync.activities
+         WHERE tenant_id = $1
+           AND source_connection_id = $2
+           AND source_collection = $3
+           AND external_id = $4
+         FOR UPDATE`,
+          [
+            tenantId,
+            retirement.source_connection_id,
+            retirement.source_collection,
+            retirement.external_id,
+          ],
+        );
+
+        const stored = existing.rows[0];
+        if (!stored) {
+          return { id: null, outcome: 'not_found' };
+        }
+
+        if (stored.deleted_at !== null) {
+          await client.query(
+            `UPDATE sync.activities
+           SET source_updated_at = $3::timestamptz,
+               last_synced_at = clock_timestamp()
+           WHERE id = $1 AND tenant_id = $2`,
+            [stored.id, tenantId, retirement.source_updated_at],
+          );
+          return { id: stored.id, outcome: 'unchanged' };
+        }
+
+        await client.query(
+          `UPDATE sync.activities
+         SET deleted_at = $3::timestamptz,
+             source_updated_at = $4::timestamptz,
+             updated_at = clock_timestamp(),
+             last_synced_at = clock_timestamp()
+         WHERE id = $1 AND tenant_id = $2`,
+          [
+            stored.id,
+            tenantId,
+            retirement.source_deleted_at,
+            retirement.source_updated_at,
+          ],
+        );
+        return { id: stored.id, outcome: 'retired' };
+      },
+    );
   }
 }

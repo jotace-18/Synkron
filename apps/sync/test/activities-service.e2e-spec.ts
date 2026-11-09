@@ -4,6 +4,7 @@ import { ActivitiesService } from '../src/activities/activities.service';
 import { activityContentHash } from '../src/activities/activity-content-hash';
 import type {
   ActivityInput,
+  ActivityRetirement,
   JsonValue,
 } from '../src/activities/activity.types';
 import { DatabaseService } from '../src/database/database.service';
@@ -28,6 +29,7 @@ interface StoredActivity {
   last_synced_at: Date;
   created_at: Date;
   updated_at: Date;
+  deleted_at: Date | null;
 }
 
 describe('ActivitiesService (PostgreSQL integration)', () => {
@@ -146,6 +148,7 @@ describe('ActivitiesService (PostgreSQL integration)', () => {
       details: input.details,
       source_updated_at: new Date(input.source_updated_at!),
       content_hash: activityContentHash(input),
+      deleted_at: null,
     });
     expect(await count()).toBe(1);
   });
@@ -390,5 +393,242 @@ describe('ActivitiesService (PostgreSQL integration)', () => {
       }),
     ).rejects.toMatchObject({ code: '22012' });
     expect(await stored(first.id)).toEqual(before);
+  });
+
+  describe('retirement and reactivation', () => {
+    function retirement(
+      overrides: Partial<ActivityRetirement> = {},
+    ): ActivityRetirement {
+      return {
+        action: 'retire',
+        source_connection_id: connectionId,
+        source_collection: 'assignments',
+        external_id: '001',
+        source_updated_at: '2026-11-09T12:00:00.000Z',
+        source_deleted_at: '2026-11-09T12:00:00.000Z',
+        ...overrides,
+      };
+    }
+
+    it('marks an existing activity as retired without deleting its identity or business content', async () => {
+      const first = await service.save(owner, activity());
+      const before = await pinTimes(first.id);
+      const input = retirement({
+        source_deleted_at: '2026-11-09T13:00:00+01:00',
+      });
+      expect(await service.retire(owner, input)).toEqual({
+        id: first.id,
+        outcome: 'retired',
+      });
+      const after = await stored(first.id);
+      expect(after).toMatchObject({
+        id: first.id,
+        created_at: oldTime,
+        title: before.title,
+        details: before.details,
+        content_hash: before.content_hash,
+        on_date: before.on_date,
+        deleted_at: new Date('2026-11-09T12:00:00.000Z'),
+        source_updated_at: new Date(input.source_updated_at!),
+      });
+      expect(after.updated_at.getTime()).toBeGreaterThan(oldTime.getTime());
+      expect(after.last_synced_at.getTime()).toBeGreaterThan(oldTime.getTime());
+      expect(await count()).toBe(1);
+    });
+
+    it('treats repeated retirements as unchanged and refreshes only read metadata', async () => {
+      const first = await service.save(owner, activity());
+      await service.retire(owner, retirement());
+      const before = await pinTimes(first.id);
+      const input = retirement({ source_updated_at: '2026-11-09T13:00:00Z' });
+      expect(await service.retire(owner, input)).toEqual({
+        id: first.id,
+        outcome: 'unchanged',
+      });
+      const after = await stored(first.id);
+      expect(after).toMatchObject({
+        created_at: before.created_at,
+        updated_at: before.updated_at,
+        deleted_at: before.deleted_at,
+        content_hash: before.content_hash,
+        source_updated_at: new Date(input.source_updated_at!),
+      });
+      expect(after.last_synced_at.getTime()).toBeGreaterThan(oldTime.getTime());
+      expect(await count()).toBe(1);
+    });
+
+    it('does not invent an activity when the source record was deleted before its first import', async () => {
+      expect(await service.retire(owner, retirement())).toEqual({
+        id: null,
+        outcome: 'not_found',
+      });
+      expect(await service.retire(owner, retirement())).toEqual({
+        id: null,
+        outcome: 'not_found',
+      });
+      expect(await count()).toBe(0);
+    });
+
+    it('cannot retire an activity belonging to another owner', async () => {
+      const first = await service.save(owner, activity());
+      const before = await stored(first.id);
+      expect(await service.retire(otherOwner, retirement())).toEqual({
+        id: null,
+        outcome: 'not_found',
+      });
+      expect(await stored(first.id)).toEqual(before);
+      expect(await count(otherOwner)).toBe(0);
+    });
+
+    it('does not confuse two connections owned by the same user', async () => {
+      const first = await service.save(owner, activity());
+      const before = await stored(first.id);
+      const secondConnection = await createConnection(owner);
+      expect(
+        await service.retire(
+          owner,
+          retirement({ source_connection_id: secondConnection }),
+        ),
+      ).toEqual({ id: null, outcome: 'not_found' });
+      expect(await stored(first.id)).toEqual(before);
+    });
+
+    it.each([
+      { source_collection: 'exams' },
+      { external_id: '1' },
+      { external_id: 'ABC' },
+    ])(
+      'does not retire another collection or textual external identity: %j',
+      async (identity) => {
+        const first = await service.save(owner, activity());
+        const before = await stored(first.id);
+        expect(await service.retire(owner, retirement(identity))).toEqual({
+          id: null,
+          outcome: 'not_found',
+        });
+        expect(await stored(first.id)).toEqual(before);
+      },
+    );
+
+    it('reactivates identical content with the original central ID and creation time', async () => {
+      const first = await service.save(owner, activity());
+      await service.retire(owner, retirement());
+      const before = await pinTimes(first.id);
+      expect(await service.save(owner, activity())).toEqual({
+        id: first.id,
+        outcome: 'updated',
+      });
+      const after = await stored(first.id);
+      expect(after).toMatchObject({
+        id: first.id,
+        created_at: oldTime,
+        deleted_at: null,
+        content_hash: before.content_hash,
+      });
+      expect(after.updated_at.getTime()).toBeGreaterThan(oldTime.getTime());
+      expect(await service.save(owner, activity())).toEqual({
+        id: first.id,
+        outcome: 'unchanged',
+      });
+      expect((await stored(first.id)).updated_at).toEqual(after.updated_at);
+      expect(await count()).toBe(1);
+    });
+
+    it('reactivates changed content without creating a new activity', async () => {
+      const first = await service.save(owner, activity());
+      await service.retire(owner, retirement());
+      const input = activity({
+        title: 'Entrega reactivada',
+        status: 'submitted',
+        details: { grade: 0, mandatory: false },
+      });
+      expect(await service.save(owner, input)).toEqual({
+        id: first.id,
+        outcome: 'updated',
+      });
+      expect(await stored(first.id)).toMatchObject({
+        deleted_at: null,
+        title: input.title,
+        status: 'submitted',
+        details: input.details,
+        content_hash: activityContentHash(input),
+      });
+      expect(await count()).toBe(1);
+    });
+
+    it('can retire a reactivated activity again using the new source deletion timestamp', async () => {
+      const first = await service.save(owner, activity());
+      await service.retire(owner, retirement());
+      await service.save(owner, activity());
+      const input = retirement({
+        source_deleted_at: '2026-11-10T12:00:00Z',
+        source_updated_at: '2026-11-10T12:00:00Z',
+      });
+      expect(await service.retire(owner, input)).toEqual({
+        id: first.id,
+        outcome: 'retired',
+      });
+      expect((await stored(first.id)).deleted_at).toEqual(
+        new Date(input.source_deleted_at),
+      );
+    });
+
+    it('changes the retirement state only once for concurrent identical retirement requests', async () => {
+      const first = await service.save(owner, activity());
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => service.retire(owner, retirement())),
+      );
+      expect(results.every((result) => result.id === first.id)).toBe(true);
+      expect(
+        results.filter((result) => result.outcome === 'retired'),
+      ).toHaveLength(1);
+      expect(
+        results.filter((result) => result.outcome === 'unchanged'),
+      ).toHaveLength(5);
+      expect(await count()).toBe(1);
+    });
+
+    it('reactivates only once when identical active imports arrive concurrently', async () => {
+      const first = await service.save(owner, activity());
+      await service.retire(owner, retirement());
+      const results = await Promise.all(
+        Array.from({ length: 6 }, () => service.save(owner, activity())),
+      );
+      expect(results.every((result) => result.id === first.id)).toBe(true);
+      expect(
+        results.filter((result) => result.outcome === 'updated'),
+      ).toHaveLength(1);
+      expect(
+        results.filter((result) => result.outcome === 'unchanged'),
+      ).toHaveLength(5);
+      expect((await stored(first.id)).deleted_at).toBeNull();
+      expect(await count()).toBe(1);
+    });
+
+    it('rolls back an invalid retirement timestamp and keeps the activity intact', async () => {
+      const first = await service.save(owner, activity());
+      const before = await stored(first.id);
+      await expect(
+        service.retire(
+          owner,
+          retirement({ source_deleted_at: 'not-a-timestamp' }),
+        ),
+      ).rejects.toMatchObject({ code: '22007' });
+      expect(await stored(first.id)).toEqual(before);
+      expect((await service.retire(owner, retirement())).outcome).toBe(
+        'retired',
+      );
+    });
+
+    it('supports a known source deletion timestamp without a source modification timestamp', async () => {
+      const first = await service.save(owner, activity());
+      expect(
+        await service.retire(owner, retirement({ source_updated_at: null })),
+      ).toEqual({ id: first.id, outcome: 'retired' });
+      expect(await stored(first.id)).toMatchObject({
+        deleted_at: new Date(retirement().source_deleted_at),
+        source_updated_at: null,
+      });
+    });
   });
 });

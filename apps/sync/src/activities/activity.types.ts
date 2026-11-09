@@ -66,3 +66,15 @@ export interface ActivitySaveResult {
   id: string;
   outcome: 'created' | 'updated' | 'unchanged';
 }
+
+export type ActivityRetirement = Extract<ActivityImport, { action: 'retire' }>;
+
+export type ActivityRetirementResult =
+  | {
+      id: string;
+      outcome: 'retired' | 'unchanged';
+    }
+  | {
+      id: null;
+      outcome: 'not_found';
+    };
