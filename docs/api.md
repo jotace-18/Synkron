@@ -161,35 +161,38 @@ contados durante la lectura, también cuando no hay `Content-Length` fiable.
 Una credencial que no puede descifrarse produce `503` sin contactar con el destino.
 El resultado se devuelve en esta petición; guardar la última prueba queda pendiente.
 
-Creación de sincronización, `POST /api/v1/sync-definitions` (propuesta de contrato
-para la siguiente implementación):
+Creación de sincronización, `POST /api/v1/sync-definitions` (DTO y servicio de
+creación implementados; ruta pendiente):
 
 ```json
 {
   "name": "Centralizar entregas académicas",
   "source_connection_id": "11111111-1111-4111-8111-111111111111",
-  "source": {
-    "method": "GET",
-    "path": "/assignments",
-    "records_path": "items",
-    "collection": "assignments"
-  },
-  "target": {"type": "central_activities", "activity_type": "academic.assignment"},
-  "mappings": {"id": "external_id", "title": "title"},
-  "schedule": {"role": "deadline", "field": "due_at"},
-  "deduplication_key": "id",
+  "connector": "academic.assignments",
   "enabled": true
 }
 ```
 
-El destino es interno y no requiere `target_connection_id` ni una ruta HTTP de
-escritura externa. Este contrato sustituye el ejemplo anterior de transferencia
-entre dos aplicaciones; esa ruta de sincronizaciones aún no está implementada.
-El modelo de destino se concreta en [Modelo de actividades](modelo-actividades.md):
-`type`, `schedule`, `status` y `details` validados. `schedule` sustituye al nombre
-provisional `scheduled_for`. La regla temporal del ejemplo ilustra cómo seleccionar
-el vencimiento de origen; el DTO completo de configuración y sus conversiones aún
-se cerrarán al implementar las definiciones.
+El nombre se recorta y debe contener entre 1 y 100 caracteres. La conexión se
+identifica mediante un UUID v4 y el único conector admitido por ahora es
+`academic.assignments`. `enabled` es un booleano y vale `true` si se omite.
+No se convierten cadenas como `"false"` en booleanos. Se rechazan campos
+adicionales, incluidos propietario, credenciales, colección y fechas técnicas.
+
+Este primer conector utiliza la lectura y la correspondencia de entregas ya
+implementadas: colección `assignments`, destino central y tipo
+`academic.assignment`. La URL de exportación y la credencial proceden de la
+conexión guardada. El modelo de destino se concreta en
+[Modelo de actividades](modelo-actividades.md). La configuración de
+correspondencias personalizadas y los demás conectores siguen pendientes.
+El servicio comprueba la existencia y propiedad de la conexión y exige que esté
+habilitada y tenga configurada una credencial Bearer. No realiza una petición al
+origen al crear la definición. Un recurso inexistente o ajeno produce `404`, una
+conexión deshabilitada produce `409` y una autenticación incompatible, `400`.
+La comprobación y la creación usan una transacción. El propietario y la colección
+se fijan en el servidor; la respuesta no incluye propietario ni credenciales.
+Dos definiciones activas para la misma conexión y colección producen `409`.
+Se permiten alternativas deshabilitadas sin sustituir la definición activa.
 
 El propietario se obtiene de la sesión comprobada y la procedencia de la conexión
 y colección configuradas. La ruta de lectura debe conservar el origen autorizado;
