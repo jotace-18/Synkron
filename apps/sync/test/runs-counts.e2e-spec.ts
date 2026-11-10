@@ -91,8 +91,9 @@ describe('Sync run counts (PostgreSQL integration)', () => {
     const result = await database.query<RunRow>(
       `INSERT INTO sync.runs (
          tenant_id, definition_id, status, created_at, started_at, finished_at,
-         read_count, created_count, updated_count, unchanged_count, retired_count, ignored_count
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+         read_count, created_count, updated_count, unchanged_count, retired_count, ignored_count,
+         error_code, error_message
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
       [
         owner,
         definitionId,
@@ -101,6 +102,10 @@ describe('Sync run counts (PostgreSQL integration)', () => {
         status === 'queued' ? null : startedAt,
         status === 'completed' || status === 'failed' ? finishedAt : null,
         ...fields.map((field) => counts[field]),
+        status === 'failed' ? 'source_error' : null,
+        status === 'failed'
+          ? 'No se pudieron obtener datos válidos de la fuente.'
+          : null,
       ],
     );
     return result.rows[0];
@@ -272,7 +277,8 @@ describe('Sync run counts (PostgreSQL integration)', () => {
   it('retains partial counters when an execution fails', async () => {
     const before = await insertRun({ read_count: 3, created_count: 1 });
     await database.query(
-      `UPDATE sync.runs SET status = 'failed', finished_at = $3
+      `UPDATE sync.runs SET status = 'failed', finished_at = $3,
+         error_code = 'source_error', error_message = 'No se pudieron obtener datos válidos de la fuente.'
        WHERE tenant_id = $1 AND id = $2`,
       [owner, before.id, finishedAt],
     );

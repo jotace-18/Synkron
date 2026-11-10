@@ -90,8 +90,8 @@ describe('Sync runs table (PostgreSQL integration)', () => {
       ...overrides,
     };
     const result = await database.query<RunRow>(
-      `INSERT INTO sync.runs (tenant_id, definition_id, status, created_at, started_at, finished_at)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      `INSERT INTO sync.runs (tenant_id, definition_id, status, created_at, started_at, finished_at, error_code, error_message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         input.tenantId,
         input.definitionId,
@@ -99,6 +99,10 @@ describe('Sync runs table (PostgreSQL integration)', () => {
         input.createdAt,
         input.startedAt,
         input.finishedAt,
+        input.status === 'failed' ? 'source_error' : null,
+        input.status === 'failed'
+          ? 'No se pudieron obtener datos válidos de la fuente.'
+          : null,
       ],
     );
     return result.rows[0];

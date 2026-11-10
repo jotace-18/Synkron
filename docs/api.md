@@ -235,6 +235,19 @@ usarán un backend autorizado y no recibirán los secretos de sus conexiones.
 
 ## Ejecuciones y reglas (previstas)
 
+La tabla de ejecuciones ya dispone de estados, fechas y contadores. Los estados
+son `queued`, `running`, `completed` y `failed`. Los contadores distinguen registros
+leídos, creados, actualizados, sin cambios, retirados e ignorados. Una ejecución
+completada debe contabilizar todos los registros leídos; una fallida puede
+conservar resultados parciales.
+
+Una ejecución fallida exige `error_code` y `error_message`; los demás estados
+mantienen ambos campos vacíos. Los mensajes proceden de un catálogo fijo según
+el tipo de excepción: fuente, configuración, dependencia, almacenamiento o fallo
+desconocido. No se copian mensajes originales, respuestas externas, sentencias
+SQL ni credenciales. Esta conversión está preparada para el futuro procesador;
+las rutas de solicitud y consulta de ejecuciones y el worker siguen pendientes.
+
 Solicitud de ejecución: `POST /api/v1/sync-definitions/{id}/runs`, cuerpo `{}`, cabecera `Idempotency-Key: tareas-001`.
 
 ```json
