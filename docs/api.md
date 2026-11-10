@@ -7,11 +7,12 @@ Los identificadores y direcciones de este documento son ficticios.
 ## Estado del contrato
 
 Están disponibles las rutas de autenticación de la API, la creación, listado
-paginado y prueba de conexiones en Sync y la API de entregas de académico. En
+paginado y prueba de conexiones en Sync, la creación de definiciones de
+sincronización y la API de entregas de académico. En
 local se accede a API por el puerto 3002, a Sync por el 3001 y a académico por el
 3101. El encaminamiento de todas las rutas bajo una entrada
-pública común, las actividades, sincronizaciones, reglas, historial y calendario
-siguen pendientes. Las operaciones indicadas como previstas en este documento
+pública común, las consultas de actividades, las ejecuciones, las reglas, el
+historial y el calendario siguen pendientes. Las operaciones indicadas como previstas en este documento
 son diseño y todavía no están implementadas.
 
 El destino inicial de una sincronización es la colección de actividades de Sync.
@@ -41,7 +42,8 @@ cambios al calendario central requiere el motor de sincronización pendiente.
 | GET / POST | `/connections` | `200` listado / `201` conexión. |
 | GET / PATCH | `/connections/{id}` | `200` detalle o cambio. |
 | POST | `/connections/{id}/test` | `200` resultado de prueba acotada. |
-| GET / POST | `/sync-definitions` | `200` listado / `201` definición. |
+| POST | `/sync-definitions` | `201`, definición creada; disponible. |
+| GET | `/sync-definitions` | `200`, listado; previsto. |
 | GET / PATCH | `/sync-definitions/{id}` | `200` detalle o cambio. |
 | POST | `/sync-definitions/{id}/runs` | `202`, ejecución pendiente y `Location`. |
 | GET | `/sync-runs/{id}` | `200`, estado guardado por Sync. |
@@ -161,8 +163,7 @@ contados durante la lectura, también cuando no hay `Content-Length` fiable.
 Una credencial que no puede descifrarse produce `503` sin contactar con el destino.
 El resultado se devuelve en esta petición; guardar la última prueba queda pendiente.
 
-Creación de sincronización, `POST /api/v1/sync-definitions` (DTO y servicio de
-creación implementados; ruta pendiente):
+Creación de sincronización, `POST /api/v1/sync-definitions` (disponible):
 
 ```json
 {
@@ -193,6 +194,14 @@ La comprobación y la creación usan una transacción. El propietario y la colec
 se fijan en el servidor; la respuesta no incluye propietario ni credenciales.
 Dos definiciones activas para la misma conexión y colección producen `409`.
 Se permiten alternativas deshabilitadas sin sustituir la definición activa.
+
+La ruta requiere sesión, origen permitido y token CSRF. Devuelve `201` con los
+campos públicos de la definición y `Cache-Control: no-store`. Las fechas se
+serializan en formato ISO. Los cuerpos inválidos o con campos adicionales
+producen `422`. Esta operación guarda la configuración; no inicia una ejecución.
+La creación y el rechazo de un duplicado se han comprobado por HTTP con la
+sesión real y la conexión académica guardada. El listado, detalle y edición de
+definiciones siguen pendientes.
 
 El propietario se obtiene de la sesión comprobada y la procedencia de la conexión
 y colección configuradas. La ruta de lectura debe conservar el origen autorizado;

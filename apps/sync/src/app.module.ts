@@ -12,10 +12,11 @@ import { ActivitiesService } from './activities/activities.service';
 import { AcademicReaderService } from './connectors/academic/academic-reader.service';
 import { AcademicImportService } from './imports/academic-import.service';
 import { DefinitionsService } from './definitions/definitions.service';
+import { DefinitionsController } from './definitions/definitions.controller';
 
 @Module({
   imports: [],
-  controllers: [AppController, ConnectionsController],
+  controllers: [AppController, ConnectionsController, DefinitionsController],
   providers: [
     ConnectionTargetPolicyService,
     AppService,
