@@ -8,12 +8,12 @@ Los identificadores y direcciones de este documento son ficticios.
 
 Están disponibles las rutas de autenticación de la API, la creación, listado
 paginado y prueba de conexiones en Sync, la creación de definiciones de
-sincronización y la API de entregas de académico. En
-local se accede a API por el puerto 3002, a Sync por el 3001 y a académico por el
+sincronización, la solicitud y consulta de ejecuciones y la API de entregas
+de académico. En local se accede a API por el puerto 3002, a Sync por el 3001 y a académico por el
 3101. El encaminamiento de todas las rutas bajo una entrada
-pública común, las consultas de actividades, las ejecuciones, las reglas, el
-historial y el calendario siguen pendientes. Las operaciones indicadas como previstas en este documento
-son diseño y todavía no están implementadas.
+pública común, las consultas de actividades, el procesamiento de ejecuciones,
+las reglas, el historial y el calendario siguen pendientes. Las operaciones
+indicadas como previstas en este documento son diseño y todavía no están implementadas.
 
 El destino inicial de una sincronización es la colección de actividades de Sync.
 Las tres fuentes se describen en [Servicios de origen](servicios-origen.md). Sus
@@ -45,8 +45,8 @@ cambios al calendario central requiere el motor de sincronización pendiente.
 | POST | `/sync-definitions` | `201`, definición creada; disponible. |
 | GET | `/sync-definitions` | `200`, listado; previsto. |
 | GET / PATCH | `/sync-definitions/{id}` | `200` detalle o cambio. |
-| POST | `/sync-definitions/{id}/runs` | `202`, ejecución pendiente y `Location`. |
-| GET | `/sync-runs/{id}` | `200`, estado guardado por Sync. |
+| POST | `/sync-definitions/{id}/runs` | `202`, ejecución pendiente y `Location`; disponible. |
+| GET | `/sync-runs/{id}` | `200`, estado guardado por Sync; disponible. |
 | GET | `/activities` | `200`, actividades personales centralizadas; previsto. |
 | GET | `/activities/{id}` | `200`, detalle, datos específicos y procedencia; previsto. |
 | GET / POST | `/automations` | `200` listado / `201` regla. |
@@ -233,7 +233,7 @@ Los endpoints de creación y modificación de académico, deporte y planes son
 contratos de esas fuentes, todavía por concretar. Los formularios de demostración
 usarán un backend autorizado y no recibirán los secretos de sus conexiones.
 
-## Ejecuciones y reglas (previstas)
+## Ejecuciones: aceptación y consulta disponibles
 
 La tabla de ejecuciones ya dispone de estados, fechas y contadores. Los estados
 son `queued`, `running`, `completed` y `failed`. Los contadores distinguen registros
@@ -245,8 +245,9 @@ Una ejecución fallida exige `error_code` y `error_message`; los demás estados
 mantienen ambos campos vacíos. Los mensajes proceden de un catálogo fijo según
 el tipo de excepción: fuente, configuración, dependencia, almacenamiento o fallo
 desconocido. No se copian mensajes originales, respuestas externas, sentencias
-SQL ni credenciales. Esta conversión está preparada para el futuro procesador;
-las rutas de solicitud y consulta de ejecuciones y el worker siguen pendientes.
+SQL ni credenciales. Esta conversión está preparada para el futuro procesador.
+Las rutas de solicitud y consulta ya están implementadas; el publicador, Rabbit
+y el worker siguen pendientes.
 
 Solicitud de ejecución: `POST /api/v1/sync-definitions/{id}/runs`, cuerpo `{}`, cabecera `Idempotency-Key: tareas-001`.
 
@@ -254,7 +255,49 @@ Solicitud de ejecución: `POST /api/v1/sync-definitions/{id}/runs`, cuerpo `{}`,
 {"id": "33333333-3333-4333-8333-333333333333", "status": "queued"}
 ```
 
-La respuesta es `202` y `Location` lleva al detalle de esa ejecución. Misma cuenta, operación, clave y contenido devuelven la ejecución existente. Si cambia el contenido con la misma clave, se responde `409`. Falta fijar cuánto tiempo se conservan esas claves.
+La respuesta es `202`, con `Cache-Control: no-store` y
+`Location: /api/v1/sync-runs/{id}`. Exige sesión, origen autorizado y CSRF. El
+cuerpo debe ser `{}`; campos adicionales producen `422`. La clave es obligatoria,
+entre 1 y 128 caracteres ASCII: empieza por letra o número y admite letras,
+números, punto, guion, guion bajo y dos puntos. No se recortan espacios ni se
+aceptan cabeceras combinadas. Una clave ausente o inválida produce `422`.
+
+Misma cuenta, operación, clave y definición devuelven la ejecución existente,
+incluso ante solicitudes simultáneas o si la configuración se deshabilita después
+de aceptarla. La misma clave con otra definición produce `409`; una clave nueva
+solicita otra ejecución. Los UUID se comparan sin distinguir mayúsculas. Se guarda
+el hash SHA-256 de la clave, no el texto original. Las claves se conservan mientras
+exista su ejecución; por ahora no hay caducidad ni eliminación pública de historial.
+
+La aceptación guarda en una sola transacción la ejecución, la identidad de la
+solicitud, la referencia al origen elegido (conexión, conector y colección) y una
+fila pendiente en `sync.run_jobs`. Si falla cualquiera de las escrituras, no se
+acepta la solicitud. Una definición inexistente o ajena produce `404`; una
+definición o conexión deshabilitada produce `409`; una autenticación de origen
+incompatible produce `400`. Solo se comprueba esta configuración para solicitudes
+nuevas, no para recuperar una solicitud ya aceptada.
+
+La referencia guardada evita que editar la definición redirija un trabajo ya
+aceptado. No copia credenciales ni respuestas externas. El futuro worker deberá
+resolver la conexión de esa cuenta y aplicar su autorización y política de red.
+
+**En este checkpoint las solicitudes permanecen en `queued`: todavía no se
+publican ni procesan automáticamente.** `202` confirma aceptación duradera,
+no importación completada. La tabla de trabajos pendientes prepara el siguiente
+paso con Rabbit; no es todavía el outbox de eventos de cambios de actividades.
+La migración no crea trabajos para ejecuciones históricas.
+
+`GET /api/v1/sync-runs/{id}` exige sesión y devuelve exclusivamente el estado
+persistido de una ejecución propia, con `Cache-Control: no-store`. No necesita
+CSRF ni vuelve a leer la fuente. Un ID ajeno o inexistente produce el mismo `404`;
+un UUID inválido produce `422`. Devuelve `id`, `definition_id`, `status`,
+`created_at`, `started_at`, `finished_at`, los seis contadores y los dos campos
+de error. Las fechas se serializan en ISO; las fechas todavía no disponibles y
+los errores de ejecuciones que no han fallado son `null`. La consulta no incluye
+propietario, hashes de idempotencia, configuración interna ni credenciales.
+Repetir el POST devuelve el estado actual de la ejecución existente.
+
+## Reglas (previstas)
 
 Creación de automatización, `POST /api/v1/automations`:
 

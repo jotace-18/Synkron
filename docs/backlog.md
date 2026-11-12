@@ -129,7 +129,8 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Guardar la ejecución y su mensaje pendiente; añadir el proceso que la realiza.
+- [x] Implementar aceptación `202` con ejecución y trabajo pendiente en una transacción PostgreSQL.
+- [ ] Añadir publicador, Rabbit y worker; actualmente los trabajos permanecen en `queued`.
 - [ ] Preparar las colas y confirmar los mensajes procesados.
 - [ ] Probar el recorrido y la recuperación de mensajes tras un fallo.
 
@@ -148,7 +149,9 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Definir identidad de solicitudes y actividades, conflictos entre configuraciones y conservación de claves.
+- [x] Implementar identidad de solicitudes por cuenta, clave y definición, con conflicto y conservación ligada al historial.
+- [x] Definir identidad de actividades por cuenta, conexión, colección e ID externo.
+- [ ] Completar conflictos entre configuraciones y deduplicación del procesamiento de mensajes.
 - [ ] Registrar mensajes procesados y controlar ejecuciones simultáneas.
 - [ ] Probar mensajes repetidos, concurrencia e interrupciones después de guardar actividades.
 
@@ -166,7 +169,8 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Añadir la consulta y su vista en el panel.
+- [x] Implementar consulta de ejecución propia con estado, fechas, contadores y errores seguros.
+- [ ] Añadir su vista en el panel.
 - [ ] Unificar el formato de errores y las medidas de cada ejecución.
 - [ ] Probar resultados correctos, parciales y fallidos.
 

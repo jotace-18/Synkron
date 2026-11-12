@@ -13,10 +13,17 @@ import { AcademicReaderService } from './connectors/academic/academic-reader.ser
 import { AcademicImportService } from './imports/academic-import.service';
 import { DefinitionsService } from './definitions/definitions.service';
 import { DefinitionsController } from './definitions/definitions.controller';
+import { RunsController } from './runs/runs.controller';
+import { RunsService } from './runs/runs.service';
 
 @Module({
   imports: [],
-  controllers: [AppController, ConnectionsController, DefinitionsController],
+  controllers: [
+    AppController,
+    ConnectionsController,
+    DefinitionsController,
+    RunsController,
+  ],
   providers: [
     ConnectionTargetPolicyService,
     AppService,
@@ -29,6 +36,7 @@ import { DefinitionsController } from './definitions/definitions.controller';
     AcademicReaderService,
     AcademicImportService,
     DefinitionsService,
+    RunsService,
   ],
 })
 export class AppModule {}
