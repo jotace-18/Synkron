@@ -22,6 +22,11 @@ services:
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
       SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
       SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
     depends_on:
       sync-db:
         condition: service_healthy
@@ -171,10 +176,29 @@ services:
       retries: 10
       start_period: 10s
 
+  rabbitmq:
+    image: rabbitmq:4.3.7-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   sync-db-data:
   api-db-data:
   academic-db-data:
+  rabbitmq-data:
 
 networks:
   default:
