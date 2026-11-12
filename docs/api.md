@@ -246,8 +246,9 @@ mantienen ambos campos vacíos. Los mensajes proceden de un catálogo fijo segú
 el tipo de excepción: fuente, configuración, dependencia, almacenamiento o fallo
 desconocido. No se copian mensajes originales, respuestas externas, sentencias
 SQL ni credenciales. Esta conversión está preparada para el futuro procesador.
-Las rutas de solicitud y consulta ya están implementadas; el publicador, Rabbit
-y el worker siguen pendientes.
+Las rutas de solicitud y consulta, Rabbit y el publicador automático ya están
+implementados. El worker y la actualización de resultados durante el procesamiento
+siguen pendientes.
 
 Solicitud de ejecución: `POST /api/v1/sync-definitions/{id}/runs`, cuerpo `{}`, cabecera `Idempotency-Key: tareas-001`.
 
@@ -281,11 +282,11 @@ La referencia guardada evita que editar la definición redirija un trabajo ya
 aceptado. No copia credenciales ni respuestas externas. El futuro worker deberá
 resolver la conexión de esa cuenta y aplicar su autorización y política de red.
 
-**En este checkpoint las solicitudes permanecen en `queued`: todavía no se
-publican ni procesan automáticamente.** `202` confirma aceptación duradera,
-no importación completada. La tabla de trabajos pendientes prepara el siguiente
-paso con Rabbit; no es todavía el outbox de eventos de cambios de actividades.
-La migración no crea trabajos para ejecuciones históricas.
+**En este checkpoint las solicitudes se publican automáticamente en Rabbit, pero
+permanecen en `queued` esperando al worker.** `202` confirma aceptación duradera,
+no importación completada. `published_at` registra publicación, no ejecución.
+La tabla de trabajos pendientes no es el outbox de eventos de cambios de
+actividades. La migración no crea trabajos para ejecuciones históricas.
 
 `GET /api/v1/sync-runs/{id}` exige sesión y devuelve exclusivamente el estado
 persistido de una ejecución propia, con `Cache-Control: no-store`. No necesita
@@ -296,6 +297,65 @@ de error. Las fechas se serializan en ISO; las fechas todavía no disponibles y
 los errores de ejecuciones que no han fallado son `null`. La consulta no incluye
 propietario, hashes de idempotencia, configuración interna ni credenciales.
 Repetir el POST devuelve el estado actual de la ejecución existente.
+
+## Publicador de trabajos
+
+Rabbit se inicia mediante el servicio `rabbitmq` de Compose. Las credenciales y
+el vhost se configuran en `.env` siguiendo `.env.example`. El panel local está en
+`http://127.0.0.1:15672`; el acceso AMQP entre contenedores utiliza `rabbitmq:5672`.
+El broker conserva sus datos en `rabbitmq-data` con un hostname estable.
+
+El proceso `sync-publisher` utiliza el Dockerfile y PostgreSQL de Sync. No expone
+una API ni necesita otra base. Con las migraciones de Sync aplicadas, se inicia
+junto con sus dependencias mediante:
+
+```bash
+docker compose up -d --build sync-publisher
+docker compose logs --tail=20 sync-publisher
+```
+
+Mantiene abiertas sus conexiones, publica los trabajos de uno en uno y espera un
+segundo entre consultas vacías. Selecciona por antigüedad, con el ID como segundo
+criterio, y reserva cada fila mediante `FOR UPDATE SKIP LOCKED` durante la
+transacción. Otro publicador puede recoger un trabajo diferente.
+
+La cola `synkron.sync.runs.v1` es clásica, durable, no exclusiva y no se borra al
+desconectar consumidores. El mensaje contiene solo `schema_version: 1`, `run_id`
+y `tenant_id`. El contrato exige UUIDv4 y rechaza campos adicionales. El
+publicador lo envía como JSON persistente, con `messageId` igual a `run_id`, y
+comprueba las confirmaciones del broker y las devoluciones de mensajes sin ruta.
+El canal se utiliza secuencialmente y la espera de confirmación está limitada a
+10 segundos. Esto no confirma procesamiento por el futuro worker.
+
+Solo después de recibir la confirmación sin devolución se actualiza
+`sync.run_jobs.published_at` y se confirma la transacción. Un fallo deja el
+trabajo pendiente. Si Rabbit aceptó el mensaje pero PostgreSQL no pudo guardar
+esa confirmación, puede enviarse de nuevo: la futura recepción debe deduplicar
+por ejecución. Este checkpoint no garantiza procesamiento exactamente una vez.
+
+El proceso atiende `SIGTERM` y `SIGINT`: deja de recoger trabajo, permite terminar
+la operación en curso y cierra Rabbit y PostgreSQL. Compose concede 30 segundos
+para la parada y configura reinicio ante un fallo del proceso. El recorrido
+HTTP a Rabbit y la parada y arranque sin republicación se han comprobado en local.
+Las pruebas de PostgreSQL simulan el broker y limitan la selección a sus propias
+cuentas de prueba para no marcar trabajos reales como publicados.
+
+También hay comandos de comprobación para declarar la cola y publicar un solo
+trabajo. Desde la raíz, tras compilar Sync:
+
+```bash
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/sync:/app" \
+  sync npm run rabbitmq:setup
+
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/sync:/app" \
+  sync npm run rabbitmq:publish-one
+```
+
+Estos comandos requieren sus dependencias arrancadas; la publicación normal la
+realiza `sync-publisher` sin intervención manual. La recuperación del worker,
+los reintentos de procesamiento y los eventos de dominio siguen pendientes.
 
 ## Reglas (previstas)
 

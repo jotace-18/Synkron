@@ -130,8 +130,9 @@ Criterios de aceptación:
 Tareas:
 
 - [x] Implementar aceptación `202` con ejecución y trabajo pendiente en una transacción PostgreSQL.
-- [ ] Añadir publicador, Rabbit y worker; actualmente los trabajos permanecen en `queued`.
-- [ ] Preparar las colas y confirmar los mensajes procesados.
+- [x] Incorporar Rabbit y el publicador automático de trabajos pendientes.
+- [x] Declarar la cola durable y publicar mensajes persistentes con confirmación del broker.
+- [ ] Añadir el worker y confirmar los mensajes procesados; las ejecuciones siguen en `queued`.
 - [ ] Probar el recorrido y la recuperación de mensajes tras un fallo.
 
 ## US-07 — Evitar duplicados
@@ -152,7 +153,8 @@ Tareas:
 - [x] Implementar identidad de solicitudes por cuenta, clave y definición, con conflicto y conservación ligada al historial.
 - [x] Definir identidad de actividades por cuenta, conexión, colección e ID externo.
 - [ ] Completar conflictos entre configuraciones y deduplicación del procesamiento de mensajes.
-- [ ] Registrar mensajes procesados y controlar ejecuciones simultáneas.
+- [x] Reservar trabajos pendientes para publicadores concurrentes y omitir los ya publicados.
+- [ ] Registrar mensajes procesados y controlar ejecuciones simultáneas en el worker.
 - [ ] Probar mensajes repetidos, concurrencia e interrupciones después de guardar actividades.
 
 ## US-08 — Revisar resultados y errores

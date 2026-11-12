@@ -19,7 +19,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "rabbitmq:setup": "node dist/messaging/setup-rabbitmq.js"
+    "rabbitmq:setup": "node dist/messaging/setup-rabbitmq.js",
+    "rabbitmq:publish-one": "node dist/messaging/publish-run.js",
+    "rabbitmq:publisher": "node dist/messaging/publisher-process.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

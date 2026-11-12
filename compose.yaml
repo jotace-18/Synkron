@@ -194,6 +194,34 @@ services:
       retries: 10
       start_period: 30s
 
+  sync-publisher:
+    build:
+      context: ./apps/sync
+      target: runtime
+    command: ["node", "dist/messaging/publisher-process.js"]
+    init: true
+    restart: on-failure
+    stop_grace_period: 30s
+    networks:
+      - default
+      - sync-data
+    environment:
+      PGHOST: sync-db
+      PGPORT: "5432"
+      PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    depends_on:
+      sync-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   sync-db-data:
   api-db-data:
