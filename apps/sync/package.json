@@ -21,7 +21,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "rabbitmq:setup": "node dist/messaging/setup-rabbitmq.js",
     "rabbitmq:publish-one": "node dist/messaging/publish-run.js",
-    "rabbitmq:publisher": "node dist/messaging/publisher-process.js"
+    "rabbitmq:publisher": "node dist/messaging/publisher-process.js",
+    "rabbitmq:worker": "node dist/messaging/worker-process.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

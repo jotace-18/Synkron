@@ -56,7 +56,7 @@ erDiagram
     SYNC_RUN ||--o{ OUTBOX_EVENT : emits
 ```
 
-Este modelo conceptual corresponde a Sync. Guarda conexiones de origen, correspondencias de campos, ejecuciones, actividades centralizadas y referencias del contenido procesado. Estas permiten distinguir registros nuevos, modificados y sin cambios. El diagrama no representa todavía tablas o migraciones implementadas para las actividades.
+Este modelo conceptual corresponde a Sync. Guarda conexiones de origen, correspondencias de campos, ejecuciones, actividades centralizadas y referencias del contenido procesado. Estas permiten distinguir registros nuevos, modificados y sin cambios. El diagrama es conceptual: ya existen las tablas de conexiones, definiciones, ejecuciones, trabajos pendientes y actividades, con la huella de contenido en cada actividad. Las correspondencias personalizadas, los intentos y los eventos pendientes del diagrama siguen por implementar.
 
 ## Sincronización y mensajes
 
@@ -68,7 +68,13 @@ Sync adapta los registros de origen y guarda las actividades nuevas o modificada
 
 Automation comprueba las reglas del usuario. La acción `notify` pide a Monitoring que guarde un aviso; `start_sync` pide a Sync otra sincronización de la misma cuenta. Las acciones conservan su origen y tienen un límite de encadenamiento para evitar bucles.
 
-Los cambios se detectan durante cada revisión, manual al principio y programada más adelante. La primera versión no propaga borrados ni recibe cambios inmediatos mediante webhooks.
+Los cambios se detectan al ejecutar una sincronización solicitada por HTTP; la programación periódica y los webhooks siguen pendientes. El conector académico reconoce las retiradas explícitas del origen y conserva la actividad central como retirada. La ausencia de un registro en una respuesta no implica su borrado.
+
+El recorrido de entregas académicas ya funciona mediante publicador y worker,
+con toma atómica, resultado persistido y confirmación manual del mensaje. La
+emisión transaccional de los eventos descritos arriba es diseño pendiente para
+Automation y Monitoring. La recuperación de ejecuciones que queden en `running`
+tras una caída también sigue pendiente.
 
 ## Cuando algo falla
 

@@ -132,7 +132,8 @@ Tareas:
 - [x] Implementar aceptación `202` con ejecución y trabajo pendiente en una transacción PostgreSQL.
 - [x] Incorporar Rabbit y el publicador automático de trabajos pendientes.
 - [x] Declarar la cola durable y publicar mensajes persistentes con confirmación del broker.
-- [ ] Añadir el worker y confirmar los mensajes procesados; las ejecuciones siguen en `queued`.
+- [x] Incorporar el worker académico y confirmar entregas tras persistir un resultado terminal.
+- [ ] Emitir eventos de resultado para Automation y Monitoring.
 - [ ] Probar el recorrido y la recuperación de mensajes tras un fallo.
 
 ## US-07 — Evitar duplicados
@@ -154,7 +155,8 @@ Tareas:
 - [x] Definir identidad de actividades por cuenta, conexión, colección e ID externo.
 - [ ] Completar conflictos entre configuraciones y deduplicación del procesamiento de mensajes.
 - [x] Reservar trabajos pendientes para publicadores concurrentes y omitir los ya publicados.
-- [ ] Registrar mensajes procesados y controlar ejecuciones simultáneas en el worker.
+- [x] Controlar el inicio simultáneo de una ejecución y reconocer duplicados de ejecuciones terminadas.
+- [ ] Completar el registro de intentos y la recuperación de ejecuciones interrumpidas.
 - [ ] Probar mensajes repetidos, concurrencia e interrupciones después de guardar actividades.
 
 ## US-08 — Revisar resultados y errores
@@ -173,8 +175,9 @@ Tareas:
 
 - [x] Implementar consulta de ejecución propia con estado, fechas, contadores y errores seguros.
 - [ ] Añadir su vista en el panel.
-- [ ] Unificar el formato de errores y las medidas de cada ejecución.
-- [ ] Probar resultados correctos, parciales y fallidos.
+- [x] Guardar resultados, contadores y errores seguros con transiciones atómicas de estado.
+- [x] Probar el guardado de resultados correctos, parciales y fallidos en el backend.
+- [ ] Completar los escenarios de fallos y recuperación del recorrido distribuido.
 
 ## US-09 — Crear automatización por evento
 

@@ -16,6 +16,7 @@ import { DefinitionsController } from './definitions/definitions.controller';
 import { RunsController } from './runs/runs.controller';
 import { RunsService } from './runs/runs.service';
 import { RunJobsService } from './messaging/run-jobs.service';
+import { RunProcessorService } from './runs/run-processor.service';
 
 @Module({
   imports: [],
@@ -39,6 +40,7 @@ import { RunJobsService } from './messaging/run-jobs.service';
     DefinitionsService,
     RunsService,
     RunJobsService,
+    RunProcessorService,
   ],
 })
 export class AppModule {}

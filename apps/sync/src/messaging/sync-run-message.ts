@@ -1,4 +1,5 @@
 import { isUUID } from 'class-validator';
+import { TextDecoder } from 'node:util';
 
 export const SYNC_RUN_QUEUE = 'synkron.sync.runs.v1';
 
@@ -34,4 +35,19 @@ export function parseSyncRunMessage(value: unknown): SyncRunMessage {
     run_id: message.run_id.toLowerCase(),
     tenant_id: message.tenant_id.toLowerCase(),
   };
+}
+
+export function decodeSyncRunMessage(content: Buffer): SyncRunMessage {
+  if (content.length === 0 || content.length > 1024) {
+    throw new Error('Mensaje de ejecución no válido');
+  }
+
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(content);
+    const value: unknown = JSON.parse(text);
+
+    return parseSyncRunMessage(value);
+  } catch {
+    throw new Error('Mensaje de ejecución no válido');
+  }
 }

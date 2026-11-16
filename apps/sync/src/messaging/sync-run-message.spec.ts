@@ -1,4 +1,4 @@
-import { parseSyncRunMessage } from './sync-run-message';
+import { decodeSyncRunMessage, parseSyncRunMessage } from './sync-run-message';
 
 const validMessage = () => ({
   schema_version: 1,
@@ -99,5 +99,38 @@ describe('Sync run message contract', () => {
     expect(() =>
       parseSyncRunMessage({ ...validMessage(), token: marker }),
     ).toThrow(new Error('Mensaje de ejecución no válido'));
+  });
+});
+
+describe('Rabbit message decoding', () => {
+  it('decodes the UTF-8 JSON emitted by the publisher through the existing contract validator', () => {
+    const content = Buffer.from(JSON.stringify(validMessage()), 'utf8');
+    expect(decodeSyncRunMessage(content)).toEqual(validMessage());
+  });
+
+  it('accepts the byte limit and rejects a larger message before parsing it', () => {
+    const json = Buffer.from(JSON.stringify(validMessage()), 'utf8');
+    const atLimit = Buffer.concat([
+      json,
+      Buffer.alloc(1024 - json.length, ' '),
+    ]);
+    expect(decodeSyncRunMessage(atLimit)).toEqual(validMessage());
+    expect(() =>
+      decodeSyncRunMessage(Buffer.concat([atLimit, Buffer.from(' ')])),
+    ).toThrow('Mensaje de ejecución no válido');
+  });
+
+  it('rejects empty, malformed or invalid UTF-8 content with a safe error', () => {
+    const malformed = [
+      Buffer.alloc(0),
+      Buffer.from('{private-content'),
+      Buffer.from([0xff]),
+      Buffer.from('null'),
+    ];
+    for (const content of malformed) {
+      expect(() => decodeSyncRunMessage(content)).toThrow(
+        new Error('Mensaje de ejecución no válido'),
+      );
+    }
   });
 });

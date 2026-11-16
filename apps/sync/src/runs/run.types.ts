@@ -18,3 +18,20 @@ export interface SyncRun {
   error_code: SyncRunErrorCode | null;
   error_message: string | null;
 }
+
+export interface ClaimedSyncRun extends SyncRun {
+  status: 'running';
+  tenant_id: string;
+  source_connection_id: string;
+  connector: 'academic.assignments';
+  source_collection: 'assignments';
+}
+
+export interface SyncRunCounts {
+  read: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  retired: number;
+  ignored: number;
+}

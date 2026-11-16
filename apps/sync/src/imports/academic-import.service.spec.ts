@@ -17,6 +17,7 @@ import type { AcademicAssignmentSource } from '../connectors/academic/assignment
 import { CredentialsService } from '../credentials/credentials.service';
 import { DatabaseService } from '../database/database.service';
 import { AcademicImportService } from './academic-import.service';
+import type { AcademicImportResult } from './academic-import.types';
 
 describe('AcademicImportService', () => {
   const owner = '11111111-1111-4111-8111-111111111111';
@@ -257,5 +258,68 @@ describe('AcademicImportService', () => {
     retire.mockRejectedValueOnce(error);
     await expect(service.run(owner, connectionId)).rejects.toBe(error);
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it('reports independent progress snapshots for creation, retirement and an ignored tombstone', async () => {
+    readAll.mockResolvedValue([
+      assignment(0),
+      assignment(1, true),
+      assignment(2, true),
+    ]);
+    retire
+      .mockResolvedValueOnce({ id: 'retired-id', outcome: 'retired' })
+      .mockResolvedValueOnce({ id: null, outcome: 'not_found' });
+    const updates: AcademicImportResult[] = [];
+    const result = await service.run(owner, connectionId, (summary) => {
+      updates.push(summary);
+    });
+    expect(
+      updates.map((summary) => [
+        summary.created,
+        summary.retired,
+        summary.ignored,
+      ]),
+    ).toEqual([
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [1, 1, 1],
+    ]);
+    expect(
+      updates.every(
+        (summary) =>
+          summary.read === 3 && summary.connection_id === connectionId,
+      ),
+    ).toBe(true);
+    expect(result).toMatchObject({
+      read: 3,
+      created: 1,
+      retired: 1,
+      ignored: 1,
+    });
+    updates[0].created = 99;
+    expect(updates[1].created).toBe(1);
+    expect(result.created).toBe(1);
+    expect(updates[updates.length - 1]).not.toBe(result);
+  });
+
+  it('preserves the last successful progress when a later activity write fails', async () => {
+    readAll.mockResolvedValue([assignment(0), assignment(1)]);
+    const failure = new Error('Second activity could not be saved');
+    save
+      .mockResolvedValueOnce({ id: 'saved-id', outcome: 'created' })
+      .mockRejectedValueOnce(failure);
+    const updates: AcademicImportResult[] = [];
+    await expect(
+      service.run(owner, connectionId, (summary) => {
+        updates.push(summary);
+      }),
+    ).rejects.toBe(failure);
+    expect(updates.map((summary) => [summary.read, summary.created])).toEqual([
+      [2, 0],
+      [2, 1],
+    ]);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(retire).not.toHaveBeenCalled();
   });
 });

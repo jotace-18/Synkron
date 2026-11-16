@@ -24,6 +24,7 @@ export class AcademicImportService {
   async run(
     tenantId: string,
     connectionId: string,
+    onProgress?: (summary: AcademicImportResult) => void,
   ): Promise<AcademicImportResult> {
     const result = await this.database.query<{
       id: string;
@@ -70,9 +71,6 @@ export class AcademicImportService {
     }
 
     const records = await this.reader.readAll(connection.base_url, token);
-    const imports = records.map((record) =>
-      mapAcademicAssignment(connection.id, record),
-    );
     const summary: AcademicImportResult = {
       connection_id: connection.id,
       read: records.length,
@@ -82,6 +80,12 @@ export class AcademicImportService {
       retired: 0,
       ignored: 0,
     };
+
+    onProgress?.({ ...summary });
+
+    const imports = records.map((record) =>
+      mapAcademicAssignment(connection.id, record),
+    );
 
     for (const instruction of imports) {
       if (instruction.action === 'upsert') {
@@ -98,6 +102,8 @@ export class AcademicImportService {
           summary[retired.outcome] += 1;
         }
       }
+
+      onProgress?.({ ...summary });
     }
 
     return summary;

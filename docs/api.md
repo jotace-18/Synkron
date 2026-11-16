@@ -9,11 +9,12 @@ Los identificadores y direcciones de este documento son ficticios.
 Están disponibles las rutas de autenticación de la API, la creación, listado
 paginado y prueba de conexiones en Sync, la creación de definiciones de
 sincronización, la solicitud y consulta de ejecuciones y la API de entregas
-de académico. En local se accede a API por el puerto 3002, a Sync por el 3001 y a académico por el
-3101. El encaminamiento de todas las rutas bajo una entrada
-pública común, las consultas de actividades, el procesamiento de ejecuciones,
-las reglas, el historial y el calendario siguen pendientes. Las operaciones
-indicadas como previstas en este documento son diseño y todavía no están implementadas.
+de académico. En local se accede a API por el puerto 3002, a Sync por el 3001
+y a académico por el 3101. El encaminamiento de todas las rutas bajo una entrada
+pública común, las consultas de actividades, las reglas, el historial y el calendario
+siguen pendientes. La ejecución en segundo plano de entregas académicas ya
+funciona. Las operaciones indicadas como previstas en este documento son diseño
+y todavía no están implementadas.
 
 El destino inicial de una sincronización es la colección de actividades de Sync.
 Las tres fuentes se describen en [Servicios de origen](servicios-origen.md). Sus
@@ -27,8 +28,8 @@ admite creación y listado, detalle y edición por ID y borrado lógico. La ruta
 `GET /api/v1/assignments/export` devuelve un array paginado que incluye registros
 eliminados con `deleted_at`, para que Sync pueda reconocer su retirada. El
 [contrato de entregas](../apps/academic/README.md) detalla campos, permisos,
-paginación, actualizaciones parciales y preparación local. La aplicación de esos
-cambios al calendario central requiere el motor de sincronización pendiente.
+paginación, actualizaciones parciales y preparación local. Sync ya importa esos cambios en segundo plano a su colección central; la consulta
+pública de actividades y el calendario siguen pendientes.
 
 ## Operaciones
 
@@ -245,10 +246,9 @@ Una ejecución fallida exige `error_code` y `error_message`; los demás estados
 mantienen ambos campos vacíos. Los mensajes proceden de un catálogo fijo según
 el tipo de excepción: fuente, configuración, dependencia, almacenamiento o fallo
 desconocido. No se copian mensajes originales, respuestas externas, sentencias
-SQL ni credenciales. Esta conversión está preparada para el futuro procesador.
-Las rutas de solicitud y consulta, Rabbit y el publicador automático ya están
-implementados. El worker y la actualización de resultados durante el procesamiento
-siguen pendientes.
+SQL ni credenciales. El procesador utiliza esa conversión al guardar un fallo.
+Las rutas de solicitud y consulta, Rabbit, el publicador automático y el worker
+ya están implementados para las entregas académicas.
 
 Solicitud de ejecución: `POST /api/v1/sync-definitions/{id}/runs`, cuerpo `{}`, cabecera `Idempotency-Key: tareas-001`.
 
@@ -279,12 +279,14 @@ incompatible produce `400`. Solo se comprueba esta configuración para solicitud
 nuevas, no para recuperar una solicitud ya aceptada.
 
 La referencia guardada evita que editar la definición redirija un trabajo ya
-aceptado. No copia credenciales ni respuestas externas. El futuro worker deberá
-resolver la conexión de esa cuenta y aplicar su autorización y política de red.
+aceptado. No copia credenciales ni respuestas externas. El worker resuelve la
+conexión de esa cuenta y el importador comprueba su disponibilidad, recupera
+su credencial y aplica la política de destinos permitidos.
 
-**En este checkpoint las solicitudes se publican automáticamente en Rabbit, pero
-permanecen en `queued` esperando al worker.** `202` confirma aceptación duradera,
-no importación completada. `published_at` registra publicación, no ejecución.
+**Las solicitudes se publican automáticamente en Rabbit y el worker procesa
+las entregas académicas hasta guardar `completed` o `failed`.** `202` confirma
+aceptación duradera, no importación completada. `published_at` registra
+publicación, no ejecución. El cliente consulta el resultado mediante GET.
 La tabla de trabajos pendientes no es el outbox de eventos de cambios de
 actividades. La migración no crea trabajos para ejecuciones históricas.
 
@@ -330,8 +332,9 @@ El canal se utiliza secuencialmente y la espera de confirmación está limitada 
 Solo después de recibir la confirmación sin devolución se actualiza
 `sync.run_jobs.published_at` y se confirma la transacción. Un fallo deja el
 trabajo pendiente. Si Rabbit aceptó el mensaje pero PostgreSQL no pudo guardar
-esa confirmación, puede enviarse de nuevo: la futura recepción debe deduplicar
-por ejecución. Este checkpoint no garantiza procesamiento exactamente una vez.
+esa confirmación, puede enviarse de nuevo. El worker reconoce las ejecuciones
+ya terminadas y no las procesa otra vez. La recuperación de trabajos en curso
+tras una caída sigue pendiente; no se garantiza procesamiento exactamente una vez.
 
 El proceso atiende `SIGTERM` y `SIGINT`: deja de recoger trabajo, permite terminar
 la operación en curso y cierra Rabbit y PostgreSQL. Compose concede 30 segundos
@@ -356,6 +359,56 @@ docker compose run --rm --no-deps \
 Estos comandos requieren sus dependencias arrancadas; la publicación normal la
 realiza `sync-publisher` sin intervención manual. La recuperación del worker,
 los reintentos de procesamiento y los eventos de dominio siguen pendientes.
+
+## Worker de ejecuciones
+
+El proceso `sync-worker` comparte el código y PostgreSQL de Sync. Usa las mismas
+variables de conexión a Rabbit, la clave `SYNC_CREDENTIALS_KEY` para descifrar las
+credenciales y `SYNC_ALLOWED_CONNECTION_ORIGINS` para autorizar destinos. Mantiene
+un contexto de Nest y recibe mensajes sin abrir un servidor HTTP.
+
+Para la demostración académica, con las migraciones y las credenciales del origen
+ya configuradas, se arranca primero la fuente y después los procesos de Sync:
+
+```bash
+docker compose up -d --wait academic
+docker compose up -d --build sync-publisher sync-worker
+docker compose logs --tail=30 sync-worker
+```
+
+La recepción exige confirmación manual y limita a uno el número de mensajes sin
+confirmar por consumidor. Antes de acceder a PostgreSQL valida contenido UTF-8,
+JSON de hasta 1 KiB, contrato de versión e identidades, tipo `application/json` y
+coincidencia entre `messageId` y `run_id`.
+
+La toma usa una sola actualización condicionada por cuenta, ID, estado `queued`
+y referencia de origen válida. Solo un worker puede pasar esa ejecución a
+`running`, guardando `started_at`. El procesador utiliza la conexión capturada,
+lee y transforma las entregas, y aplica sus altas, cambios y retiradas.
+
+Al terminar guarda `completed`, fecha final y los seis contadores en una sola
+actualización condicionada a `running`. Si falla la importación, guarda `failed`
+con error seguro y el último progreso conocido. El importador comunica copias del
+resumen al terminar la lectura y después de cada operación exitosa. Esto conserva
+el progreso observado; no convierte toda la importación en una única transacción.
+
+El tratamiento vuelve a consultar la ejecución y solo envía `ack` después de
+comprobar un estado terminal persistido. Una entrega repetida de una ejecución
+`completed` o `failed` se confirma sin volver a importar. Una ejecución todavía
+`running`, un mensaje inválido o un error de persistencia no se confirman. Los
+fallos de infraestructura detienen el proceso y cierran la conexión, permitiendo
+que Rabbit vuelva a entregar los mensajes sin confirmar.
+
+Al recibir `SIGTERM` o `SIGINT`, cancela la recepción, espera al trabajo activo y
+cierra Rabbit y el contexto de Nest. Las entregas que lleguen durante la parada
+no se reclaman ni se confirman. Compose concede 30 segundos y configura reinicio
+ante errores. Se han comprobado solicitudes HTTP nuevas hasta `completed`,
+contadores coherentes, repetición idempotente y parada ordenada en local.
+
+Este checkpoint todavía no recupera automáticamente una ejecución que quede en
+`running` tras una caída. Faltan las políticas de recuperación, reintentos y
+tratamiento de mensajes inválidos. Tampoco se emiten aún los eventos de cambios
+y resultados para Automation y Monitoring. Estas partes siguen en el backlog.
 
 ## Reglas (previstas)
 

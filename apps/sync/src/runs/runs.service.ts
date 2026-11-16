@@ -6,8 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import type { SyncRun } from './run.types';
+
+import type { ClaimedSyncRun, SyncRun, SyncRunCounts } from './run.types';
 import { validateRunRequestKey } from './validate-run-request-key';
+import { toSafeRunError } from './sync-run-error';
 
 const publicColumns = `id, definition_id, status, created_at, started_at, finished_at,
   read_count, created_count, updated_count, unchanged_count, retired_count, ignored_count,
@@ -32,8 +34,6 @@ export class RunsService {
       `create-sync-run:${definitionId.toLowerCase()}:{}`,
     );
     return this.database.transaction<SyncRun>(async (client) => {
-      // Serialize retries of this account/key across application processes.
-      // The unique index is an additional database invariant.
       await client.query(
         'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
         [`sync-run:${tenantId.toLowerCase()}:${keyHash}`],
@@ -122,12 +122,118 @@ export class RunsService {
     });
   }
 
+  async claimQueued(
+    tenantId: string,
+    runId: string,
+  ): Promise<ClaimedSyncRun | null> {
+    const result = await this.database.query<ClaimedSyncRun>(
+      `UPDATE sync.runs
+     SET status = 'running',
+         started_at = clock_timestamp()
+     WHERE tenant_id = $1
+       AND id = $2
+       AND status = 'queued'
+       AND source_connection_id IS NOT NULL
+       AND connector = 'academic.assignments'
+       AND source_collection = 'assignments'
+     RETURNING ${publicColumns},
+               tenant_id, source_connection_id,
+               connector, source_collection`,
+      [tenantId, runId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
   async get(tenantId: string, runId: string): Promise<SyncRun> {
     const result = await this.database.query<SyncRun>(
       `SELECT ${publicColumns} FROM sync.runs WHERE tenant_id = $1 AND id = $2`,
       [tenantId, runId],
     );
     if (!result.rows[0]) throw new NotFoundException('Ejecución no encontrada');
+    return result.rows[0];
+  }
+
+  async complete(
+    tenantId: string,
+    runId: string,
+    counts: SyncRunCounts,
+  ): Promise<SyncRun> {
+    const result = await this.database.query<SyncRun>(
+      `UPDATE sync.runs
+     SET status = 'completed',
+         finished_at = clock_timestamp(),
+         read_count = $3,
+         created_count = $4,
+         updated_count = $5,
+         unchanged_count = $6,
+         retired_count = $7,
+         ignored_count = $8
+     WHERE tenant_id = $1
+       AND id = $2
+       AND status = 'running'
+     RETURNING ${publicColumns}`,
+      [
+        tenantId,
+        runId,
+        counts.read,
+        counts.created,
+        counts.updated,
+        counts.unchanged,
+        counts.retired,
+        counts.ignored,
+      ],
+    );
+
+    if (!result.rows[0]) {
+      throw new ConflictException('La ejecución no está en curso');
+    }
+
+    return result.rows[0];
+  }
+
+  async fail(
+    tenantId: string,
+    runId: string,
+    counts: SyncRunCounts,
+    error: unknown,
+  ): Promise<SyncRun> {
+    const safeError = toSafeRunError(error);
+
+    const result = await this.database.query<SyncRun>(
+      `UPDATE sync.runs
+     SET status = 'failed',
+         finished_at = clock_timestamp(),
+         read_count = $3,
+         created_count = $4,
+         updated_count = $5,
+         unchanged_count = $6,
+         retired_count = $7,
+         ignored_count = $8,
+         error_code = $9,
+         error_message = $10
+     WHERE tenant_id = $1
+       AND id = $2
+       AND status = 'running'
+     RETURNING ${publicColumns}`,
+      [
+        tenantId,
+        runId,
+        counts.read,
+        counts.created,
+        counts.updated,
+        counts.unchanged,
+        counts.retired,
+        counts.ignored,
+        safeError.code,
+        safeError.message,
+      ],
+    );
+
+    if (!result.rows[0]) {
+      throw new ConflictException('La ejecución no está en curso');
+    }
+
     return result.rows[0];
   }
 }
