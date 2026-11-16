@@ -1,25 +1,32 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import { Logger } from '@nestjs/common';
-import type { Channel, ChannelModel, ConsumeMessage } from 'amqplib';
+import type {
+  Channel,
+  ChannelModel,
+  ConsumeMessage,
+  ConfirmChannel,
+} from 'amqplib';
 import { connectRabbitmq } from './rabbitmq-connection';
 import { declareSyncRunQueue } from './sync-run-queue';
-import type { ClaimedSyncRun, SyncRun } from '../runs/run.types';
+import type { ClaimedSyncRun } from '../runs/run.types';
 import type { RunsService } from '../runs/runs.service';
 import {
   decodeSyncRunMessage,
   SYNC_RUN_QUEUE,
   type SyncRunMessage,
 } from './sync-run-message';
+import { publishRejectedRun } from './rejected-run-publisher';
 
 const logger = new Logger('RunWorker');
 
 export async function openRunWorker(): Promise<{
   connection: ChannelModel;
-  channel: Channel;
+  channel: ConfirmChannel;
 }> {
   const connection = await connectRabbitmq();
 
   try {
-    const channel = await connection.createChannel();
+    const channel = await connection.createConfirmChannel();
 
     channel.on('error', () => {
       logger.error('Error en el canal del worker');
@@ -91,25 +98,68 @@ export async function registerRunConsumer(
 }
 
 export async function handleRunDelivery(
-  channel: Channel,
+  channel: ConfirmChannel,
   delivery: ConsumeMessage,
   runs: RunsService,
   processRun: (run: ClaimedSyncRun) => Promise<void>,
+  signal?: AbortSignal,
 ): Promise<void> {
-  const claimed = await claimRunDelivery(delivery, runs);
-  let saved: SyncRun;
+  while (!signal?.aborted) {
+    let claimed: ClaimedSyncRun | null;
 
-  if (claimed) {
-    await processRun(claimed);
-    saved = await runs.get(claimed.tenant_id, claimed.id);
-  } else {
+    try {
+      claimed = await claimRunDelivery(delivery, runs);
+    } catch (error: unknown) {
+      if (!(error instanceof InvalidRunDeliveryError)) throw error;
+      await publishRejectedRun(channel, delivery, 'invalid_message');
+      channel.ack(delivery);
+      return;
+    }
+
+    if (claimed) {
+      // Work already acquired drains on shutdown; only idle waits are aborted.
+      await processRun(claimed);
+      const saved = await runs.get(claimed.tenant_id, claimed.id);
+      if (saved.status !== 'completed' && saved.status !== 'failed') {
+        throw new Error('La ejecución todavía no tiene un resultado guardado');
+      }
+      channel.ack(delivery);
+      return;
+    }
+
     const message = decodeSyncRunMessage(delivery.content);
-    saved = await runs.get(message.tenant_id, message.run_id);
-  }
+    const state = await runs.getDeliveryState(
+      message.tenant_id,
+      message.run_id,
+    );
 
-  if (saved.status !== 'completed' && saved.status !== 'failed') {
-    throw new Error('La ejecución todavía no tiene un resultado guardado');
-  }
+    if (!state) {
+      await publishRejectedRun(channel, delivery, 'run_not_found');
+      channel.ack(delivery);
+      return;
+    }
 
-  channel.ack(delivery);
+    if (state.status === 'completed' || state.status === 'failed') {
+      channel.ack(delivery);
+      return;
+    }
+
+    if (
+      !state.source_supported ||
+      (state.status === 'running' && state.lease_expires_at === null)
+    ) {
+      await publishRejectedRun(channel, delivery, 'run_not_recoverable');
+      channel.ack(delivery);
+      return;
+    }
+
+    // Keep this delivery unacknowledged. A later claim can recover an expired
+    // lease, or the next read can observe the other worker's terminal result.
+    try {
+      await delay(1_000, undefined, { signal });
+    } catch (error: unknown) {
+      if (signal?.aborted) return;
+      throw error;
+    }
+  }
 }

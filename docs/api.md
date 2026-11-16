@@ -327,14 +327,14 @@ y `tenant_id`. El contrato exige UUIDv4 y rechaza campos adicionales. El
 publicador lo envía como JSON persistente, con `messageId` igual a `run_id`, y
 comprueba las confirmaciones del broker y las devoluciones de mensajes sin ruta.
 El canal se utiliza secuencialmente y la espera de confirmación está limitada a
-10 segundos. Esto no confirma procesamiento por el futuro worker.
+10 segundos. Esto confirma el almacenamiento en Rabbit, no el procesamiento por el worker.
 
 Solo después de recibir la confirmación sin devolución se actualiza
 `sync.run_jobs.published_at` y se confirma la transacción. Un fallo deja el
 trabajo pendiente. Si Rabbit aceptó el mensaje pero PostgreSQL no pudo guardar
 esa confirmación, puede enviarse de nuevo. El worker reconoce las ejecuciones
-ya terminadas y no las procesa otra vez. La recuperación de trabajos en curso
-tras una caída sigue pendiente; no se garantiza procesamiento exactamente una vez.
+ya terminadas y no las procesa otra vez. Las ejecuciones en curso con reserva
+caducada pueden recuperarse; no se garantiza procesamiento exactamente una vez.
 
 El proceso atiende `SIGTERM` y `SIGINT`: deja de recoger trabajo, permite terminar
 la operación en curso y cierra Rabbit y PostgreSQL. Compose concede 30 segundos
@@ -357,8 +357,8 @@ docker compose run --rm --no-deps \
 ```
 
 Estos comandos requieren sus dependencias arrancadas; la publicación normal la
-realiza `sync-publisher` sin intervención manual. La recuperación del worker,
-los reintentos de procesamiento y los eventos de dominio siguen pendientes.
+realiza `sync-publisher` sin intervención manual. Los reintentos de importaciones
+que ya terminaron en `failed` y los eventos de dominio siguen pendientes.
 
 ## Worker de ejecuciones
 
@@ -381,34 +381,76 @@ confirmar por consumidor. Antes de acceder a PostgreSQL valida contenido UTF-8,
 JSON de hasta 1 KiB, contrato de versión e identidades, tipo `application/json` y
 coincidencia entre `messageId` y `run_id`.
 
-La toma usa una sola actualización condicionada por cuenta, ID, estado `queued`
-y referencia de origen válida. Solo un worker puede pasar esa ejecución a
-`running`, guardando `started_at`. El procesador utiliza la conexión capturada,
-lee y transforma las entregas, y aplica sus altas, cambios y retiradas.
+La toma usa una actualización condicionada por cuenta, ID y referencia de origen
+válida. Puede adquirir una ejecución `queued` o recuperar una `running` cuya
+reserva haya caducado. Cada adquisición genera un `claim_token` nuevo y una
+reserva de 60 segundos; conserva el `started_at` original al recuperar. Solo un
+worker puede adquirirla, incluso si varios lo intentan simultáneamente.
 
-Al terminar guarda `completed`, fecha final y los seis contadores en una sola
-actualización condicionada a `running`. Si falla la importación, guarda `failed`
-con error seguro y el último progreso conocido. El importador comunica copias del
-resumen al terminar la lectura y después de cada operación exitosa. Esto conserva
-el progreso observado; no convierte toda la importación en una única transacción.
+Antes de importar, el procesador comprueba su reserva. Durante el trabajo la
+renueva cada 20 segundos. Si una renovación falla, solicita detener la importación
+y no guarda un resultado terminal con una reserva ajena. La cancelación se
+comprueba antes de cada actividad; no interrumpe una consulta ya en curso.
 
-El tratamiento vuelve a consultar la ejecución y solo envía `ack` después de
-comprobar un estado terminal persistido. Una entrega repetida de una ejecución
-`completed` o `failed` se confirma sin volver a importar. Una ejecución todavía
-`running`, un mensaje inválido o un error de persistencia no se confirman. Los
-fallos de infraestructura detienen el proceso y cierran la conexión, permitiendo
-que Rabbit vuelva a entregar los mensajes sin confirmar.
+Las escrituras del worker bloquean la fila de ejecución dentro de la misma
+transacción que guarda o retira la actividad. Después de obtener el bloqueo
+comprueban cuenta, token, vigencia y conexión y colección capturadas. El bloqueo
+se mantiene hasta terminar la transacción: una recuperación tiene que esperar
+antes de sustituir la reserva. Las importaciones manuales anteriores conservan
+su funcionamiento sin contexto de ejecución.
 
-Al recibir `SIGTERM` o `SIGINT`, cancela la recepción, espera al trabajo activo y
-cierra Rabbit y el contexto de Nest. Las entregas que lleguen durante la parada
-no se reclaman ni se confirman. Compose concede 30 segundos y configura reinicio
-ante errores. Se han comprobado solicitudes HTTP nuevas hasta `completed`,
-contadores coherentes, repetición idempotente y parada ordenada en local.
+Al terminar se detiene y espera al renovador antes de guardar `completed`, la
+fecha final y los seis contadores. Tanto `complete` como `fail` exigen el token
+vigente y liberan la reserva. Un fallo de importación guarda `failed`, error
+seguro y el último progreso conocido. Un fallo al persistir ese resultado deja
+el mensaje sin confirmar. Los contadores corresponden al intento que los guardó;
+no hay todavía un historial separado de intentos ni un acumulado de todos ellos.
+La importación completa sigue sin ser una única transacción: puede haber
+actividades ya guardadas cuando se interrumpe el procesamiento.
 
-Este checkpoint todavía no recupera automáticamente una ejecución que quede en
-`running` tras una caída. Faltan las políticas de recuperación, reintentos y
-tratamiento de mensajes inválidos. Tampoco se emiten aún los eventos de cambios
-y resultados para Automation y Monitoring. Estas partes siguen en el backlog.
+El consumidor decide según el estado persistido:
+
+- Después de importar, confirma el mensaje solo si el resultado es terminal.
+- Un duplicado de `completed` o `failed` se confirma sin volver a importar.
+- Si otra instancia mantiene una reserva, conserva el mensaje sin confirmar y
+  espera un segundo antes de volver a intentar la adquisición. Al caducar la
+  reserva puede recuperar el trabajo; si la otra instancia termina, confirma el
+  duplicado. Esta espera no reinicia el proceso.
+- Un mensaje inválido, una ejecución inexistente o una configuración histórica
+  no recuperable se copia a `synkron.sync.runs.rejected.v1`, con contenido original
+  y motivo en las cabeceras. La cola es clásica y durable. Solo se confirma el
+  original después de confirmar la copia persistente y comprobar que Rabbit no
+  la devolvió. Si falla la publicación se conserva el original sin confirmar.
+- Las ejecuciones históricas `running` sin reserva no se recuperan automáticamente:
+  no se presupone que estén abandonadas. Tampoco se ejecutan registros sin una
+  configuración de origen capturada.
+
+Los fallos de infraestructura cierran la sesión de trabajo y sus conexiones,
+permitiendo que Rabbit vuelva a entregar los mensajes sin confirmar. El proceso
+intenta abrir una sesión nueva después de cinco segundos, sin registrar detalles
+privados del error. La espera se cancela con `SIGTERM` o `SIGINT`.
+
+La parada cancela la recepción y las esperas por reservas ajenas; no reclama ni
+confirma nuevas entregas. Deja terminar el trabajo ya adquirido, cierra Rabbit
+y el contexto de Nest. Compose concede 30 segundos y mantiene el reinicio ante
+un fallo del proceso. Un cierre forzado puede dejar una reserva vigente hasta
+60 segundos después de la última renovación.
+
+La aceptación, la persistencia y la recuperación ofrecen entrega al menos una
+vez, no ejecución exactamente una vez. Si se pierde un ACK después de copiar un
+rechazado, puede quedar más de una copia en esa cola. Los rechazos no se vuelven
+a publicar automáticamente: requieren revisión. Una importación que ya acabó
+en `failed` tampoco se reinicia automáticamente; sus reintentos funcionales
+siguen pendientes, junto con los eventos para Automation y Monitoring.
+
+Se han comprobado solicitudes HTTP hasta `completed` y parada ordenada en local.
+Las pruebas de PostgreSQL cubren reservas caducadas, competencia por la recuperación
+y protección de escrituras tras esperar un bloqueo. También se ha comprobado una
+caída real del consumidor temporal después de adquirir una ejecución y antes de
+importar o confirmar el mensaje: el worker normal esperó a que caducase la reserva,
+recuperó la misma ejecución conservando su inicio y terminó sin errores. Un mensaje
+ficticio inválido quedó guardado en rechazados. La caída durante una importación
+parcial y los demás escenarios distribuidos siguen como comprobaciones pendientes.
 
 ## Reglas (previstas)
 

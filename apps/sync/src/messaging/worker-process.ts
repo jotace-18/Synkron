@@ -1,6 +1,7 @@
 import { once } from 'node:events';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../app.module';
+import { runWorkerLoop } from './worker-loop';
 import { RunsService } from '../runs/runs.service';
 import { RunProcessorService } from '../runs/run-processor.service';
 import {
@@ -43,8 +44,12 @@ export async function runWorkerProcess(signal: AbortSignal): Promise<void> {
         (delivery) => {
           if (stop.aborted) return Promise.resolve();
 
-          active = handleRunDelivery(channel, delivery, runs, (run) =>
-            processor.process(run),
+          active = handleRunDelivery(
+            channel,
+            delivery,
+            runs,
+            (run) => processor.process(run),
+            stop,
           );
 
           return active;
@@ -83,7 +88,10 @@ if (require.main === module) {
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);
 
-  void runWorkerProcess(controller.signal)
+  void runWorkerLoop(
+    () => runWorkerProcess(controller.signal),
+    controller.signal,
+  )
     .catch(() => {
       console.error('El worker de ejecuciones se ha detenido por un error');
       process.exitCode = 1;

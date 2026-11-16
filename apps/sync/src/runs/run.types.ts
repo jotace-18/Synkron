@@ -25,6 +25,8 @@ export interface ClaimedSyncRun extends SyncRun {
   source_connection_id: string;
   connector: 'academic.assignments';
   source_collection: 'assignments';
+  claim_token: string;
+  lease_expires_at: Date;
 }
 
 export interface SyncRunCounts {
@@ -34,4 +36,10 @@ export interface SyncRunCounts {
   unchanged: number;
   retired: number;
   ignored: number;
+}
+
+export interface SyncRunDeliveryState {
+  status: SyncRunStatus;
+  source_supported: boolean;
+  lease_expires_at: Date | null;
 }

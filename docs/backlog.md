@@ -134,7 +134,8 @@ Tareas:
 - [x] Declarar la cola durable y publicar mensajes persistentes con confirmación del broker.
 - [x] Incorporar el worker académico y confirmar entregas tras persistir un resultado terminal.
 - [ ] Emitir eventos de resultado para Automation y Monitoring.
-- [ ] Probar el recorrido y la recuperación de mensajes tras un fallo.
+- [x] Comprobar caída tras adquirir una ejecución, recuperación conservando ID e inicio y traslado de un mensaje inválido a rechazados.
+- [ ] Completar los escenarios distribuidos de interrupción durante una importación parcial.
 
 ## US-07 — Evitar duplicados
 
@@ -156,7 +157,9 @@ Tareas:
 - [ ] Completar conflictos entre configuraciones y deduplicación del procesamiento de mensajes.
 - [x] Reservar trabajos pendientes para publicadores concurrentes y omitir los ya publicados.
 - [x] Controlar el inicio simultáneo de una ejecución y reconocer duplicados de ejecuciones terminadas.
-- [ ] Completar el registro de intentos y la recuperación de ejecuciones interrumpidas.
+- [x] Recuperar ejecuciones con reserva caducada, rotar el token y proteger las escrituras frente a intentos antiguos.
+- [x] Esperar las reservas activas y apartar mensajes inválidos con publicación confirmada.
+- [ ] Completar el historial de intentos y los reintentos funcionales de importaciones fallidas.
 - [ ] Probar mensajes repetidos, concurrencia e interrupciones después de guardar actividades.
 
 ## US-08 — Revisar resultados y errores

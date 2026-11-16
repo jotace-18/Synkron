@@ -255,6 +255,269 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
     ).resolves.toMatchObject({ id, tenant_id: owner, status: 'running' });
   });
 
+  it('reads delivery state privately and distinguishes missing ownership and unsupported captured sources', async () => {
+    const id = await createRun();
+    await expect(service.getDeliveryState(owner, id)).resolves.toEqual({
+      status: 'queued',
+      source_supported: true,
+      lease_expires_at: null,
+    });
+    await expect(service.getDeliveryState(otherOwner, id)).resolves.toBeNull();
+    await expect(
+      service.getDeliveryState(owner, randomUUID()),
+    ).resolves.toBeNull();
+    const claimed = (await service.claimQueued(owner, id))!;
+    await expect(service.getDeliveryState(owner, id)).resolves.toEqual({
+      status: 'running',
+      source_supported: true,
+      lease_expires_at: claimed.lease_expires_at,
+    });
+    await database.query(
+      'UPDATE sync.runs SET source_connection_id = NULL, connector = NULL, source_collection = NULL WHERE tenant_id = $1 AND id = $2',
+      [owner, id],
+    );
+    await expect(service.getDeliveryState(owner, id)).resolves.toEqual({
+      status: 'running',
+      source_supported: false,
+      lease_expires_at: claimed.lease_expires_at,
+    });
+    const detail = await service.get(owner, id);
+    for (const field of ['source_supported', 'lease_expires_at', 'claim_token'])
+      expect(Object.hasOwn(detail, field)).toBe(false);
+  });
+
+  describe('recovery', () => {
+    const empty = {
+      read: 0,
+      created: 0,
+      updated: 0,
+      unchanged: 0,
+      retired: 0,
+      ignored: 0,
+    };
+
+    async function expire(id: string) {
+      await database.query(
+        `UPDATE sync.runs SET lease_expires_at = clock_timestamp() - interval '1 second'
+         WHERE tenant_id = $1 AND id = $2`,
+        [owner, id],
+      );
+    }
+
+    it('recovers the same run with a new token, preserves its start and captured source, and rejects the old worker', async () => {
+      const id = await createRun();
+      const original = (await service.claimQueued(owner, id))!;
+      const replacementSource = await createSource(owner);
+      await database.query(
+        'UPDATE sync.definitions SET enabled = false WHERE tenant_id = $1 AND id = $2',
+        [owner, replacementSource.definitionId],
+      );
+      await database.query(
+        'UPDATE sync.definitions SET source_connection_id = $3 WHERE tenant_id = $1 AND id = $2',
+        [owner, source.definitionId, replacementSource.connectionId],
+      );
+      await expire(id);
+      const expired = await snapshot(id);
+      await expect(service.claimQueued(otherOwner, id)).resolves.toBeNull();
+      expect(await snapshot(id)).toEqual(expired);
+
+      const recovered = await new RunsService(database).claimQueued(owner, id);
+      expect(recovered).not.toBeNull();
+      expect(recovered).toMatchObject({
+        id,
+        tenant_id: owner,
+        definition_id: original.definition_id,
+        status: 'running',
+        created_at: original.created_at,
+        started_at: original.started_at,
+        finished_at: null,
+        source_connection_id: original.source_connection_id,
+        connector: original.connector,
+        source_collection: original.source_collection,
+      });
+      expect(recovered!.claim_token).not.toBe(original.claim_token);
+      expect(recovered!.lease_expires_at.getTime()).toBeGreaterThan(
+        (expired.lease_expires_at as Date).getTime(),
+      );
+      const beforeOldWorker = await snapshot(id);
+      await expect(
+        service.renewLease(owner, id, original.claim_token),
+      ).resolves.toBe(false);
+      await expect(
+        service.complete(owner, id, empty, original.claim_token),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(
+        service.fail(
+          owner,
+          id,
+          empty,
+          new Error('Old worker'),
+          original.claim_token,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(await snapshot(id)).toEqual(beforeOldWorker);
+      await expect(
+        service.complete(owner, id, empty, recovered!.claim_token),
+      ).resolves.toMatchObject({
+        id,
+        status: 'completed',
+        started_at: original.started_at,
+      });
+    });
+
+    it('allows exactly one concurrent recovery and does not replace its fresh reservation', async () => {
+      const id = await createRun();
+      const original = (await service.claimQueued(owner, id))!;
+      await expire(id);
+      const results = await Promise.all(
+        Array.from({ length: 4 }, () =>
+          new RunsService(database).claimQueued(owner, id),
+        ),
+      );
+      const winners = results.filter((result) => result !== null);
+      expect(winners).toHaveLength(1);
+      expect(results.filter((result) => result === null)).toHaveLength(3);
+      expect(winners[0].claim_token).not.toBe(original.claim_token);
+      expect(winners[0].started_at).toEqual(original.started_at);
+      const before = await snapshot(id);
+      expect(before.claim_token).toBe(winners[0].claim_token);
+      await expect(service.claimQueued(owner, id)).resolves.toBeNull();
+      expect(await snapshot(id)).toEqual(before);
+    });
+
+    it('does not guess ownership of legacy running history or recover a run without a captured source', async () => {
+      for (const capturedSource of [true, false]) {
+        const id = await createRun();
+        if (capturedSource) {
+          // An older running execution without a lease has no known expiration.
+          await database.query(
+            `UPDATE sync.runs SET status = 'running', started_at = created_at WHERE tenant_id = $1 AND id = $2`,
+            [owner, id],
+          );
+        } else {
+          await service.claimQueued(owner, id);
+          await expire(id);
+          await database.query(
+            `UPDATE sync.runs SET source_connection_id = NULL, connector = NULL, source_collection = NULL WHERE tenant_id = $1 AND id = $2`,
+            [owner, id],
+          );
+        }
+        const before = await snapshot(id);
+        await expect(service.claimQueued(owner, id)).resolves.toBeNull();
+        expect(await snapshot(id)).toEqual(before);
+      }
+    });
+  });
+
+  describe('lease ownership', () => {
+    const empty = {
+      read: 0,
+      created: 0,
+      updated: 0,
+      unchanged: 0,
+      retired: 0,
+      ignored: 0,
+    };
+
+    it('renews only the active owner and token without modifying rejected reservations', async () => {
+      const id = await createRun();
+      const claimed = (await service.claimQueued(owner, id))!;
+      expect(claimed.claim_token).toMatch(/^[a-f0-9-]{36}$/);
+      expect(claimed.lease_expires_at).toBeInstanceOf(Date);
+      expect(claimed.lease_expires_at.getTime()).toBeGreaterThan(
+        claimed.started_at!.getTime(),
+      );
+      await database.query(
+        `UPDATE sync.runs SET lease_expires_at = clock_timestamp() + interval '10 seconds' WHERE tenant_id = $1 AND id = $2`,
+        [owner, id],
+      );
+      const before = await snapshot(id);
+      await expect(
+        service.renewLease(otherOwner, id, claimed.claim_token),
+      ).resolves.toBe(false);
+      await expect(service.renewLease(owner, id, randomUUID())).resolves.toBe(
+        false,
+      );
+      await expect(
+        service.renewLease(owner, randomUUID(), claimed.claim_token),
+      ).resolves.toBe(false);
+      expect(await snapshot(id)).toEqual(before);
+      await expect(
+        service.renewLease(owner, id, claimed.claim_token),
+      ).resolves.toBe(true);
+      const after = await snapshot(id);
+      expect(after.claim_token).toBe(claimed.claim_token);
+      expect((after.lease_expires_at as Date).getTime()).toBeGreaterThan(
+        (before.lease_expires_at as Date).getTime(),
+      );
+    });
+
+    it('does not revive or finalize an expired reservation even with the matching token', async () => {
+      const id = await createRun();
+      const claimed = (await service.claimQueued(owner, id))!;
+      await database.query(
+        `UPDATE sync.runs SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE tenant_id = $1 AND id = $2`,
+        [owner, id],
+      );
+      const before = await snapshot(id);
+      await expect(
+        service.renewLease(owner, id, claimed.claim_token),
+      ).resolves.toBe(false);
+      await expect(
+        service.complete(owner, id, empty, claimed.claim_token),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(
+        service.fail(
+          owner,
+          id,
+          empty,
+          new Error('Stale failure'),
+          claimed.claim_token,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(await snapshot(id)).toEqual(before);
+    });
+
+    it('rejects a replaced token and releases the current reservation on completion without exposing it', async () => {
+      const id = await createRun();
+      const claimed = (await service.claimQueued(owner, id))!;
+      const replacement = randomUUID();
+      // Model a later reservation; automatic recovery is tested when implemented.
+      await database.query(
+        'UPDATE sync.runs SET claim_token = $3 WHERE tenant_id = $1 AND id = $2',
+        [owner, id, replacement],
+      );
+      const before = await snapshot(id);
+      await expect(
+        service.renewLease(owner, id, claimed.claim_token),
+      ).resolves.toBe(false);
+      await expect(
+        service.complete(owner, id, empty, claimed.claim_token),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expect(
+        service.fail(
+          owner,
+          id,
+          empty,
+          new Error('Stale failure'),
+          claimed.claim_token,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(await snapshot(id)).toEqual(before);
+      const completed = await service.complete(owner, id, empty, replacement);
+      expect(completed.status).toBe('completed');
+      expect(Object.hasOwn(completed, 'claim_token')).toBe(false);
+      expect(Object.hasOwn(completed, 'lease_expires_at')).toBe(false);
+      expect(await snapshot(id)).toMatchObject({
+        claim_token: null,
+        lease_expires_at: null,
+      });
+      await expect(service.renewLease(owner, id, replacement)).resolves.toBe(
+        false,
+      );
+    });
+  });
+
   describe('completion', () => {
     const counts = {
       read: 15,
@@ -268,7 +531,8 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
     it('atomically stores a complete result with correctly mapped counters and public timestamps', async () => {
       const id = await createRun();
       const claimed = await service.claimQueued(owner, id);
-      const completed = await service.complete(owner, id, counts);
+      const claimToken = claimed!.claim_token;
+      const completed = await service.complete(owner, id, counts, claimToken);
       expect(completed).toMatchObject({
         id,
         definition_id: source.definitionId,
@@ -301,7 +565,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
 
     it('completes an empty import with all counters at zero', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const empty = {
         read: 0,
         created: 0,
@@ -310,7 +574,9 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
         retired: 0,
         ignored: 0,
       };
-      await expect(service.complete(owner, id, empty)).resolves.toMatchObject({
+      await expect(
+        service.complete(owner, id, empty, claimToken),
+      ).resolves.toMatchObject({
         status: 'completed',
         read_count: 0,
         created_count: 0,
@@ -323,18 +589,19 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
 
     it('rejects foreign and nonexistent execution identities without altering the running execution', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const before = await snapshot(id);
       await expect(
-        service.complete(otherOwner, id, counts),
+        service.complete(otherOwner, id, counts, claimToken),
       ).rejects.toBeInstanceOf(ConflictException);
       await expect(
-        service.complete(owner, randomUUID(), counts),
+        service.complete(owner, randomUUID(), counts, claimToken),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(await snapshot(id)).toEqual(before);
     });
 
     it('does not complete a queued execution or overwrite completed and failed history', async () => {
+      const claimToken = randomUUID();
       for (const status of ['queued', 'completed', 'failed'] as const) {
         const id = await createRun();
         if (status !== 'queued') {
@@ -352,7 +619,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
         }
         const before = await snapshot(id);
         await expect(
-          service.complete(owner, id, counts),
+          service.complete(owner, id, counts, claimToken),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(await snapshot(id)).toEqual(before);
       }
@@ -360,23 +627,25 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
 
     it('rejects an unbalanced completed result without partially changing status, dates or counters', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const before = await snapshot(id);
       await expect(
-        service.complete(owner, id, { ...counts, read: 16 }),
+        service.complete(owner, id, { ...counts, read: 16 }, claimToken),
       ).rejects.toMatchObject({
         code: '23514',
         constraint: 'runs_completed_counts_valid',
       });
       expect(await snapshot(id)).toEqual(before);
-      await expect(service.complete(owner, id, counts)).resolves.toMatchObject({
+      await expect(
+        service.complete(owner, id, counts, claimToken),
+      ).resolves.toMatchObject({
         status: 'completed',
       });
     });
 
     it('allows only one concurrent completion and preserves the complete winning result', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const alternative = {
         read: 1,
         created: 0,
@@ -386,8 +655,8 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
         ignored: 0,
       };
       const results = await Promise.allSettled([
-        service.complete(owner, id, counts),
-        new RunsService(database).complete(owner, id, alternative),
+        service.complete(owner, id, counts, claimToken),
+        new RunsService(database).complete(owner, id, alternative, claimToken),
       ]);
       expect(
         results.filter((result) => result.status === 'fulfilled'),
@@ -423,12 +692,14 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
     it('stores a safe error and partial counters atomically without persisting the original exception', async () => {
       const id = await createRun();
       const claimed = await service.claimQueued(owner, id);
+      const claimToken = claimed!.claim_token;
       const marker = 'private-upstream-token-must-not-leak';
       const result = await service.fail(
         owner,
         id,
         partial,
         new BadGatewayException(marker),
+        claimToken,
       );
       expect(result).toMatchObject({
         id,
@@ -453,14 +724,14 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
 
     it('protects ownership and never overwrites queued or terminal executions', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const before = await snapshot(id);
       const error = new Error('Fixture failure');
       await expect(
-        service.fail(otherOwner, id, partial, error),
+        service.fail(otherOwner, id, partial, error, claimToken),
       ).rejects.toBeInstanceOf(ConflictException);
       await expect(
-        service.fail(owner, randomUUID(), partial, error),
+        service.fail(owner, randomUUID(), partial, error, claimToken),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(await snapshot(id)).toEqual(before);
       for (const status of ['queued', 'completed', 'failed'] as const) {
@@ -480,7 +751,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
         }
         const original = await snapshot(another);
         await expect(
-          service.fail(owner, another, partial, error),
+          service.fail(owner, another, partial, error, claimToken),
         ).rejects.toBeInstanceOf(ConflictException);
         expect(await snapshot(another)).toEqual(original);
       }
@@ -488,7 +759,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
 
     it('rejects incoherent counters without leaving a failed state or error fields partially saved', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const before = await snapshot(id);
       await expect(
         service.fail(
@@ -496,6 +767,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
           id,
           { ...partial, read: 14 },
           new Error('Fixture failure'),
+          claimToken,
         ),
       ).rejects.toMatchObject({
         code: '23514',
@@ -506,15 +778,16 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
 
     it('allows only one terminal result when completion and failure compete for the same running execution', async () => {
       const id = await createRun();
-      await service.claimQueued(owner, id);
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
       const completeCounts = { ...partial, read: 15 };
       const results = await Promise.allSettled([
-        service.complete(owner, id, completeCounts),
+        service.complete(owner, id, completeCounts, claimToken),
         new RunsService(database).fail(
           owner,
           id,
           partial,
           new BadGatewayException('Fixture source unavailable'),
+          claimToken,
         ),
       ]);
       expect(

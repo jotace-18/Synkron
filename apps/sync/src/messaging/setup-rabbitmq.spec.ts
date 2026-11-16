@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import type { Channel, ChannelModel, Options, Replies } from 'amqplib';
 import { connectRabbitmq } from './rabbitmq-connection';
 import { setupRabbitmq } from './setup-rabbitmq';
-import { SYNC_RUN_QUEUE } from './sync-run-message';
+import { SYNC_RUN_QUEUE, SYNC_RUN_REJECTED_QUEUE } from './sync-run-message';
 
 jest.mock('./rabbitmq-connection', () => ({ connectRabbitmq: jest.fn() }));
 
@@ -56,6 +56,15 @@ describe('RabbitMQ queue setup', () => {
           arguments: { 'x-queue-type': 'classic' },
         },
       ],
+      [
+        SYNC_RUN_REJECTED_QUEUE,
+        {
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: { 'x-queue-type': 'classic' },
+        },
+      ],
     ]);
     expect(connectMock).toHaveBeenCalledTimes(1);
     expect(createChannel).toHaveBeenCalledTimes(1);
@@ -72,7 +81,7 @@ describe('RabbitMQ queue setup', () => {
     const declarationStarted = new Promise<void>((resolve) => {
       started = resolve;
     });
-    assertQueue.mockImplementationOnce(() => {
+    assertQueue.mockResolvedValueOnce(reply).mockImplementationOnce(() => {
       started();
       return confirmation;
     });
@@ -105,13 +114,17 @@ describe('RabbitMQ queue setup', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it('closes the connection and reports no success if the queue cannot be declared', async () => {
-    const error = new Error('Queue configuration mismatch');
-    assertQueue.mockRejectedValueOnce(error);
-    await expect(setupRabbitmq()).rejects.toBe(error);
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(log).not.toHaveBeenCalled();
-  });
+  it.each(['work', 'rejected'] as const)(
+    'closes the connection and reports no success if the %s queue cannot be declared',
+    async (queue) => {
+      const error = new Error('Queue configuration mismatch');
+      if (queue === 'rejected') assertQueue.mockResolvedValueOnce(reply);
+      assertQueue.mockRejectedValueOnce(error);
+      await expect(setupRabbitmq()).rejects.toBe(error);
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(log).not.toHaveBeenCalled();
+    },
+  );
 
   it('handles the channel error event accompanying a failed declaration without logging its contents', async () => {
     const error = new Error('private-broker-error-content');

@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ActivitiesService } from '../activities/activities.service';
+import type { ActivityRunLease } from '../activities/activity.types';
 import { AcademicReaderService } from '../connectors/academic/academic-reader.service';
 import { mapAcademicAssignment } from '../connectors/academic/assignment.mapper';
 import { CredentialsService } from '../credentials/credentials.service';
@@ -25,7 +26,11 @@ export class AcademicImportService {
     tenantId: string,
     connectionId: string,
     onProgress?: (summary: AcademicImportResult) => void,
+    signal?: AbortSignal,
+    lease?: ActivityRunLease,
   ): Promise<AcademicImportResult> {
+    signal?.throwIfAborted();
+
     const result = await this.database.query<{
       id: string;
       base_url: string;
@@ -71,6 +76,8 @@ export class AcademicImportService {
     }
 
     const records = await this.reader.readAll(connection.base_url, token);
+    signal?.throwIfAborted();
+
     const summary: AcademicImportResult = {
       connection_id: connection.id,
       read: records.length,
@@ -88,14 +95,21 @@ export class AcademicImportService {
     );
 
     for (const instruction of imports) {
+      signal?.throwIfAborted();
+
       if (instruction.action === 'upsert') {
         const saved = await this.activities.save(
           tenantId,
           instruction.activity,
+          lease,
         );
         summary[saved.outcome] += 1;
       } else {
-        const retired = await this.activities.retire(tenantId, instruction);
+        const retired = await this.activities.retire(
+          tenantId,
+          instruction,
+          lease,
+        );
         if (retired.outcome === 'not_found') {
           summary.ignored += 1;
         } else {
@@ -106,6 +120,7 @@ export class AcademicImportService {
       onProgress?.({ ...summary });
     }
 
+    signal?.throwIfAborted();
     return summary;
   }
 }

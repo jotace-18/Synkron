@@ -3,11 +3,16 @@ import { setImmediate as nextTurn } from 'node:timers/promises';
 import type {
   Channel,
   ChannelModel,
+  ConfirmChannel,
   ConsumeMessage,
   Options,
   Replies,
 } from 'amqplib';
-import type { ClaimedSyncRun, SyncRun } from '../runs/run.types';
+import type {
+  ClaimedSyncRun,
+  SyncRun,
+  SyncRunDeliveryState,
+} from '../runs/run.types';
 import type { RunsService } from '../runs/runs.service';
 import { connectRabbitmq } from './rabbitmq-connection';
 import {
@@ -17,7 +22,7 @@ import {
   openRunWorker,
   registerRunConsumer,
 } from './run-worker';
-import { SYNC_RUN_QUEUE } from './sync-run-message';
+import { SYNC_RUN_QUEUE, SYNC_RUN_REJECTED_QUEUE } from './sync-run-message';
 
 jest.mock('./rabbitmq-connection', () => ({ connectRabbitmq: jest.fn() }));
 
@@ -35,6 +40,8 @@ function runningRun(): ClaimedSyncRun {
     source_connection_id: '22222222-2222-4222-8222-222222222222',
     connector: 'academic.assignments',
     source_collection: 'assignments',
+    claim_token: '55555555-5555-4555-8555-555555555555',
+    lease_expires_at: new Date('2026-11-13T10:01:01Z'),
     status: 'running',
     created_at: new Date('2026-11-13T10:00:00Z'),
     started_at: new Date('2026-11-13T10:00:01Z'),
@@ -116,19 +123,22 @@ describe('Worker delivery boundary', () => {
 
 describe('Worker channel preparation', () => {
   const connectMock = jest.mocked(connectRabbitmq);
-  const assertQueue = jest.fn<Promise<Replies.AssertQueue>, []>();
+  const assertQueue = jest.fn<
+    Promise<Replies.AssertQueue>,
+    Parameters<Channel['assertQueue']>
+  >();
   const prefetch = jest.fn<Promise<Replies.Empty>, [number, boolean?]>();
   const close = jest.fn<Promise<void>, []>();
-  let channel: Channel;
+  let channel: ConfirmChannel;
   let connection: ChannelModel;
 
   beforeEach(() => {
     channel = Object.assign(new EventEmitter(), {
       assertQueue,
       prefetch,
-    }) as unknown as Channel;
+    }) as unknown as ConfirmChannel;
     connection = {
-      createChannel: () => Promise.resolve(channel),
+      createConfirmChannel: () => Promise.resolve(channel),
       close,
     } as unknown as ChannelModel;
     connectMock.mockReset().mockResolvedValue(connection);
@@ -149,6 +159,10 @@ describe('Worker channel preparation', () => {
       autoDelete: false,
       arguments: { 'x-queue-type': 'classic' },
     });
+    expect(assertQueue.mock.calls.map(([queue]) => queue)).toEqual([
+      SYNC_RUN_QUEUE,
+      SYNC_RUN_REJECTED_QUEUE,
+    ]);
     expect(prefetch.mock.calls).toEqual([[1, false]]);
     expect(close).not.toHaveBeenCalled();
   });
@@ -245,10 +259,26 @@ describe('Manual-ack consumer registration', () => {
 describe('Acknowledgement after persisted run result', () => {
   const claim = jest.fn<Promise<ClaimedSyncRun | null>, [string, string]>();
   const get = jest.fn<Promise<SyncRun>, [string, string]>();
+  const getState = jest.fn<
+    Promise<SyncRunDeliveryState | null>,
+    [string, string]
+  >();
   const processRun = jest.fn<Promise<void>, [ClaimedSyncRun]>();
   const ack = jest.fn<void, [ConsumeMessage]>();
-  const channel = { ack } as unknown as Channel;
-  const runs = { claimQueued: claim, get } as unknown as RunsService;
+  const send = jest.fn<boolean, [string, Buffer, Options.Publish?]>();
+  const confirms = jest.fn<Promise<void>, []>();
+  const close = jest.fn<Promise<void>, []>();
+  const channel = Object.assign(new EventEmitter(), {
+    ack,
+    sendToQueue: send,
+    waitForConfirms: confirms,
+    close,
+  }) as unknown as ConfirmChannel;
+  const runs = {
+    claimQueued: claim,
+    get,
+    getDeliveryState: getState,
+  } as unknown as RunsService;
 
   function arrange() {
     claim.mockReset().mockResolvedValue(runningRun());
@@ -257,8 +287,17 @@ describe('Acknowledgement after persisted run result', () => {
       status: 'completed',
       finished_at: new Date('2026-11-13T10:00:02Z'),
     });
+    getState.mockReset();
+    getState.mockResolvedValue({
+      status: 'completed',
+      source_supported: true,
+      lease_expires_at: null,
+    });
     processRun.mockReset().mockResolvedValue(undefined);
     ack.mockReset();
+    send.mockReset().mockReturnValue(true);
+    confirms.mockReset().mockResolvedValue(undefined);
+    close.mockReset().mockResolvedValue(undefined);
   }
   beforeEach(arrange);
 
@@ -301,32 +340,55 @@ describe('Acknowledgement after persisted run result', () => {
     claim.mockResolvedValue(null);
     for (const status of ['completed', 'failed'] as const) {
       ack.mockClear();
-      get.mockResolvedValueOnce({
-        ...runningRun(),
+      getState.mockResolvedValueOnce({
         status,
-        finished_at: new Date('2026-11-13T10:00:02Z'),
-        error_code: status === 'failed' ? 'unknown_error' : null,
-        error_message: status === 'failed' ? 'Error seguro' : null,
+        source_supported: false,
+        lease_expires_at: null,
       });
       const input = delivery();
       await handleRunDelivery(channel, input, runs, processRun);
       expect(ack.mock.calls).toEqual([[input]]);
     }
     expect(processRun).not.toHaveBeenCalled();
-    expect(get.mock.calls).toEqual([
+    expect(get).not.toHaveBeenCalled();
+    expect(getState.mock.calls).toEqual([
       [message.tenant_id, message.run_id],
       [message.tenant_id, message.run_id],
     ]);
+    expect(send).not.toHaveBeenCalled();
   });
 
-  it('preserves an unavailable running delivery instead of treating it as a completed duplicate', async () => {
-    claim.mockResolvedValueOnce(null);
-    get.mockResolvedValueOnce(runningRun());
-    await expect(
-      handleRunDelivery(channel, delivery(), runs, processRun),
-    ).rejects.toThrow('La ejecución todavía no tiene un resultado guardado');
+  it('keeps a busy delivery unacknowledged and stops its wait promptly when requested', async () => {
+    const stop = new AbortController();
+    let observed!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      observed = resolve;
+    });
+    claim.mockResolvedValue(null);
+    getState.mockImplementationOnce(() => {
+      observed();
+      return Promise.resolve({
+        status: 'running',
+        source_supported: true,
+        lease_expires_at: new Date(),
+      });
+    });
+    const pending = handleRunDelivery(
+      channel,
+      delivery(),
+      runs,
+      processRun,
+      stop.signal,
+    );
+    await reading;
+    await nextTurn();
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(ack).not.toHaveBeenCalled();
+    stop.abort();
+    await expect(pending).resolves.toBeUndefined();
     expect(processRun).not.toHaveBeenCalled();
     expect(ack).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('never acknowledges failures in claiming, processing or reading the stored result', async () => {
@@ -338,6 +400,144 @@ describe('Acknowledgement after persisted run result', () => {
         handleRunDelivery(channel, delivery(), runs, processRun),
       ).rejects.toBe(failure);
       expect(ack).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
     }
+  });
+
+  it('acknowledges an invalid delivery only after its rejected copy is confirmed and never queries or processes a run', async () => {
+    let published!: () => void;
+    let confirm!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      published = resolve;
+    });
+    const broker = new Promise<void>((resolve) => {
+      confirm = resolve;
+    });
+    confirms.mockImplementationOnce(() => {
+      published();
+      return broker;
+    });
+    const input = delivery({}, Buffer.from('malformed JSON'));
+    const pending = handleRunDelivery(channel, input, runs, processRun);
+    await entered;
+    expect(send.mock.calls[0][0]).toBe(SYNC_RUN_REJECTED_QUEUE);
+    expect(send.mock.calls[0][1]).toBe(input.content);
+    expect(ack).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(processRun).not.toHaveBeenCalled();
+    confirm();
+    await pending;
+    expect(ack.mock.calls).toEqual([[input]]);
+  });
+
+  it('leaves an invalid delivery unacknowledged when storing its rejected copy fails', async () => {
+    confirms.mockRejectedValueOnce(new Error('Broker unavailable'));
+    const input = delivery({}, Buffer.from('malformed JSON'));
+    await expect(
+      handleRunDelivery(channel, input, runs, processRun),
+    ).rejects.toThrow('No se pudo confirmar el mensaje rechazado');
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(ack).not.toHaveBeenCalled();
+    expect(claim).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    expect(processRun).not.toHaveBeenCalled();
+  });
+
+  it('waits before retrying a busy run and processes the new reservation when it becomes available', async () => {
+    let observed!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      observed = resolve;
+    });
+    claim.mockResolvedValueOnce(null).mockResolvedValueOnce(runningRun());
+    getState.mockImplementationOnce(() => {
+      observed();
+      return Promise.resolve({
+        status: 'running',
+        source_supported: true,
+        lease_expires_at: new Date(),
+      });
+    });
+    const input = delivery();
+    const pending = handleRunDelivery(channel, input, runs, processRun);
+    await reading;
+    await nextTurn();
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(processRun).not.toHaveBeenCalled();
+    expect(ack).not.toHaveBeenCalled();
+    await pending;
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(processRun).toHaveBeenCalledTimes(1);
+    expect(ack.mock.calls).toEqual([[input]]);
+  });
+
+  it('acknowledges without importing when another worker finishes during the wait', async () => {
+    claim.mockResolvedValue(null);
+    getState.mockResolvedValueOnce({
+      status: 'running',
+      source_supported: true,
+      lease_expires_at: new Date(),
+    });
+    await handleRunDelivery(channel, delivery(), runs, processRun);
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(processRun).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { state: null, reason: 'run_not_found' },
+    {
+      state: {
+        status: 'queued',
+        source_supported: false,
+        lease_expires_at: null,
+      },
+      reason: 'run_not_recoverable',
+    },
+    {
+      state: {
+        status: 'running',
+        source_supported: true,
+        lease_expires_at: null,
+      },
+      reason: 'run_not_recoverable',
+    },
+  ] satisfies { state: SyncRunDeliveryState | null; reason: string }[])(
+    'parks a delivery with unavailable configuration: $reason / $state',
+    async ({ state, reason }) => {
+      claim.mockResolvedValue(null);
+      getState.mockResolvedValueOnce(state);
+      const input = delivery();
+      await handleRunDelivery(channel, input, runs, processRun);
+      expect(send.mock.calls[0][0]).toBe(SYNC_RUN_REJECTED_QUEUE);
+      expect(send.mock.calls[0][2]?.headers).toMatchObject({
+        'x-synkron-rejection-reason': reason,
+      });
+      expect(confirms).toHaveBeenCalledTimes(1);
+      expect(ack.mock.calls).toEqual([[input]]);
+      expect(processRun).not.toHaveBeenCalled();
+      expect(get).not.toHaveBeenCalled();
+      expect(claim).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('preserves a valid delivery when reading its internal state fails', async () => {
+    const error = new Error('State lookup unavailable');
+    claim.mockResolvedValue(null);
+    getState.mockRejectedValueOnce(error);
+    await expect(
+      handleRunDelivery(channel, delivery(), runs, processRun),
+    ).rejects.toBe(error);
+    expect(send).not.toHaveBeenCalled();
+    expect(ack).not.toHaveBeenCalled();
+  });
+
+  it('does not claim or acknowledge new work when already stopped', async () => {
+    const stop = new AbortController();
+    stop.abort();
+    await handleRunDelivery(channel, delivery(), runs, processRun, stop.signal);
+    expect(claim).not.toHaveBeenCalled();
+    expect(ack).not.toHaveBeenCalled();
   });
 });

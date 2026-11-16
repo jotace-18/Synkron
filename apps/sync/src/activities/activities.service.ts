@@ -6,15 +6,58 @@ import type {
   ActivityRetirement,
   ActivityRetirementResult,
   ActivitySaveResult,
+  ActivityRunLease,
 } from './activity.types';
+import type { PoolClient } from 'pg';
+import { RunLeaseLostError } from '../runs/run-lease';
 
 @Injectable()
 export class ActivitiesService {
   constructor(private readonly database: DatabaseService) {}
 
+  private async assertRunLease(
+    client: PoolClient,
+    tenantId: string,
+    sourceConnectionId: string,
+    sourceCollection: string,
+    lease: ActivityRunLease,
+  ): Promise<void> {
+    await client.query(
+      `SELECT id
+     FROM sync.runs
+     WHERE tenant_id = $1 AND id = $2
+     FOR UPDATE`,
+      [tenantId, lease.run_id],
+    );
+
+    const result = await client.query<{ id: string }>(
+      `SELECT id
+     FROM sync.runs
+     WHERE tenant_id = $1
+       AND id = $2
+       AND claim_token = $3
+       AND status = 'running'
+       AND lease_expires_at > clock_timestamp()
+       AND source_connection_id = $4
+       AND source_collection = $5`,
+      [
+        tenantId,
+        lease.run_id,
+        lease.claim_token,
+        sourceConnectionId,
+        sourceCollection,
+      ],
+    );
+
+    if (!result.rows[0]) {
+      throw new RunLeaseLostError();
+    }
+  }
+
   async save(
     tenantId: string,
     activity: ActivityInput,
+    lease?: ActivityRunLease,
   ): Promise<ActivitySaveResult> {
     const hash = activityContentHash(activity);
 
@@ -37,6 +80,15 @@ export class ActivitiesService {
     ];
 
     return this.database.transaction<ActivitySaveResult>(async (client) => {
+      if (lease) {
+        await this.assertRunLease(
+          client,
+          tenantId,
+          activity.source_connection_id,
+          activity.source_collection,
+          lease,
+        );
+      }
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO sync.activities (
            tenant_id, source_connection_id, source_collection, external_id,
@@ -117,9 +169,19 @@ export class ActivitiesService {
   async retire(
     tenantId: string,
     retirement: ActivityRetirement,
+    lease?: ActivityRunLease,
   ): Promise<ActivityRetirementResult> {
     return this.database.transaction<ActivityRetirementResult>(
       async (client) => {
+        if (lease) {
+          await this.assertRunLease(
+            client,
+            tenantId,
+            retirement.source_connection_id,
+            retirement.source_collection,
+            lease,
+          );
+        }
         const existing = await client.query<{
           id: string;
           deleted_at: Date | null;

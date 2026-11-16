@@ -2,6 +2,7 @@ import { isUUID } from 'class-validator';
 import { TextDecoder } from 'node:util';
 
 export const SYNC_RUN_QUEUE = 'synkron.sync.runs.v1';
+export const SYNC_RUN_REJECTED_QUEUE = 'synkron.sync.runs.rejected.v1';
 
 export interface SyncRunMessage {
   schema_version: 1;

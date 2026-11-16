@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { EventEmitter } from 'node:events';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import type {
-  Channel,
+  ConfirmChannel,
   ChannelModel,
   ConsumeMessage,
   Options,
@@ -36,6 +36,8 @@ const claimed: ClaimedSyncRun = {
   source_connection_id: '44444444-4444-4444-8444-444444444444',
   connector: 'academic.assignments',
   source_collection: 'assignments',
+  claim_token: '55555555-5555-4555-8555-555555555555',
+  lease_expires_at: new Date('2026-11-13T10:01:01Z'),
   status: 'running',
   created_at: new Date('2026-11-13T10:00:00Z'),
   started_at: new Date('2026-11-13T10:00:01Z'),
@@ -67,11 +69,15 @@ describe('Worker process lifecycle', () => {
     ReturnType<RunsService['get']>,
     Parameters<RunsService['get']>
   >();
+  const getState = jest.fn<
+    ReturnType<RunsService['getDeliveryState']>,
+    Parameters<RunsService['getDeliveryState']>
+  >();
   const processRun = jest.fn<Promise<void>, [ClaimedSyncRun]>();
   const closeConnection = jest.fn<Promise<void>, []>();
   const closeApp = jest.fn<Promise<void>, []>();
   const openMock = jest.mocked(openRunWorker);
-  let channel: Channel;
+  let channel: ConfirmChannel;
   let controller: AbortController;
   let registered: ReturnType<typeof deferred>;
   let receive: (input: ConsumeMessage | null) => void;
@@ -98,7 +104,7 @@ describe('Worker process lifecycle', () => {
       consume,
       cancel,
       ack,
-    }) as unknown as Channel;
+    }) as unknown as ConfirmChannel;
     const connection = { close: closeConnection } as unknown as ChannelModel;
     consume.mockReset().mockImplementation((_queue, callback) => {
       receive = callback;
@@ -113,6 +119,12 @@ describe('Worker process lifecycle', () => {
       status: 'completed',
       finished_at: new Date('2026-11-13T10:00:02Z'),
     });
+    getState.mockReset();
+    getState.mockResolvedValue({
+      status: 'running',
+      source_supported: true,
+      lease_expires_at: new Date(),
+    });
     processRun.mockReset().mockResolvedValue(undefined);
     closeConnection.mockReset().mockImplementation(() => {
       channel.emit('close');
@@ -120,7 +132,7 @@ describe('Worker process lifecycle', () => {
     });
     closeApp.mockReset().mockResolvedValue(undefined);
     openMock.mockReset().mockResolvedValue({ connection, channel });
-    const runs = { claimQueued: claim, get };
+    const runs = { claimQueued: claim, get, getDeliveryState: getState };
     const processor = { process: processRun };
     const app = {
       get: (token: unknown) => {
@@ -239,6 +251,31 @@ describe('Worker process lifecycle', () => {
     await registered.promise;
     controller.abort();
     await rejected;
+    expect(closeApp).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a busy delivery wait on shutdown without acknowledging it or starting another claim', async () => {
+    claim.mockResolvedValue(null);
+    const reading = deferred();
+    getState.mockImplementationOnce(() => {
+      reading.resolve();
+      return Promise.resolve({
+        status: 'running',
+        source_supported: true,
+        lease_expires_at: new Date(),
+      });
+    });
+    const pending = runWorkerProcess(controller.signal);
+    await registered.promise;
+    receive(delivery());
+    await reading.promise;
+    await nextTurn();
+    controller.abort();
+    await expect(pending).resolves.toBeUndefined();
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(ack).not.toHaveBeenCalled();
+    expect(processRun).not.toHaveBeenCalled();
+    expect(closeConnection).toHaveBeenCalledTimes(1);
     expect(closeApp).toHaveBeenCalledTimes(1);
   });
 });

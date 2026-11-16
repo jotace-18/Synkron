@@ -78,3 +78,8 @@ export type ActivityRetirementResult =
       id: null;
       outcome: 'not_found';
     };
+
+export interface ActivityRunLease {
+  run_id: string;
+  claim_token: string;
+}

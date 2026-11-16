@@ -7,7 +7,12 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
-import type { ClaimedSyncRun, SyncRun, SyncRunCounts } from './run.types';
+import type {
+  ClaimedSyncRun,
+  SyncRun,
+  SyncRunCounts,
+  SyncRunDeliveryState,
+} from './run.types';
 import { validateRunRequestKey } from './validate-run-request-key';
 import { toSafeRunError } from './sync-run-error';
 
@@ -129,20 +134,49 @@ export class RunsService {
     const result = await this.database.query<ClaimedSyncRun>(
       `UPDATE sync.runs
      SET status = 'running',
-         started_at = clock_timestamp()
+         started_at = COALESCE(started_at, clock_timestamp()),
+         claim_token = gen_random_uuid(),
+         lease_expires_at = clock_timestamp() + interval '60 seconds'
      WHERE tenant_id = $1
        AND id = $2
-       AND status = 'queued'
+       AND (
+         status = 'queued'
+         OR (
+           status = 'running'
+           AND lease_expires_at <= clock_timestamp()
+         )
+       )
        AND source_connection_id IS NOT NULL
        AND connector = 'academic.assignments'
        AND source_collection = 'assignments'
      RETURNING ${publicColumns},
                tenant_id, source_connection_id,
-               connector, source_collection`,
+               connector, source_collection,
+               claim_token, lease_expires_at`,
       [tenantId, runId],
     );
 
     return result.rows[0] ?? null;
+  }
+
+  async renewLease(
+    tenantId: string,
+    runId: string,
+    claimToken: string,
+  ): Promise<boolean> {
+    const result = await this.database.query<{ id: string }>(
+      `UPDATE sync.runs
+     SET lease_expires_at = clock_timestamp() + interval '60 seconds'
+     WHERE tenant_id = $1
+       AND id = $2
+       AND status = 'running'
+       AND claim_token = $3
+       AND lease_expires_at > clock_timestamp()
+     RETURNING id`,
+      [tenantId, runId, claimToken],
+    );
+
+    return result.rows.length === 1;
   }
 
   async get(tenantId: string, runId: string): Promise<SyncRun> {
@@ -154,15 +188,38 @@ export class RunsService {
     return result.rows[0];
   }
 
+  async getDeliveryState(
+    tenantId: string,
+    runId: string,
+  ): Promise<SyncRunDeliveryState | null> {
+    const result = await this.database.query<SyncRunDeliveryState>(
+      `SELECT status, lease_expires_at,
+              COALESCE(
+                source_connection_id IS NOT NULL
+                AND connector = 'academic.assignments'
+                AND source_collection = 'assignments',
+                false
+              ) AS source_supported
+       FROM sync.runs
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, runId],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
   async complete(
     tenantId: string,
     runId: string,
     counts: SyncRunCounts,
+    claimToken: string,
   ): Promise<SyncRun> {
     const result = await this.database.query<SyncRun>(
       `UPDATE sync.runs
      SET status = 'completed',
          finished_at = clock_timestamp(),
+         claim_token = NULL,
+         lease_expires_at = NULL,
          read_count = $3,
          created_count = $4,
          updated_count = $5,
@@ -172,6 +229,8 @@ export class RunsService {
      WHERE tenant_id = $1
        AND id = $2
        AND status = 'running'
+       AND claim_token = $9
+       AND lease_expires_at > clock_timestamp()
      RETURNING ${publicColumns}`,
       [
         tenantId,
@@ -182,6 +241,7 @@ export class RunsService {
         counts.unchanged,
         counts.retired,
         counts.ignored,
+        claimToken,
       ],
     );
 
@@ -197,6 +257,7 @@ export class RunsService {
     runId: string,
     counts: SyncRunCounts,
     error: unknown,
+    claimToken: string,
   ): Promise<SyncRun> {
     const safeError = toSafeRunError(error);
 
@@ -204,6 +265,8 @@ export class RunsService {
       `UPDATE sync.runs
      SET status = 'failed',
          finished_at = clock_timestamp(),
+         claim_token = NULL,
+         lease_expires_at = NULL,
          read_count = $3,
          created_count = $4,
          updated_count = $5,
@@ -215,6 +278,8 @@ export class RunsService {
      WHERE tenant_id = $1
        AND id = $2
        AND status = 'running'
+       AND claim_token = $11
+       AND lease_expires_at > clock_timestamp()
      RETURNING ${publicColumns}`,
       [
         tenantId,
@@ -227,6 +292,7 @@ export class RunsService {
         counts.ignored,
         safeError.code,
         safeError.message,
+        claimToken,
       ],
     );
 

@@ -6,12 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ActivitiesService } from '../activities/activities.service';
-import type {
-  ActivityInput,
-  ActivityRetirement,
-  ActivityRetirementResult,
-  ActivitySaveResult,
-} from '../activities/activity.types';
+import type { ActivityRunLease } from '../activities/activity.types';
 import { AcademicReaderService } from '../connectors/academic/academic-reader.service';
 import type { AcademicAssignmentSource } from '../connectors/academic/assignment-source.types';
 import { CredentialsService } from '../credentials/credentials.service';
@@ -35,10 +30,13 @@ describe('AcademicImportService', () => {
     Promise<AcademicAssignmentSource[]>,
     [string, string]
   >();
-  const save = jest.fn<Promise<ActivitySaveResult>, [string, ActivityInput]>();
+  const save = jest.fn<
+    ReturnType<ActivitiesService['save']>,
+    Parameters<ActivitiesService['save']>
+  >();
   const retire = jest.fn<
-    Promise<ActivityRetirementResult>,
-    [string, ActivityRetirement]
+    ReturnType<ActivitiesService['retire']>,
+    Parameters<ActivitiesService['retire']>
   >();
   let service: AcademicImportService;
 
@@ -166,6 +164,7 @@ describe('AcademicImportService', () => {
         source_updated_at: '2026-11-09T12:00:00.000Z',
         source_deleted_at: '2026-11-09T12:00:00.000Z',
       },
+      undefined,
     ]);
   });
 
@@ -321,5 +320,65 @@ describe('AcademicImportService', () => {
     ]);
     expect(save).toHaveBeenCalledTimes(2);
     expect(retire).not.toHaveBeenCalled();
+  });
+
+  it('does not access dependencies when cancellation was already requested', async () => {
+    const stop = new AbortController();
+    const reason = new Error('Lease lost');
+    stop.abort(reason);
+    await expect(
+      service.run(owner, connectionId, undefined, stop.signal),
+    ).rejects.toBe(reason);
+    expect(query).not.toHaveBeenCalled();
+    expect(readAll).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(retire).not.toHaveBeenCalled();
+  });
+
+  it('does not persist records when cancellation occurs during source reading', async () => {
+    const stop = new AbortController();
+    const reason = new Error('Lease lost');
+    readAll.mockImplementationOnce(() => {
+      stop.abort(reason);
+      return Promise.resolve([assignment()]);
+    });
+    await expect(
+      service.run(owner, connectionId, undefined, stop.signal),
+    ).rejects.toBe(reason);
+    expect(save).not.toHaveBeenCalled();
+    expect(retire).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'drains the current write and rejects cancellation before further work or successful return (another record: %s)',
+    async (hasNext) => {
+      const stop = new AbortController();
+      const reason = new Error('Lease lost');
+      readAll.mockResolvedValue(
+        hasNext ? [assignment(), assignment(1, true)] : [assignment()],
+      );
+      save.mockImplementationOnce(() => {
+        stop.abort(reason);
+        return Promise.resolve({ id: 'saved-id', outcome: 'created' });
+      });
+      const progress = jest.fn<void, [AcademicImportResult]>();
+      await expect(
+        service.run(owner, connectionId, progress, stop.signal),
+      ).rejects.toBe(reason);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(retire).not.toHaveBeenCalled();
+      expect(progress.mock.calls.at(-1)?.[0]).toMatchObject({ created: 1 });
+    },
+  );
+
+  it('passes the worker reservation to both activity writes and retirements', async () => {
+    const lease: ActivityRunLease = {
+      run_id: '33333333-3333-4333-8333-333333333333',
+      claim_token: '44444444-4444-4444-8444-444444444444',
+    };
+    readAll.mockResolvedValue([assignment(), assignment(1, true)]);
+    await service.run(owner, connectionId, undefined, undefined, lease);
+    expect(save.mock.calls[0][2]).toBe(lease);
+    expect(retire.mock.calls[0][2]).toBe(lease);
   });
 });

@@ -73,8 +73,11 @@ Los cambios se detectan al ejecutar una sincronización solicitada por HTTP; la 
 El recorrido de entregas académicas ya funciona mediante publicador y worker,
 con toma atómica, resultado persistido y confirmación manual del mensaje. La
 emisión transaccional de los eventos descritos arriba es diseño pendiente para
-Automation y Monitoring. La recuperación de ejecuciones que queden en `running`
-tras una caída también sigue pendiente.
+Automation y Monitoring. El worker recupera ejecuciones `running` con reserva
+caducada, cambia su token y protege las escrituras y el resultado frente a
+intentos antiguos. Se ha comprobado una caída después de adquirir el trabajo y
+antes de importar: el worker normal recuperó la ejecución con el mismo ID e inicio.
+Las reservas y la protección de escrituras también tienen pruebas con PostgreSQL.
 
 ## Cuando algo falla
 
@@ -93,7 +96,7 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-Los estados básicos son pendiente (`queued`), en curso (`running`), completada (`completed`) y fallida (`failed`). La espera de reintento (`retry_wait`) se añadirá con esa función.
+Los estados básicos son pendiente (`queued`), en curso (`running`), completada (`completed`) y fallida (`failed`). Recuperar una reserva caducada mantiene el estado `running`, conserva el inicio y cambia el token. La espera de reintento funcional (`retry_wait`) se añadirá con esa función; las pausas actuales de reconexión no crean ese estado.
 
 En el flujo inicial el destino es PostgreSQL de Sync: una restricción de identidad y las transacciones permitirán reconocer las actividades ya guardadas tras una interrupción. Una lectura incompleta del origen no equivale a una confirmación de escritura de nuevas actividades.
 

@@ -227,10 +227,80 @@ describe('RunsService.createQueued', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
+  it('reads internal delivery state for the exact account without turning a missing row into a public error', async () => {
+    const state = {
+      status: 'running',
+      source_supported: true,
+      lease_expires_at: new Date('2026-11-16T10:01:00Z'),
+    };
+    readQuery.mockResolvedValueOnce({ rows: [state] });
+    await expect(service.getDeliveryState(owner, run.id)).resolves.toEqual(
+      state,
+    );
+    expect(readQuery.mock.calls[0][1]).toEqual([owner, run.id]);
+    readQuery.mockResolvedValueOnce({ rows: [] });
+    await expect(service.getDeliveryState(owner, run.id)).resolves.toBeNull();
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
   it('uses the same public 404 for a missing or foreign run', async () => {
     readQuery.mockResolvedValueOnce({ rows: [] });
     await expect(service.get(owner, run.id)).rejects.toThrow(
       'Ejecución no encontrada',
     );
+  });
+});
+
+describe('RunsService lease parameters', () => {
+  const owner = '11111111-1111-4111-8111-111111111111';
+  const runId = '22222222-2222-4222-8222-222222222222';
+  const token = '33333333-3333-4333-8333-333333333333';
+  const counts = {
+    read: 0,
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    retired: 0,
+    ignored: 0,
+  };
+  const query = jest.fn<Promise<{ rows: unknown[] }>, [string, unknown[]?]>();
+  const service = new RunsService({ query } as unknown as DatabaseService);
+
+  beforeEach(() => query.mockReset());
+
+  it.each(['complete', 'fail'] as const)(
+    'passes the claim token to PostgreSQL on %s and propagates a rejected transition',
+    async (operation) => {
+      const invoke = () =>
+        operation === 'complete'
+          ? service.complete(owner, runId, counts, token)
+          : service.fail(
+              owner,
+              runId,
+              counts,
+              new Error('Private import failure'),
+              token,
+            );
+      query.mockResolvedValueOnce({ rows: [{ id: runId }] });
+      await expect(invoke()).resolves.toEqual({ id: runId });
+      const values = query.mock.calls[0][1]!;
+      expect(values.slice(0, 2)).toEqual([owner, runId]);
+      expect(values).toHaveLength(operation === 'complete' ? 9 : 11);
+      expect(values.at(-1)).toBe(token);
+      expect(values).not.toContain('Private import failure');
+      query.mockResolvedValueOnce({ rows: [] });
+      await expect(invoke()).rejects.toBeInstanceOf(ConflictException);
+    },
+  );
+
+  it('reports a rejected renewal and propagates storage errors instead of treating them as renewed', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: runId }] });
+    await expect(service.renewLease(owner, runId, token)).resolves.toBe(true);
+    expect(query.mock.calls[0][1]).toEqual([owner, runId, token]);
+    query.mockResolvedValueOnce({ rows: [] });
+    await expect(service.renewLease(owner, runId, token)).resolves.toBe(false);
+    const error = new Error('Database unavailable');
+    query.mockRejectedValueOnce(error);
+    await expect(service.renewLease(owner, runId, token)).rejects.toBe(error);
   });
 });

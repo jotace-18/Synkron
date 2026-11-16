@@ -3,7 +3,11 @@ import { EventEmitter } from 'node:events';
 import type { ChannelModel, ConfirmChannel, Options, Replies } from 'amqplib';
 import { connectRabbitmq } from './rabbitmq-connection';
 import { openRunPublisher, publishRunMessage } from './run-publisher';
-import { SYNC_RUN_QUEUE, type SyncRunMessage } from './sync-run-message';
+import {
+  SYNC_RUN_QUEUE,
+  SYNC_RUN_REJECTED_QUEUE,
+  type SyncRunMessage,
+} from './sync-run-message';
 
 jest.mock('./rabbitmq-connection', () => ({ connectRabbitmq: jest.fn() }));
 
@@ -72,7 +76,10 @@ describe('Confirmed run publication', () => {
   it('opens a confirm channel, ensures the queue and leaves resources open for the publishing loop', async () => {
     await expect(openRunPublisher()).resolves.toEqual({ connection, channel });
     expect(createConfirmChannel).toHaveBeenCalledTimes(1);
-    expect(assertQueue.mock.calls[0][0]).toBe(SYNC_RUN_QUEUE);
+    expect(assertQueue.mock.calls.map(([queue]) => queue)).toEqual([
+      SYNC_RUN_QUEUE,
+      SYNC_RUN_REJECTED_QUEUE,
+    ]);
     expect(connectionClose).not.toHaveBeenCalled();
     expect(channelClose).not.toHaveBeenCalled();
   });
