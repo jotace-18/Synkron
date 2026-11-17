@@ -7,9 +7,17 @@ import type {
   ActivityRetirementResult,
   ActivitySaveResult,
   ActivityRunLease,
+  ActivityType,
 } from './activity.types';
 import type { PoolClient } from 'pg';
 import { RunLeaseLostError } from '../runs/run-lease';
+import { createDataChangedEvent } from '../events/create-data-changed-event';
+import { appendOutboxEvent } from '../events/event-outbox';
+import type { DataChangedPayload } from '../events/sync-event.types';
+import {
+  changedActivityFields,
+  type StoredActivityContent,
+} from './activity-changes';
 
 @Injectable()
 export class ActivitiesService {
@@ -60,6 +68,12 @@ export class ActivitiesService {
     lease?: ActivityRunLease,
   ): Promise<ActivitySaveResult> {
     const hash = activityContentHash(activity);
+    const eventSource = {
+      source_connection_id: activity.source_connection_id,
+      source_collection: activity.source_collection,
+      activity_type: activity.type,
+      external_id: activity.external_id,
+    };
 
     const values = [
       tenantId,
@@ -106,15 +120,22 @@ export class ActivitiesService {
       );
 
       if (inserted.rows[0]) {
+        await this.recordChange(client, tenantId, lease, {
+          ...eventSource,
+          activity_id: inserted.rows[0].id,
+          change_type: 'created',
+          changed_fields: [],
+        });
+
         return { id: inserted.rows[0].id, outcome: 'created' };
       }
 
-      const existing = await client.query<{
-        id: string;
-        content_hash: string;
-        deleted_at: Date | null;
-      }>(
-        `SELECT id, content_hash, deleted_at
+      const existing = await client.query<
+        StoredActivityContent & { id: string; content_hash: string }
+      >(
+        `SELECT id, content_hash, deleted_at,
+                type, title, time_kind, time_role,
+                on_date::text AS on_date, at, end_at, status, details
          FROM sync.activities
          WHERE tenant_id = $1
            AND source_connection_id = $2
@@ -162,8 +183,38 @@ export class ActivitiesService {
            AND external_id = $4`,
         values,
       );
+      await this.recordChange(client, tenantId, lease, {
+        ...eventSource,
+        activity_id: stored.id,
+        change_type: 'updated',
+        changed_fields: lease ? changedActivityFields(stored, activity) : [],
+      });
       return { id: stored.id, outcome: 'updated' };
     });
+  }
+
+  private async recordChange(
+    client: PoolClient,
+    tenantId: string,
+    lease: ActivityRunLease | undefined,
+    payload: Omit<DataChangedPayload, 'sync_run_id'>,
+  ): Promise<void> {
+    if (!lease) return;
+
+    if (
+      payload.change_type === 'updated' &&
+      payload.changed_fields.length === 0
+    ) {
+      return;
+    }
+
+    await appendOutboxEvent(
+      client,
+      createDataChangedEvent(tenantId, {
+        ...payload,
+        sync_run_id: lease.run_id,
+      }),
+    );
   }
 
   async retire(
@@ -184,9 +235,10 @@ export class ActivitiesService {
         }
         const existing = await client.query<{
           id: string;
+          type: ActivityType;
           deleted_at: Date | null;
         }>(
-          `SELECT id, deleted_at
+          `SELECT id, type, deleted_at
          FROM sync.activities
          WHERE tenant_id = $1
            AND source_connection_id = $2
@@ -231,6 +283,15 @@ export class ActivitiesService {
             retirement.source_updated_at,
           ],
         );
+        await this.recordChange(client, tenantId, lease, {
+          activity_id: stored.id,
+          source_connection_id: retirement.source_connection_id,
+          source_collection: retirement.source_collection,
+          activity_type: stored.type,
+          external_id: retirement.external_id,
+          change_type: 'retired',
+          changed_fields: ['deleted_at'],
+        });
         return { id: stored.id, outcome: 'retired' };
       },
     );

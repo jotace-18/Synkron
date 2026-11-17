@@ -133,7 +133,7 @@ Tareas:
 - [x] Incorporar Rabbit y el publicador automático de trabajos pendientes.
 - [x] Declarar la cola durable y publicar mensajes persistentes con confirmación del broker.
 - [x] Incorporar el worker académico y confirmar entregas tras persistir un resultado terminal.
-- [ ] Emitir eventos de resultado para Automation y Monitoring.
+- [x] Emitir eventos de resultado mediante outbox y publicador confirmado; los consumidores de Automation y Monitoring siguen pendientes.
 - [x] Comprobar caída tras adquirir una ejecución, recuperación conservando ID e inicio y traslado de un mensaje inválido a rechazados.
 - [x] Comprobar recuperación real después de confirmar una actividad y antes de importar la siguiente, conservando la identidad ya guardada.
 
@@ -382,7 +382,8 @@ Tareas:
 - [x] Integrar conexión guardada, lectura paginada, validación, transformación y persistencia de entregas; comprobar la primera importación y su repetición con Academic real.
 - [x] Completar la demostración manual de actualización y retirada con Academic real, conservando el mismo ID y comprobando la repetición sin cambios.
 - [ ] Ampliar las correspondencias a las demás colecciones y fuentes.
-- [ ] Guardar cada cambio y su evento pendiente juntos mediante outbox.
+- [x] Guardar cada cambio y su evento pendiente juntos mediante outbox.
+- [x] Publicar cambios y resultados con confirmación de Rabbit y comprobar la recuperación tras una caída del broker, conservando el ID del evento.
 - [ ] Excluir las actividades retiradas de la futura consulta de actividades activas.
 - [ ] Añadir lectura autenticada y paginada de actividades propias.
 - [ ] Probar dos fuentes, actualizaciones, relaciones, repeticiones y accesos cruzados.

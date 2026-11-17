@@ -34,7 +34,7 @@ Académico, deporte y planes sociales son tres servicios de origen, descritos en
 
 El destino inicial de las sincronizaciones es una colección interna de actividades, almacenada en PostgreSQL de Sync. El frontend consulta esa colección a través de la API general, con el propietario comprobado. Monitoring conserva el historial y los avisos; no es el almacén principal de los compromisos académicos, entrenamientos o planes.
 
-Cada actividad debe conservar título, información temporal, tipo, estado cuando corresponda y los detalles específicos necesarios, además de propietario, fuente, identidad externa y referencia de sincronización. Se utilizará un modelo híbrido: columnas comunes para identidad, permisos, fechas y consultas conjuntas, y un campo `details` de tipo JSONB con validación según el tipo de actividad. Solo se conservarán los detalles autorizados necesarios, no la respuesta completa de cada fuente. La parte común y sus restricciones temporales se definen en [Modelo de actividades](modelo-actividades.md), según [ADR-009](decisiones.md#adr-009-modelo-híbrido-de-actividades); su migración sigue pendiente.
+Cada actividad debe conservar título, información temporal, tipo, estado cuando corresponda y los detalles específicos necesarios, además de propietario, fuente, identidad externa y referencia de sincronización. Se utilizará un modelo híbrido: columnas comunes para identidad, permisos, fechas y consultas conjuntas, y un campo `details` de tipo JSONB con validación según el tipo de actividad. Solo se conservarán los detalles autorizados necesarios, no la respuesta completa de cada fuente. La parte común y sus restricciones temporales se definen en [Modelo de actividades](modelo-actividades.md), según [ADR-009](decisiones.md#adr-009-modelo-híbrido-de-actividades); su migración está implementada.
 
 La identidad del registro distingue propietario, conexión, colección de origen e identificador externo. Un examen y una entrega con el mismo ID externo no se confunden, ni dos actividades de fuentes diferentes. Una nueva importación conserva el ID central. El contrato de definiciones evitará configuraciones activas con correspondencias distintas para la misma conexión y colección; sus restricciones se implementarán al crear esas tablas.
 
@@ -56,7 +56,7 @@ erDiagram
     SYNC_RUN ||--o{ OUTBOX_EVENT : emits
 ```
 
-Este modelo conceptual corresponde a Sync. Guarda conexiones de origen, correspondencias de campos, ejecuciones, actividades centralizadas y referencias del contenido procesado. Estas permiten distinguir registros nuevos, modificados y sin cambios. El diagrama es conceptual: ya existen las tablas de conexiones, definiciones, ejecuciones, trabajos pendientes y actividades, con la huella de contenido en cada actividad. Las correspondencias personalizadas, los intentos y los eventos pendientes del diagrama siguen por implementar.
+Este modelo conceptual corresponde a Sync. Guarda conexiones de origen, correspondencias de campos, ejecuciones, actividades centralizadas y referencias del contenido procesado. Estas permiten distinguir registros nuevos, modificados y sin cambios. El diagrama es conceptual: ya existen las tablas de conexiones, definiciones, ejecuciones, trabajos pendientes y actividades, con la huella de contenido en cada actividad. También existe el outbox de eventos; las correspondencias personalizadas y el historial de intentos del diagrama siguen por implementar.
 
 ## Sincronización y mensajes
 
@@ -72,8 +72,15 @@ Los cambios se detectan al ejecutar una sincronización solicitada por HTTP; la 
 
 El recorrido de entregas académicas ya funciona mediante publicador y worker,
 con toma atómica, resultado persistido y confirmación manual del mensaje. La
-emisión transaccional de los eventos descritos arriba es diseño pendiente para
-Automation y Monitoring. El worker recupera ejecuciones `running` con reserva
+emisión transaccional de eventos está implementada: `sync-event-publisher` lee
+el outbox y publica en el exchange durable de tipo `topic` `synkron.events.v1`.
+Solo marca cada evento tras la confirmación del broker. La cola durable
+`synkron.events.inspection.v1` recibe los tres tipos para inspección; los
+consumidores de Automation y Monitoring siguen pendientes. Se ha comprobado
+una caída real de Rabbit: el evento se conservó pendiente y se publicó con el
+mismo ID tras la recuperación automática. Puede haber reenvíos si el proceso cae
+entre la publicación y el commit; los consumidores deberán deduplicar por
+`event_id`. El worker recupera ejecuciones `running` con reserva
 caducada, cambia su token y protege las escrituras y el resultado frente a
 intentos antiguos. Se ha comprobado una caída después de adquirir el trabajo y
 antes de importar y otra después de confirmar el primer guardado. En ambos casos
@@ -108,7 +115,7 @@ Una sincronización incompleta puede haber cambiado parte de los datos. No se pr
 
 ## Estado de implementación y entrega
 
-El código actual cubre cuentas y sesiones, conexiones, cifrado y prueba acotada de destinos autorizados. Existe una fuente ficticia estática de tareas. Los componentes de centralización, fuentes editables, mensajería, reglas, historial y calendario descritos aquí son el diseño pendiente.
+El código actual cubre cuentas y sesiones, conexiones, cifrado, prueba acotada de destinos autorizados, la API editable de entregas académicas y su centralización asíncrona con RabbitMQ. También están implementados el outbox y el publicador de eventos de cambios y resultados. Existe una fuente ficticia estática de tareas. La ampliación de las fuentes, los consumidores de Automation y Monitoring, las reglas, el historial de intentos y el calendario siguen pendientes.
 
 El Hito 2 se cerrará con el alcance funcional inicial completo, no solo con la base de contenedores o una demostración parcial. El entorno deberá iniciar sus backends, bases, fuentes, RabbitMQ y frontend de forma reproducible; CI validará y publicará las imágenes en GHCR. Terraform y despliegue se trabajan después.
 

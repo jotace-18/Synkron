@@ -3,6 +3,9 @@ import { BadGatewayException, ConflictException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { DatabaseService } from '../src/database/database.service';
 import { RunsService } from '../src/runs/runs.service';
+import type { SyncRun } from '../src/runs/run.types';
+import type { SyncEvent } from '../src/events/sync-event.types';
+import * as eventOutbox from '../src/events/event-outbox';
 
 describe('Run execution lifecycle (PostgreSQL integration)', () => {
   let module: TestingModule;
@@ -28,6 +31,10 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
   });
 
   afterEach(async () => {
+    await database.query(
+      'DELETE FROM sync.event_outbox WHERE tenant_id IN ($1, $2)',
+      [owner, otherOwner],
+    );
     await database.query('DELETE FROM sync.runs WHERE tenant_id IN ($1, $2)', [
       owner,
       otherOwner,
@@ -85,6 +92,90 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
       )
     ).rows[0] as Record<string, unknown>;
   }
+
+  async function expectTerminalEvent(run: SyncRun) {
+    const events = await database.query<
+      Pick<
+        SyncEvent,
+        | 'event_type'
+        | 'tenant_id'
+        | 'correlation_id'
+        | 'causation_id'
+        | 'payload'
+      >
+    >(
+      `SELECT event_type, tenant_id, correlation_id, causation_id, payload
+       FROM sync.event_outbox WHERE tenant_id = $1 AND correlation_id = $2`,
+      [owner, run.id],
+    );
+    expect(events.rows).toEqual([
+      {
+        event_type: `sync.${run.status}`,
+        tenant_id: owner,
+        correlation_id: run.id,
+        causation_id: run.id,
+        payload: {
+          sync_run_id: run.id,
+          definition_id: run.definition_id,
+          counts: {
+            read: run.read_count,
+            created: run.created_count,
+            updated: run.updated_count,
+            unchanged: run.unchanged_count,
+            retired: run.retired_count,
+            ignored: run.ignored_count,
+          },
+          ...(run.status === 'failed'
+            ? { error: { code: run.error_code, message: run.error_message } }
+            : {}),
+        },
+      },
+    ]);
+  }
+
+  it.each(['completed', 'failed'] as const)(
+    'rolls back %s and its lease release when storing the terminal event fails',
+    async (status) => {
+      const id = await createRun();
+      const claimToken = (await service.claimQueued(owner, id))!.claim_token;
+      const counts = {
+        read: 0,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        retired: 0,
+        ignored: 0,
+      };
+      const finish = () =>
+        status === 'completed'
+          ? service.complete(owner, id, counts, claimToken)
+          : service.fail(
+              owner,
+              id,
+              counts,
+              new BadGatewayException('private'),
+              claimToken,
+            );
+      const before = await snapshot(id);
+      const failure = new Error('Simulated terminal outbox failure');
+      const append = jest
+        .spyOn(eventOutbox, 'appendOutboxEvent')
+        .mockRejectedValueOnce(failure);
+      try {
+        await expect(finish()).rejects.toBe(failure);
+        expect(await snapshot(id)).toEqual(before);
+        const pending = await database.query(
+          'SELECT event_id FROM sync.event_outbox WHERE tenant_id = $1',
+          [owner],
+        );
+        expect(pending.rows).toEqual([]);
+      } finally {
+        append.mockRestore();
+      }
+      // Rollback must preserve the original reservation so the same worker can retry.
+      await expectTerminalEvent(await finish());
+    },
+  );
 
   it('claims the owned run and returns its captured source with coherent running timestamps and unchanged counters', async () => {
     const id = await createRun();
@@ -552,6 +643,10 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
         claimed!.started_at!.getTime(),
       );
       await expect(service.get(owner, id)).resolves.toEqual(completed);
+      await expect(
+        service.complete(owner, id, counts, claimToken),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expectTerminalEvent(completed);
       for (const field of [
         'tenant_id',
         'source_connection_id',
@@ -676,6 +771,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
       }
       expect(loser.reason).toBeInstanceOf(ConflictException);
       await expect(service.get(owner, id)).resolves.toEqual(winner.value);
+      await expectTerminalEvent(winner.value);
     });
   });
 
@@ -719,6 +815,16 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
         claimed!.started_at!.getTime(),
       );
       await expect(service.get(owner, id)).resolves.toEqual(result);
+      await expect(
+        service.fail(
+          owner,
+          id,
+          partial,
+          new BadGatewayException(marker),
+          claimToken,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      await expectTerminalEvent(result);
       expect(JSON.stringify(await snapshot(id))).not.toContain(marker);
     });
 
@@ -808,6 +914,7 @@ describe('Run execution lifecycle (PostgreSQL integration)', () => {
       }
       expect(loser.reason).toBeInstanceOf(ConflictException);
       await expect(service.get(owner, id)).resolves.toEqual(winner.value);
+      await expectTerminalEvent(winner.value);
     });
   });
 });

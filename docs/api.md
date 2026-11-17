@@ -505,9 +505,22 @@ Un evento comunica un cambio o resultado. `sync.completed` indica que la sincron
 
 Los mensajes no incluyen contraseñas ni el contenido personal completo.
 
-El resultado de una sincronización incluye su identificador, estado y cantidades leídas, escritas y omitidas. Si falla, añade la causa del error sin datos sensibles.
+El contrato de tipos está definido en
+[`sync-event.types.ts`](../apps/sync/src/events/sync-event.types.ts).
+La versión inicial fija `schema_version: 1` y `producer: "sync"`. Los
+identificadores del sobre son UUID y `occurred_at` representa el momento del
+hecho en ISO 8601 UTC, no el de cada reenvío. En el flujo actual,
+`correlation_id` identifica la ejecución y `causation_id` su mensaje de trabajo;
+ambos usan el ID de ejecución. Cada evento tiene su propio `event_id`, que se
+conserva si la publicación debe repetirse.
 
-También se emitirá `data.changed` al confirmar una actividad nueva o modificada
+Los eventos de resultado incluyen `sync_run_id`, `definition_id` y `counts`,
+con `read`, `created`, `updated`, `unchanged`, `retired` e `ignored`. Reutilizan
+el tipo de contadores de Sync. `sync.failed` añade `error: { code, message }`,
+con el formato de error seguro existente. El tipo de evento distingue éxito y
+fallo; no se duplica el estado dentro del payload.
+
+También se emitirá `data.changed` al confirmar una actividad nueva, modificada o retirada
 en la colección de Sync. La actividad y el evento pendiente se guardan juntos:
 
 ```json
@@ -526,7 +539,29 @@ en la colección de Sync. La actividad y el evento pendiente se guardan juntos:
 Este es un ejemplo previsto de `payload`, acompañado de los campos anteriores.
 Identifica el cambio de una nota sin incluir su valor, participantes ni el contenido
 completo del registro. El cambio se detecta al sincronizar; no se revisa
-continuamente ni se propagan borrados en la primera versión.
+continuamente. Las retiradas explícitas del origen se conservan como marcas de
+retirada en Sync; la ausencia de un registro no implica su borrado.
+
+`change_type` admite `created`, `updated` y `retired`. Una actividad sin cambios
+no genera `data.changed`; una ejecución nueva que termine sin cambios sí genera
+`sync.completed`. `changed_fields` contiene nombres de campos, no sus valores.
+Los tres contratos están definidos y existe la tabla `sync.event_outbox`, con
+un helper que recibe la conexión de una transacción ya abierta. `published_at`
+nulo identifica un evento pendiente. El worker guarda `data.changed` en la misma
+transacción que crea, modifica o retira la actividad. El cierre de una ejecución
+guarda `sync.completed` o `sync.failed` en la misma transacción que su resultado,
+incluidos los contadores y, si corresponde, el error seguro. Si falla guardar el
+evento, se deshace esa transacción; repetir un cierre ya confirmado no genera
+otro evento.
+
+El proceso `sync-event-publisher` publica los pendientes en el exchange durable
+de tipo `topic` `synkron.events.v1`, usando `event_type` como routing key.
+Los mensajes son persistentes y se marcan como publicados después de recibir
+confirmación de RabbitMQ; si no se pueden enrutar o confirmar, quedan pendientes.
+La cola durable `synkron.events.inspection.v1` recibe los tres tipos para su
+inspección. Una caída después de publicar y antes de confirmar la transacción
+puede provocar un reenvío: se conserva el mismo `event_id` y los futuros
+consumidores deberán deduplicarlo.
 
 ## Errores
 

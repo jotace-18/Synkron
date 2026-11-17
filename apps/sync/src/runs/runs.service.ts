@@ -6,6 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import {
+  createSyncCompletedEvent,
+  createSyncFailedEvent,
+} from '../events/create-sync-result-event';
+import { appendOutboxEvent } from '../events/event-outbox';
 
 import type {
   ClaimedSyncRun,
@@ -214,42 +219,62 @@ export class RunsService {
     counts: SyncRunCounts,
     claimToken: string,
   ): Promise<SyncRun> {
-    const result = await this.database.query<SyncRun>(
-      `UPDATE sync.runs
-     SET status = 'completed',
-         finished_at = clock_timestamp(),
-         claim_token = NULL,
-         lease_expires_at = NULL,
-         read_count = $3,
-         created_count = $4,
-         updated_count = $5,
-         unchanged_count = $6,
-         retired_count = $7,
-         ignored_count = $8
-     WHERE tenant_id = $1
-       AND id = $2
-       AND status = 'running'
-       AND claim_token = $9
-       AND lease_expires_at > clock_timestamp()
-     RETURNING ${publicColumns}`,
-      [
-        tenantId,
-        runId,
-        counts.read,
-        counts.created,
-        counts.updated,
-        counts.unchanged,
-        counts.retired,
-        counts.ignored,
-        claimToken,
-      ],
-    );
+    return this.database.transaction(async (client) => {
+      const result = await client.query<SyncRun>(
+        `UPDATE sync.runs
+       SET status = 'completed',
+           finished_at = clock_timestamp(),
+           claim_token = NULL,
+           lease_expires_at = NULL,
+           read_count = $3,
+           created_count = $4,
+           updated_count = $5,
+           unchanged_count = $6,
+           retired_count = $7,
+           ignored_count = $8
+       WHERE tenant_id = $1
+         AND id = $2
+         AND status = 'running'
+         AND claim_token = $9
+         AND lease_expires_at > clock_timestamp()
+       RETURNING ${publicColumns}`,
+        [
+          tenantId,
+          runId,
+          counts.read,
+          counts.created,
+          counts.updated,
+          counts.unchanged,
+          counts.retired,
+          counts.ignored,
+          claimToken,
+        ],
+      );
 
-    if (!result.rows[0]) {
-      throw new ConflictException('La ejecución no está en curso');
-    }
+      const run = result.rows[0];
 
-    return result.rows[0];
+      if (!run) {
+        throw new ConflictException('La ejecución no está en curso');
+      }
+
+      await appendOutboxEvent(
+        client,
+        createSyncCompletedEvent(tenantId, {
+          sync_run_id: run.id,
+          definition_id: run.definition_id,
+          counts: {
+            read: run.read_count,
+            created: run.created_count,
+            updated: run.updated_count,
+            unchanged: run.unchanged_count,
+            retired: run.retired_count,
+            ignored: run.ignored_count,
+          },
+        }),
+      );
+
+      return run;
+    });
   }
 
   async fail(
@@ -261,45 +286,66 @@ export class RunsService {
   ): Promise<SyncRun> {
     const safeError = toSafeRunError(error);
 
-    const result = await this.database.query<SyncRun>(
-      `UPDATE sync.runs
-     SET status = 'failed',
-         finished_at = clock_timestamp(),
-         claim_token = NULL,
-         lease_expires_at = NULL,
-         read_count = $3,
-         created_count = $4,
-         updated_count = $5,
-         unchanged_count = $6,
-         retired_count = $7,
-         ignored_count = $8,
-         error_code = $9,
-         error_message = $10
-     WHERE tenant_id = $1
-       AND id = $2
-       AND status = 'running'
-       AND claim_token = $11
-       AND lease_expires_at > clock_timestamp()
-     RETURNING ${publicColumns}`,
-      [
-        tenantId,
-        runId,
-        counts.read,
-        counts.created,
-        counts.updated,
-        counts.unchanged,
-        counts.retired,
-        counts.ignored,
-        safeError.code,
-        safeError.message,
-        claimToken,
-      ],
-    );
+    return this.database.transaction(async (client) => {
+      const result = await client.query<SyncRun>(
+        `UPDATE sync.runs
+       SET status = 'failed',
+           finished_at = clock_timestamp(),
+           claim_token = NULL,
+           lease_expires_at = NULL,
+           read_count = $3,
+           created_count = $4,
+           updated_count = $5,
+           unchanged_count = $6,
+           retired_count = $7,
+           ignored_count = $8,
+           error_code = $9,
+           error_message = $10
+       WHERE tenant_id = $1
+         AND id = $2
+         AND status = 'running'
+         AND claim_token = $11
+         AND lease_expires_at > clock_timestamp()
+       RETURNING ${publicColumns}`,
+        [
+          tenantId,
+          runId,
+          counts.read,
+          counts.created,
+          counts.updated,
+          counts.unchanged,
+          counts.retired,
+          counts.ignored,
+          safeError.code,
+          safeError.message,
+          claimToken,
+        ],
+      );
 
-    if (!result.rows[0]) {
-      throw new ConflictException('La ejecución no está en curso');
-    }
+      const run = result.rows[0];
 
-    return result.rows[0];
+      if (!run) {
+        throw new ConflictException('La ejecución no está en curso');
+      }
+
+      await appendOutboxEvent(
+        client,
+        createSyncFailedEvent(tenantId, {
+          sync_run_id: run.id,
+          definition_id: run.definition_id,
+          counts: {
+            read: run.read_count,
+            created: run.created_count,
+            updated: run.updated_count,
+            unchanged: run.unchanged_count,
+            retired: run.retired_count,
+            ignored: run.ignored_count,
+          },
+          error: safeError,
+        }),
+      );
+
+      return run;
+    });
   }
 }

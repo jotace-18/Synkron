@@ -264,7 +264,11 @@ describe('RunsService lease parameters', () => {
     ignored: 0,
   };
   const query = jest.fn<Promise<{ rows: unknown[] }>, [string, unknown[]?]>();
-  const service = new RunsService({ query } as unknown as DatabaseService);
+  const service = new RunsService({
+    query,
+    transaction: (operation: (client: PoolClient) => Promise<SyncRun>) =>
+      operation({ query } as unknown as PoolClient),
+  } as unknown as DatabaseService);
 
   beforeEach(() => query.mockReset());
 
@@ -281,6 +285,7 @@ describe('RunsService lease parameters', () => {
               new Error('Private import failure'),
               token,
             );
+      query.mockResolvedValue({ rows: [] });
       query.mockResolvedValueOnce({ rows: [{ id: runId }] });
       await expect(invoke()).resolves.toEqual({ id: runId });
       const values = query.mock.calls[0][1]!;

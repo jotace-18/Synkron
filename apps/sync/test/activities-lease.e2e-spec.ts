@@ -10,6 +10,8 @@ import type {
 import { DatabaseService } from '../src/database/database.service';
 import { RunLeaseLostError } from '../src/runs/run-lease';
 import { RunsService } from '../src/runs/runs.service';
+import * as eventOutbox from '../src/events/event-outbox';
+import type { DataChangedPayload } from '../src/events/sync-event.types';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -65,6 +67,9 @@ describe('Activity writes protected by a run lease (PostgreSQL integration)', ()
   });
 
   afterEach(async () => {
+    await database.query('DELETE FROM sync.event_outbox WHERE tenant_id = $1', [
+      owner,
+    ]);
     await database.query('DELETE FROM sync.activities WHERE tenant_id = $1', [
       owner,
     ]);
@@ -125,6 +130,26 @@ describe('Activity writes protected by a run lease (PostgreSQL integration)', ()
     ).rows;
   }
 
+  async function events() {
+    return (
+      await database.query<{
+        event_id: string;
+        tenant_id: string;
+        event_type: string;
+        correlation_id: string;
+        causation_id: string;
+        payload: DataChangedPayload;
+        published_at: Date | null;
+      }>(
+        `SELECT event_id, tenant_id, event_type, correlation_id, causation_id,
+                payload, published_at
+         FROM sync.event_outbox WHERE tenant_id = $1
+         ORDER BY occurred_at, event_id`,
+        [owner],
+      )
+    ).rows;
+  }
+
   async function expectRejectedWrites(reservation = lease) {
     const before = await snapshot();
     await expect(
@@ -142,7 +167,7 @@ describe('Activity writes protected by a run lease (PostgreSQL integration)', ()
   it('permits creation, update, unchanged tracking and retirement with the current reservation', async () => {
     const created = await activities.save(owner, input(), lease);
     expect(created.outcome).toBe('created');
-    const changed = input({ title: 'Updated assignment' });
+    const changed = input({ details: { grade: 8.75 } });
     await expect(activities.save(owner, changed, lease)).resolves.toEqual({
       id: created.id,
       outcome: 'updated',
@@ -154,6 +179,12 @@ describe('Activity writes protected by a run lease (PostgreSQL integration)', ()
     await expect(
       activities.retire(owner, retirement(), lease),
     ).resolves.toEqual({ id: created.id, outcome: 'retired' });
+    await expect(
+      activities.retire(owner, retirement(), lease),
+    ).resolves.toEqual({ id: created.id, outcome: 'unchanged' });
+    await expect(
+      activities.retire(owner, retirement({ external_id: 'absent' }), lease),
+    ).resolves.toEqual({ id: null, outcome: 'not_found' });
     expect(await snapshot()).toMatchObject([
       {
         id: created.id,
@@ -161,6 +192,57 @@ describe('Activity writes protected by a run lease (PostgreSQL integration)', ()
         deleted_at: new Date('2026-11-16T11:00:00Z'),
       },
     ]);
+    await expect(activities.save(owner, changed, lease)).resolves.toEqual({
+      id: created.id,
+      outcome: 'updated',
+    });
+    const recorded = await events();
+    expect(recorded).toHaveLength(4);
+    for (const event of recorded) {
+      expect(event).toMatchObject({
+        tenant_id: owner,
+        event_type: 'data.changed',
+        correlation_id: lease.run_id,
+        causation_id: lease.run_id,
+        published_at: null,
+      });
+    }
+    expect(new Set(recorded.map((event) => event.event_id)).size).toBe(4);
+    expect(recorded.map((event) => event.payload)).toEqual(
+      [
+        { change_type: 'created', changed_fields: [] },
+        { change_type: 'updated', changed_fields: ['grade'] },
+        { change_type: 'retired', changed_fields: ['deleted_at'] },
+        { change_type: 'updated', changed_fields: ['deleted_at'] },
+      ].map((change) => ({
+        ...change,
+        sync_run_id: lease.run_id,
+        activity_id: created.id,
+        source_connection_id: connectionId,
+        source_collection: 'assignments',
+        activity_type: 'academic.assignment',
+        external_id: 'lease-fixture',
+      })),
+    );
+  });
+
+  it('rolls back the activity change when appending its event fails', async () => {
+    await activities.save(owner, input(), lease);
+    const before = await snapshot();
+    const beforeEvents = await events();
+    const failure = new Error('Simulated outbox write failure');
+    const append = jest
+      .spyOn(eventOutbox, 'appendOutboxEvent')
+      .mockRejectedValueOnce(failure);
+    try {
+      await expect(
+        activities.save(owner, input({ details: { grade: 9.25 } }), lease),
+      ).rejects.toBe(failure);
+      expect(await snapshot()).toEqual(before);
+      expect(await events()).toEqual(beforeEvents);
+    } finally {
+      append.mockRestore();
+    }
   });
 
   it('rejects an old token without inserting, updating or retiring data and accepts the replacement token', async () => {

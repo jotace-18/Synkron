@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ActivityInput, JsonValue } from './activity.types';
 
-function canonicalJson(value: JsonValue): string {
+export function canonicalJson(value: JsonValue): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
   }

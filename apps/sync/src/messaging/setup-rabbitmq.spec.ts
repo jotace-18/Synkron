@@ -4,14 +4,24 @@ import type { Channel, ChannelModel, Options, Replies } from 'amqplib';
 import { connectRabbitmq } from './rabbitmq-connection';
 import { setupRabbitmq } from './setup-rabbitmq';
 import { SYNC_RUN_QUEUE, SYNC_RUN_REJECTED_QUEUE } from './sync-run-message';
+import { SYNC_EVENT_EXCHANGE } from './sync-event-exchange';
+import { SYNC_EVENT_INSPECTION_QUEUE } from './sync-event-queue';
 
 jest.mock('./rabbitmq-connection', () => ({ connectRabbitmq: jest.fn() }));
 
-describe('RabbitMQ queue setup', () => {
+describe('RabbitMQ topology setup', () => {
   const connectMock = jest.mocked(connectRabbitmq);
   const assertQueue = jest.fn<
     Promise<Replies.AssertQueue>,
     [string, Options.AssertQueue?]
+  >();
+  const assertExchange = jest.fn<
+    ReturnType<Channel['assertExchange']>,
+    Parameters<Channel['assertExchange']>
+  >();
+  const bindQueue = jest.fn<
+    ReturnType<Channel['bindQueue']>,
+    Parameters<Channel['bindQueue']>
   >();
   const createChannel = jest.fn<Promise<Channel>, []>();
   const close = jest.fn<Promise<void>, []>();
@@ -27,11 +37,17 @@ describe('RabbitMQ queue setup', () => {
   beforeEach(() => {
     channel = Object.assign(new EventEmitter(), {
       assertQueue,
+      assertExchange,
+      bindQueue,
     }) as unknown as Channel;
     const connection = { createChannel, close } as unknown as ChannelModel;
     connectMock.mockReset().mockResolvedValue(connection);
     createChannel.mockReset().mockResolvedValue(channel);
     assertQueue.mockReset().mockResolvedValue(reply);
+    assertExchange
+      .mockReset()
+      .mockResolvedValue({ exchange: SYNC_EVENT_EXCHANGE });
+    bindQueue.mockReset().mockResolvedValue({});
     close.mockReset().mockResolvedValue(undefined);
     log = jest.spyOn(console, 'log').mockImplementation(() => {});
     logError = jest
@@ -44,7 +60,7 @@ describe('RabbitMQ queue setup', () => {
     logError.mockRestore();
   });
 
-  it('declares the shared queue with durable non-exclusive configuration and closes the connection', async () => {
+  it('declares durable queues, a topic exchange and the three event bindings before closing', async () => {
     await expect(setupRabbitmq()).resolves.toBeUndefined();
     expect(assertQueue.mock.calls).toEqual([
       [
@@ -65,11 +81,35 @@ describe('RabbitMQ queue setup', () => {
           arguments: { 'x-queue-type': 'classic' },
         },
       ],
+      [
+        SYNC_EVENT_INSPECTION_QUEUE,
+        {
+          durable: true,
+          exclusive: false,
+          autoDelete: false,
+          arguments: { 'x-queue-type': 'classic' },
+        },
+      ],
     ]);
+    expect(assertExchange).toHaveBeenCalledWith(SYNC_EVENT_EXCHANGE, 'topic', {
+      durable: true,
+      autoDelete: false,
+    });
+    expect(bindQueue.mock.calls).toEqual(
+      ['data.changed', 'sync.completed', 'sync.failed'].map((eventType) => [
+        SYNC_EVENT_INSPECTION_QUEUE,
+        SYNC_EVENT_EXCHANGE,
+        eventType,
+      ]),
+    );
     expect(connectMock).toHaveBeenCalledTimes(1);
     expect(createChannel).toHaveBeenCalledTimes(1);
     expect(close).toHaveBeenCalledTimes(1);
-    expect(log.mock.calls).toEqual([['Cola disponible: synkron.sync.runs.v1']]);
+    expect(log.mock.calls).toEqual([
+      [`Cola disponible: ${SYNC_RUN_QUEUE}`],
+      [`Exchange disponible: ${SYNC_EVENT_EXCHANGE}`],
+      [`Cola disponible: ${SYNC_EVENT_INSPECTION_QUEUE}`],
+    ]);
   });
 
   it('waits for the broker confirmation before reporting readiness or closing the connection', async () => {
@@ -92,7 +132,7 @@ describe('RabbitMQ queue setup', () => {
     confirm(reply);
     await pending;
     expect(close).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledTimes(3);
   });
 
   it('propagates a failed connection without declaring a queue or reporting success', async () => {
@@ -138,6 +178,16 @@ describe('RabbitMQ queue setup', () => {
     ]);
     expect(close).toHaveBeenCalledTimes(1);
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it('closes the connection and does not report the inspection queue ready if a binding fails', async () => {
+    const error = new Error('Binding unavailable');
+    bindQueue.mockRejectedValueOnce(error);
+    await expect(setupRabbitmq()).rejects.toBe(error);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(log).not.toHaveBeenCalledWith(
+      `Cola disponible: ${SYNC_EVENT_INSPECTION_QUEUE}`,
+    );
   });
 
   it('does not return a successful command result if connection closure fails', async () => {

@@ -2,7 +2,7 @@
 
 Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
-Es un proyecto en desarrollo. Ya funcionan la autenticación, la gestión básica de conexiones y la sincronización en segundo plano de entregas académicas. La ampliación de las fuentes, Automation, Monitoring y el calendario siguen pendientes de implementación.
+Es un proyecto en desarrollo. Ya funcionan la autenticación, la gestión básica de conexiones y la sincronización en segundo plano de entregas académicas y la publicación de eventos de cambios y resultados. La ampliación de las fuentes, Automation, Monitoring y el calendario siguen pendientes de implementación.
 
 ## Qué permitirá hacer
 
@@ -166,7 +166,9 @@ Sync incorpora definiciones, aceptación idempotente y consulta de ejecuciones. 
 
 El recorrido de entregas se ha comprobado manualmente con altas, edición, retirada y repetición, fuente inaccesible y recuperación tras un guardado parcial. Se conservaron las identidades centrales y los datos existentes ante fallos de lectura. Estas comprobaciones con Rabbit real complementan las pruebas unitarias y de PostgreSQL de CI.
 
-Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, la consulta de actividades centralizadas, el historial de intentos y los reintentos funcionales, los eventos de cambios y resultados, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
+Sync guarda los eventos `data.changed`, `sync.completed` y `sync.failed` en un outbox, en la misma transacción que el cambio o resultado. El proceso `sync-event-publisher` los publica con confirmación de RabbitMQ en `synkron.events.v1`; la cola `synkron.events.inspection.v1` permite observarlos. Se han comprobado los tres tipos, la repetición sin cambios y una caída real de Rabbit: el evento permaneció pendiente y se publicó automáticamente al recuperarse el broker, conservando su ID. Los futuros consumidores deberán deduplicar por `event_id`.
+
+Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, la consulta de actividades centralizadas, el historial de intentos y los reintentos funcionales, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
 
 El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 
