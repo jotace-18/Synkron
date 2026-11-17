@@ -76,8 +76,10 @@ emisión transaccional de los eventos descritos arriba es diseño pendiente para
 Automation y Monitoring. El worker recupera ejecuciones `running` con reserva
 caducada, cambia su token y protege las escrituras y el resultado frente a
 intentos antiguos. Se ha comprobado una caída después de adquirir el trabajo y
-antes de importar: el worker normal recuperó la ejecución con el mismo ID e inicio.
-Las reservas y la protección de escrituras también tienen pruebas con PostgreSQL.
+antes de importar y otra después de confirmar el primer guardado. En ambos casos
+el worker normal recuperó la misma ejecución; tras el guardado parcial conservó
+el ID existente y creó únicamente la actividad pendiente. Las reservas y la
+protección de escrituras también tienen pruebas con PostgreSQL.
 
 ## Cuando algo falla
 

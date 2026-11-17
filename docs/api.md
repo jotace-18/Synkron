@@ -449,8 +449,27 @@ y protección de escrituras tras esperar un bloqueo. También se ha comprobado u
 caída real del consumidor temporal después de adquirir una ejecución y antes de
 importar o confirmar el mensaje: el worker normal esperó a que caducase la reserva,
 recuperó la misma ejecución conservando su inicio y terminó sin errores. Un mensaje
-ficticio inválido quedó guardado en rechazados. La caída durante una importación
-parcial y los demás escenarios distribuidos siguen como comprobaciones pendientes.
+ficticio inválido quedó guardado en rechazados.
+
+Se completaron también estas cinco comprobaciones manuales del recorrido académico,
+con la fuente, PostgreSQL, el publicador, Rabbit y el worker reales:
+
+| Escenario | Resultado observado |
+| --- | --- |
+| Alta | Una nueva entrega produjo una única actividad central con sus datos normalizados. |
+| Edición | Cambiaron título, vencimiento, estado y nota, conservando ID y fecha de creación central. |
+| Retirada y repetición | La marca de retirada explícita llegó a Sync; otra ejecución conservó la misma identidad y no volvió a retirar ni reactivar la actividad. |
+| Fuente inaccesible | La ejecución terminó en `failed` con `source_error`, contadores a cero y actividades intactas, incluido `last_synced_at`. Al recuperar la fuente, una ejecución nueva terminó en `completed`; el fallo anterior permaneció en el historial. |
+| Caída tras un guardado | Un consumidor de prueba terminó abruptamente después de confirmar la primera de dos altas. El worker normal recuperó la misma ejecución, conservó el ID de la actividad ya guardada y creó únicamente la pendiente. |
+
+En la última comprobación se verificó el estado intermedio `running` con una sola
+actividad de las dos nuevas persistida. Tras recuperar, el resultado fue cinco
+entradas leídas, una creada y cuatro sin cambios, sin errores. Son contadores del
+intento recuperado; el alta confirmada antes de la caída se reconoció como existente.
+
+Estas comprobaciones distribuidas se realizaron manualmente. CI mantiene sus
+pruebas unitarias y de integración con PostgreSQL; no se presenta esa ejecución
+manual como una suite de CI con Rabbit real.
 
 ## Reglas (previstas)
 

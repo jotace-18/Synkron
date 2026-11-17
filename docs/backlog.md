@@ -135,7 +135,7 @@ Tareas:
 - [x] Incorporar el worker académico y confirmar entregas tras persistir un resultado terminal.
 - [ ] Emitir eventos de resultado para Automation y Monitoring.
 - [x] Comprobar caída tras adquirir una ejecución, recuperación conservando ID e inicio y traslado de un mensaje inválido a rechazados.
-- [ ] Completar los escenarios distribuidos de interrupción durante una importación parcial.
+- [x] Comprobar recuperación real después de confirmar una actividad y antes de importar la siguiente, conservando la identidad ya guardada.
 
 ## US-07 — Evitar duplicados
 
@@ -160,7 +160,7 @@ Tareas:
 - [x] Recuperar ejecuciones con reserva caducada, rotar el token y proteger las escrituras frente a intentos antiguos.
 - [x] Esperar las reservas activas y apartar mensajes inválidos con publicación confirmada.
 - [ ] Completar el historial de intentos y los reintentos funcionales de importaciones fallidas.
-- [ ] Probar mensajes repetidos, concurrencia e interrupciones después de guardar actividades.
+- [x] Probar repetición de ejecuciones, concurrencia en PostgreSQL y recuperación después de guardar una actividad.
 
 ## US-08 — Revisar resultados y errores
 
@@ -180,7 +180,7 @@ Tareas:
 - [ ] Añadir su vista en el panel.
 - [x] Guardar resultados, contadores y errores seguros con transiciones atómicas de estado.
 - [x] Probar el guardado de resultados correctos, parciales y fallidos en el backend.
-- [ ] Completar los escenarios de fallos y recuperación del recorrido distribuido.
+- [x] Comprobar fuente inaccesible sin alterar actividades y una ejecución nueva satisfactoria tras recuperar la fuente.
 
 ## US-09 — Crear automatización por evento
 
