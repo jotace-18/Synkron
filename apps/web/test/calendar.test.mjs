@@ -5,11 +5,24 @@ import {
   addCalendarDays,
   getMadridDate,
   getMonthDays,
+  getWeekDays,
+  getWeekLabel,
 } from '../src/activities/calendar-utils.ts'
 import {
   listActivitiesInPeriod,
   SessionExpiredError,
 } from '../src/activities/activities-client.ts'
+
+test('keeps a Monday-to-Sunday week together across a year boundary', () => {
+  const days = getWeekDays('2027-01-01')
+  assert.deepEqual(days.map(({ date }) => date), [
+    '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31',
+    '2027-01-01', '2027-01-02', '2027-01-03',
+  ])
+  assert.equal(addCalendarDays(days[0].date, 7), '2027-01-04')
+  assert.match(getWeekLabel('2027-01-01'), /2026/)
+  assert.match(getWeekLabel('2027-01-01'), /2027/)
+})
 
 test('preserves date deadlines and places instants and exclusive intervals on Madrid days', () => {
   const days = getMonthDays(2026, 10)

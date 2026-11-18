@@ -1,7 +1,7 @@
 # Frontend de Synkron
 
 Aplicación React y TypeScript creada con Vite. Incluye inicio y cierre de sesión,
-restauración al recargar, agenda básica y calendario mensual con navegación.
+restauración al recargar, agenda básica y calendario con vistas Mes, Semana y Día.
 El calendario ocupa el 90 % del ancho en escritorio, consulta todas las páginas
 del periodo visible y muestra eventos compactos con título, sigla de asignatura,
 tipo, parte y estado. Los colores representan el estado y el fondo distingue las
@@ -9,7 +9,10 @@ entregas obligatorias. El día actual se resalta en azul. Al pulsar un evento o
 un título de la agenda se consulta su detalle y se abre un modal con los datos
 académicos, que puede cerrarse con el botón o Escape.
 Fechas y horas usan Europe/Madrid; las actividades sin hora conservan su fecha.
-Filtros y vistas semanal y diaria siguen pendientes.
+Las vistas semanal y diaria separan las actividades sin hora de las que tienen hora.
+Anterior, Hoy y Siguiente actúan sobre la vista elegida; el cambio entre vistas
+conserva la fecha de referencia. Pulsar el número de un día abre su vista diaria,
+que consulta únicamente esa jornada. Los filtros siguen pendientes.
 
 Desde la raíz del repositorio, instala y arranca el entorno de desarrollo:
 

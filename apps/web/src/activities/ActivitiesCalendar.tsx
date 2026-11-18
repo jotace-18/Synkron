@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   activityOccursOn,
   addCalendarDays,
   getMadridDate,
+  getDayLabel,
   getMonthDays,
   getMonthLabel,
+  getWeekDays,
+  getWeekLabel,
 } from './calendar-utils'
 import { listActivitiesInPeriod, SessionExpiredError } from './activities-client'
 import {
@@ -22,10 +25,6 @@ const hourFormatter = new Intl.DateTimeFormat('es-ES', {
   timeZone: 'Europe/Madrid',
 })
 
-function currentMonth(): Date {
-  return new Date(`${getMadridDate().slice(0, 7)}-01T00:00:00Z`)
-}
-
 interface ActivitiesCalendarProps {
   onSessionExpired: () => void
   onSelect: (id: string) => void
@@ -41,15 +40,31 @@ export default function ActivitiesCalendar({
   onSessionExpired,
   onSelect,
 }: ActivitiesCalendarProps) {
-  const [visibleMonth, setVisibleMonth] = useState(currentMonth)
+  const [referenceDate, setReferenceDate] = useState(() => getMadridDate())
+  const [calendarView, setCalendarView] = useState<'month' | 'week' | 'day'>('month')
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const [today, setToday] = useState(() => getMadridDate())
   const [result, setResult] = useState<CalendarResult | null>(null)
   const [retry, setRetry] = useState(0)
 
-  const year = visibleMonth.getUTCFullYear()
-  const month = visibleMonth.getUTCMonth()
-  const days = getMonthDays(year, month)
-  const label = getMonthLabel(year, month)
+  const reference = new Date(`${referenceDate}T00:00:00Z`)
+  const year = reference.getUTCFullYear()
+  const month = reference.getUTCMonth()
+  const days = calendarView === 'month'
+    ? getMonthDays(year, month)
+    : calendarView === 'week'
+      ? getWeekDays(referenceDate)
+      : [{ date: referenceDate, day: reference.getUTCDate(), inCurrentMonth: true }]
+  const label = calendarView === 'month'
+    ? getMonthLabel(year, month)
+    : calendarView === 'week'
+      ? getWeekLabel(referenceDate)
+      : getDayLabel(referenceDate)
+  const periodName = { month: 'Mes', week: 'Semana', day: 'Día' }[calendarView]
+  const viewName = { month: 'mensual', week: 'semanal', day: 'diario' }[calendarView]
+  const columns = calendarView === 'day'
+    ? [weekdays[(reference.getUTCDay() + 6) % 7]]
+    : weekdays
   const from = days[0].date
   const to = addCalendarDays(days[days.length - 1].date, 1)
   const requestKey = `${from}/${to}/${retry}`
@@ -86,10 +101,33 @@ export default function ActivitiesCalendar({
     return () => controller.abort()
   }, [from, to, requestKey, onSessionExpired])
 
-  function changeMonth(direction: number) {
-    setVisibleMonth((current) => new Date(Date.UTC(
-      current.getUTCFullYear(), current.getUTCMonth() + direction, 1,
-    )))
+  function changePeriod(direction: number) {
+    setReferenceDate((current) => {
+      if (calendarView === 'day') {
+        return addCalendarDays(current, direction)
+      }
+      if (calendarView === 'week') {
+        return addCalendarDays(current, direction * 7)
+      }
+
+      const date = new Date(`${current}T00:00:00Z`)
+      const targetMonth = date.getUTCMonth() + direction
+      const lastDay = new Date(
+        Date.UTC(date.getUTCFullYear(), targetMonth + 1, 0),
+      ).getUTCDate()
+
+      return new Date(Date.UTC(
+        date.getUTCFullYear(),
+        targetMonth,
+        Math.min(date.getUTCDate(), lastDay),
+      )).toISOString().slice(0, 10)
+    })
+  }
+
+  function openDay(date: string) {
+    setReferenceDate(date)
+    setCalendarView('day')
+    window.requestAnimationFrame(() => titleRef.current?.focus())
   }
 
   return (
@@ -99,28 +137,51 @@ export default function ActivitiesCalendar({
       aria-busy={loading}
     >
       <div className="calendar-toolbar">
-        <h2 id="calendar-title" aria-live="polite">{label}</h2>
+        <h2 ref={titleRef} id="calendar-title" tabIndex={-1} aria-live="polite">{label}</h2>
+        <div className="view-switch" role="group" aria-label="Periodo del calendario">
+          <button
+            type="button"
+            aria-pressed={calendarView === 'month'}
+            onClick={() => setCalendarView('month')}
+          >
+            Mes
+          </button>
+          <button
+            type="button"
+            aria-pressed={calendarView === 'week'}
+            onClick={() => setCalendarView('week')}
+          >
+            Semana
+          </button>
+          <button
+            type="button"
+            aria-pressed={calendarView === 'day'}
+            onClick={() => setCalendarView('day')}
+          >
+            Día
+          </button>
+        </div>
         <div className="calendar-navigation">
           <button
             className="secondary-button"
             type="button"
-            aria-label="Mes anterior"
-            onClick={() => changeMonth(-1)}
+            aria-label={`${periodName} anterior`}
+            onClick={() => changePeriod(-1)}
           >
             Anterior
           </button>
           <button
             className="secondary-button"
             type="button"
-            onClick={() => setVisibleMonth(currentMonth())}
+            onClick={() => setReferenceDate(getMadridDate())}
           >
             Hoy
           </button>
           <button
             className="secondary-button"
             type="button"
-            aria-label="Mes siguiente"
-            onClick={() => changeMonth(1)}
+            aria-label={`${periodName} siguiente`}
+            onClick={() => changePeriod(1)}
           >
             Siguiente
           </button>
@@ -144,44 +205,62 @@ export default function ActivitiesCalendar({
         ) : (
           <p role="status">
             {activities.length === 0
-              ? 'No hay actividades en este periodo.'
+              ? calendarView === 'day' ? 'No hay actividades para este día.' : 'No hay actividades en este periodo.'
               : 'Horarios de Madrid · Verde: entregada · Ámbar: en curso · Rojo: pendiente'}
           </p>
         )}
       </div>
 
       <div className="calendar-scroll">
-        <table className="calendar-table">
+        <table className={`calendar-table calendar-${calendarView}`}>
           <caption className="visually-hidden">
-            Calendario de actividades: {label}
+            Calendario {viewName}: {label}
           </caption>
           <thead>
             <tr>
-              {weekdays.map((day) => <th key={day} scope="col">{day}</th>)}
+              {columns.map((day) => <th key={day} scope="col">{day}</th>)}
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: 6 }, (_, week) => (
+            {Array.from({ length: calendarView === 'month' ? 6 : 1 }, (_, week) => (
               <tr key={week}>
                 {days.slice(week * 7, week * 7 + 7).map((day) => (
                   <td
                     key={day.date}
                     className={[
-                      !day.inCurrentMonth && 'calendar-outside',
+                      calendarView === 'month' && !day.inCurrentMonth && 'calendar-outside',
                       day.date === today && 'calendar-today',
                     ].filter(Boolean).join(' ')}
                   >
-                    <time
-                      className="calendar-day-number"
-                      dateTime={day.date}
-                      aria-current={day.date === today ? 'date' : undefined}
+                    <button
+                      className="calendar-day-button"
+                      type="button"
+                      aria-label={`Ver ${getDayLabel(day.date)}`}
+                      onClick={() => openDay(day.date)}
                     >
-                      {day.day}
-                    </time>
+                      <time
+                        className="calendar-day-number"
+                        dateTime={day.date}
+                        aria-current={day.date === today ? 'date' : undefined}
+                      >
+                        {day.day}
+                      </time>
+                    </button>
                     <ul className="calendar-events">
                       {activities.filter((activity) => activityOccursOn(activity, day.date))
-                        .map((activity) => (
-                          <li key={activity.id}>
+                        .sort((left, right) =>
+                          Number(left.schedule.kind !== 'date') - Number(right.schedule.kind !== 'date'))
+                        .map((activity, index, items) => (
+                          <Fragment key={activity.id}>
+                          {calendarView !== 'month' && (
+                            index === 0 ||
+                            (items[index - 1].schedule.kind === 'date') !== (activity.schedule.kind === 'date')
+                          ) && (
+                            <li className="calendar-section-label">
+                              {activity.schedule.kind === 'date' ? 'Sin hora' : 'Con hora'}
+                            </li>
+                          )}
+                          <li>
                             <button
                               type="button"
                               aria-haspopup="dialog"
@@ -214,6 +293,7 @@ export default function ActivitiesCalendar({
                             </span>
                             </button>
                           </li>
+                          </Fragment>
                         ))}
                     </ul>
                   </td>
