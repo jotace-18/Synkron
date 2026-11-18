@@ -149,7 +149,7 @@ Las rutas parten de `/api/v1`. Los datos se intercambian en JSON y el acceso se 
 | `GET`, `POST` | `/sync-definitions` | Consultar o definir sincronizaciones. |
 | `POST` | `/sync-definitions/{id}/runs` | Iniciar una sincronización. |
 | `GET` | `/sync-runs/{id}` | Consultar su estado y resultado. |
-| `GET` | `/activities` | Consultar actividades centralizadas; contrato pendiente de implementar. |
+| `GET` | `/activities` | Consultar actividades propias y activas, con filtros y paginación. |
 | `GET` | `/activities/{id}` | Consultar el detalle y procedencia de una actividad; previsto. |
 | `GET`, `POST` | `/automations` | Consultar o crear reglas. |
 | `GET` | `/activity` | Consultar cambios y operaciones. |
@@ -168,7 +168,9 @@ El recorrido de entregas se ha comprobado manualmente con altas, edición, retir
 
 Sync guarda los eventos `data.changed`, `sync.completed` y `sync.failed` en un outbox, en la misma transacción que el cambio o resultado. El proceso `sync-event-publisher` los publica con confirmación de RabbitMQ en `synkron.events.v1`; la cola `synkron.events.inspection.v1` permite observarlos. Se han comprobado los tres tipos, la repetición sin cambios y una caída real de Rabbit: el evento permaneció pendiente y se publicó automáticamente al recuperarse el broker, conservando su ID. Los futuros consumidores deberán deduplicar por `event_id`.
 
-Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, la consulta de actividades centralizadas, el historial de intentos y los reintentos funcionales, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
+El listado y detalle de actividades centralizadas ya están disponibles por HTTP con sesión autenticada. Permiten filtrar por periodo, tipo y conexión, con paginación y selección de zona horaria. Las actividades retiradas quedan excluidas y el detalle de una actividad ajena devuelve `404`. Se han comprobado fechas sin hora, intervalos solapados y cambios de horario estacional con PostgreSQL, así como listado y detalle con una sesión real. El calendario sigue pendiente.
+
+Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, el historial de intentos y los reintentos funcionales, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
 
 El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 

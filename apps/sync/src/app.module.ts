@@ -9,6 +9,7 @@ import { ConnectionsController } from './connections/connections.controller';
 import { CredentialsService } from './credentials/credentials.service';
 import { ConnectionProbeService } from './connections/connection-probe.service';
 import { ActivitiesService } from './activities/activities.service';
+import { ActivitiesController } from './activities/activities.controller';
 import { AcademicReaderService } from './connectors/academic/academic-reader.service';
 import { AcademicImportService } from './imports/academic-import.service';
 import { DefinitionsService } from './definitions/definitions.service';
@@ -23,6 +24,7 @@ import { RunProcessorService } from './runs/run-processor.service';
   controllers: [
     AppController,
     ConnectionsController,
+    ActivitiesController,
     DefinitionsController,
     RunsController,
   ],

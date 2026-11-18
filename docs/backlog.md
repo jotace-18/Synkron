@@ -384,8 +384,9 @@ Tareas:
 - [ ] Ampliar las correspondencias a las demás colecciones y fuentes.
 - [x] Guardar cada cambio y su evento pendiente juntos mediante outbox.
 - [x] Publicar cambios y resultados con confirmación de Rabbit y comprobar la recuperación tras una caída del broker, conservando el ID del evento.
-- [ ] Excluir las actividades retiradas de la futura consulta de actividades activas.
-- [ ] Añadir lectura autenticada y paginada de actividades propias.
+- [x] Excluir las actividades retiradas del listado y detalle de actividades activas.
+- [x] Añadir lectura autenticada y paginada de actividades propias.
+- [x] Comprobar filtros temporales, solapamientos, horario estacional, permisos y consulta HTTP con una sesión real.
 - [ ] Probar dos fuentes, actualizaciones, relaciones, repeticiones y accesos cruzados.
 
 ## US-19 — Consultar la agenda y el calendario

@@ -218,8 +218,10 @@ por pruebas de integración.
 Cada actividad se guarda en su propia transacción. Si falla la lectura o la
 validación no se empieza a guardar; si falla la persistencia durante el lote,
 se propaga el error y las actividades anteriores ya confirmadas permanecen.
-El reintento reconoce las identidades existentes. Este servicio es interno:
-todavía no crea trabajos, historial de ejecuciones ni eventos de outbox.
+El reintento reconoce las identidades existentes. En el recorrido asíncrono,
+`RunProcessorService` aporta la reserva de ejecución y las escrituras guardan
+sus eventos de outbox en la misma transacción. La aceptación de trabajos y el
+resultado de la ejecución se gestionan fuera del servicio de importación.
 
 ## Relaciones y límites de responsabilidad
 
@@ -234,7 +236,12 @@ propietario viene del acceso comprobado. La creación y edición se realizan en
 las fuentes; la colección central la modifica el motor de Sync. El backend
 filtra las actividades propias antes de paginar y de devolver detalles.
 
+La consulta autenticada ya permite listar y consultar actividades propias y
+activas, filtrar por periodo, tipo y conexión y paginar. La selección temporal
+conserva las fechas sin hora y considera los solapamientos y la zona del calendario.
+El contrato está descrito en [API](api.md#consulta-de-actividades-centralizadas).
+
 Quedan para las próximas implementaciones los esquemas de `details` y los estados
-de los demás tipos, el contrato completo de correspondencias, las consultas y
-filtros temporales y las tablas de definiciones/ejecuciones. La implementación
-actual cubre la parte común y el recorrido interno de las entregas académicas.
+de los demás tipos y las correspondencias de las restantes colecciones y fuentes.
+La implementación actual cubre la parte común, el recorrido asíncrono de entregas
+académicas, las definiciones y ejecuciones y la lectura de actividades por HTTP.

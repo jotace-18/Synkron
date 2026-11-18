@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { activityContentHash } from './activity-content-hash';
 import type {
@@ -18,10 +18,101 @@ import {
   changedActivityFields,
   type StoredActivityContent,
 } from './activity-changes';
+import type { ActivityView } from './activity-view.types';
+import type { ListActivitiesDto } from './dto/list-activities.dto';
+import { toActivityView, type ActivityRow } from './activity-view.mapper';
+
+const activityViewColumns = `
+  id, source_connection_id, source_collection, external_id,
+  type, title, time_kind, time_role,
+  on_date::text AS on_date, at, end_at,
+  status, details, source_updated_at,
+  created_at, updated_at, last_synced_at
+`;
 
 @Injectable()
 export class ActivitiesService {
   constructor(private readonly database: DatabaseService) {}
+
+  async list(
+    tenantId: string,
+    filters: ListActivitiesDto,
+  ): Promise<ActivityView[]> {
+    const result = await this.database.query<ActivityRow>(
+      `SELECT ${activityViewColumns}
+     FROM sync.activities
+     WHERE tenant_id = $1
+       AND deleted_at IS NULL
+       AND ($2::text IS NULL OR type = $2::text)
+       AND (
+         $3::uuid IS NULL
+         OR source_connection_id = $3::uuid
+       )
+       AND (
+         $4::date IS NULL
+         OR (
+           time_kind = 'date'
+           AND on_date >= $4::date
+           AND on_date < $5::date
+         )
+         OR (
+           time_kind = 'instant'
+           AND at >= (
+             $4::date::timestamp AT TIME ZONE $6::text
+           )
+           AND at < (
+             $5::date::timestamp AT TIME ZONE $6::text
+           )
+         )
+         OR (
+           time_kind = 'interval'
+           AND at < (
+             $5::date::timestamp AT TIME ZONE $6::text
+           )
+           AND end_at > (
+             $4::date::timestamp AT TIME ZONE $6::text
+           )
+         )
+       )
+     ORDER BY
+       COALESCE(on_date, (at AT TIME ZONE $6::text)::date) ASC,
+       CASE WHEN time_kind = 'date' THEN 0 ELSE 1 END ASC,
+       at ASC NULLS FIRST,
+       id ASC
+     LIMIT $7 OFFSET $8`,
+      [
+        tenantId,
+        filters.type ?? null,
+        filters.source_connection_id ?? null,
+        filters.from ?? null,
+        filters.to ?? null,
+        filters.timezone,
+        filters.limit,
+        filters.offset,
+      ],
+    );
+
+    return result.rows.map(toActivityView);
+  }
+
+  async get(tenantId: string, activityId: string): Promise<ActivityView> {
+    const result = await this.database.query<ActivityRow>(
+      `SELECT ${activityViewColumns}
+     FROM sync.activities
+     WHERE tenant_id = $1
+       AND id = $2
+       AND deleted_at IS NULL`,
+      [tenantId, activityId],
+    );
+
+    const activity = result.rows[0];
+
+    if (!activity) {
+      throw new NotFoundException('Actividad no encontrada');
+    }
+
+    return toActivityView(activity);
+  }
 
   private async assertRunLease(
     client: PoolClient,

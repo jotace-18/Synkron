@@ -1,14 +1,17 @@
-export type ActivityType =
-  | 'academic.assignment'
-  | 'academic.exam'
-  | 'academic.work_session'
-  | 'academic.event'
-  | 'sport.gym'
-  | 'sport.football'
-  | 'sport.hiking'
-  | 'sport.running'
-  | 'sport.other'
-  | 'social.plan';
+export const ACTIVITY_TYPES = [
+  'academic.assignment',
+  'academic.exam',
+  'academic.work_session',
+  'academic.event',
+  'sport.gym',
+  'sport.football',
+  'sport.hiking',
+  'sport.running',
+  'sport.other',
+  'social.plan',
+] as const;
+
+export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
 export type ActivitySchedule =
   | {

@@ -8,10 +8,10 @@ Los identificadores y direcciones de este documento son ficticios.
 
 Están disponibles las rutas de autenticación de la API, la creación, listado
 paginado y prueba de conexiones en Sync, la creación de definiciones de
-sincronización, la solicitud y consulta de ejecuciones y la API de entregas
-de académico. En local se accede a API por el puerto 3002, a Sync por el 3001
+sincronización, la solicitud y consulta de ejecuciones, el listado y detalle
+de actividades centralizadas y la API de entregas de académico. En local se accede a API por el puerto 3002, a Sync por el 3001
 y a académico por el 3101. El encaminamiento de todas las rutas bajo una entrada
-pública común, las consultas de actividades, las reglas, el historial y el calendario
+pública común, las reglas, el historial y el calendario
 siguen pendientes. La ejecución en segundo plano de entregas académicas ya
 funciona. Las operaciones indicadas como previstas en este documento son diseño
 y todavía no están implementadas.
@@ -29,7 +29,7 @@ admite creación y listado, detalle y edición por ID y borrado lógico. La ruta
 eliminados con `deleted_at`, para que Sync pueda reconocer su retirada. El
 [contrato de entregas](../apps/academic/README.md) detalla campos, permisos,
 paginación, actualizaciones parciales y preparación local. Sync ya importa esos cambios en segundo plano a su colección central; la consulta
-pública de actividades y el calendario siguen pendientes.
+autenticada de actividades ya está disponible; el calendario sigue pendiente.
 
 ## Operaciones
 
@@ -48,8 +48,8 @@ pública de actividades y el calendario siguen pendientes.
 | GET / PATCH | `/sync-definitions/{id}` | `200` detalle o cambio. |
 | POST | `/sync-definitions/{id}/runs` | `202`, ejecución pendiente y `Location`; disponible. |
 | GET | `/sync-runs/{id}` | `200`, estado guardado por Sync; disponible. |
-| GET | `/activities` | `200`, actividades personales centralizadas; previsto. |
-| GET | `/activities/{id}` | `200`, detalle, datos específicos y procedencia; previsto. |
+| GET | `/activities` | `200`, listado autenticado, filtrado y paginado; disponible. |
+| GET | `/activities/{id}` | `200`, detalle propio y activo con procedencia; disponible. |
 | GET / POST | `/automations` | `200` listado / `201` regla. |
 | GET / PATCH | `/automations/{id}` | `200` detalle o cambio. |
 | GET | `/automation-runs/{id}` | `200`, detalle de regla y acciones. |
@@ -209,13 +209,70 @@ y colección configuradas. La ruta de lectura debe conservar el origen autorizad
 la configuración no puede convertirla en una llamada a otro servidor. Al
 reimportar un recurso se actualiza su actividad central, sin duplicarla.
 
-## Consulta de actividades centralizadas (prevista)
+## Consulta de actividades centralizadas
 
-`GET /api/v1/activities` reunirá las actividades propias de las tres fuentes.
-Permitirá seleccionar un intervalo temporal, fuente y tipo; la forma concreta
-de filtros y paginación se cerrará al implementar la consulta. El detalle
-`GET /api/v1/activities/{id}` conservará la procedencia, la referencia externa,
-los datos comunes y los detalles de origen autorizados.
+`GET /api/v1/activities` devuelve un array de actividades activas del propietario
+autenticado. `GET /api/v1/activities/{id}` devuelve una actividad con el mismo
+formato público. Un ID inexistente, ajeno o retirado devuelve `404`; una petición
+sin sesión válida devuelve `401`. Un ID que no sea UUID v4 produce `422`. Ambas rutas usan
+`Cache-Control: no-store`.
+
+El tipo público es `ActivityView`, definido en
+`apps/sync/src/activities/activity-view.types.ts`: contiene los campos de
+`ActivityInput` más `id`, `created_at`, `updated_at` y `last_synced_at`. Las fechas
+técnicas y `source_updated_at`, cuando se conozca, se devuelven como cadenas ISO
+UTC. Los detalles son los datos autorizados que Sync ya ha normalizado.
+
+Las pruebas con PostgreSQL cubren permisos, exclusión de retiradas, filtros antes
+de paginar, orden estable, límites temporales y días de 23 y 25 horas. Las pruebas
+HTTP usan el guard y la validación reales y simulan únicamente la comprobación
+interna de sesión. También se han consultado listado y detalle con una sesión
+real en el entorno local.
+
+### Parámetros del listado
+
+| Parámetro | Contrato |
+| --- | --- |
+| `limit` | Entero entre 1 y 50; por defecto 20. |
+| `offset` | Entero entre 0 y 9007199254740991; por defecto 0. |
+| `type` | Opcional; uno de los tipos de `ActivityType`, con coincidencia exacta. |
+| `source_connection_id` | UUID opcional de la conexión de origen. Una conexión inexistente o ajena no produce coincidencias. |
+| `from` | Fecha real `YYYY-MM-DD`, inicio incluido del periodo. Se envía junto a `to`. |
+| `to` | Fecha real `YYYY-MM-DD`, final excluido. Debe ser posterior a `from`. |
+| `timezone` | Zona horaria IANA válida; por defecto `Europe/Madrid`. Se usa para interpretar los días del calendario y ordenar. |
+
+Ejemplo para consultar noviembre:
+
+```http
+GET /api/v1/activities?from=2026-11-01&to=2026-12-01&timezone=Europe%2FMadrid&type=academic.assignment&limit=20&offset=0
+```
+
+Sin `from` ni `to` se admite el listado paginado sin restricción temporal. Enviar
+solo uno, usar un periodo vacío o invertido, o parámetros desconocidos o inválidos
+produce `422`. El cliente no puede seleccionar propietario ni solicitar registros
+retirados mediante parámetros adicionales.
+
+El filtrado por propietario, retirada, periodo, tipo y conexión se aplica antes
+de paginar. El orden es ascendente por día de inicio o vencimiento en la zona
+solicitada; dentro del día, primero las actividades sin hora y después las que
+tienen hora, ordenadas por su instante real de inicio o vencimiento. `id ASC`
+desempata. No se inventa una hora pública para ordenar las fechas sin hora. Una
+página fuera del resultado devuelve `[]`. Como en conexiones, la paginación con
+`offset` no mantiene una instantánea entre peticiones; las sincronizaciones
+concurrentes pueden desplazar resultados.
+
+### Selección temporal
+
+- `kind: date`: `from <= schedule.date < to`, sin desplazar el día por la zona.
+- `kind: instant`: el instante pertenece al periodo entre el comienzo del día
+  `from` y el comienzo del día `to` en `timezone`.
+- `kind: interval`: el intervalo se solapa con ese periodo. Se incluye si
+  `at < fin_del_periodo` y `end_at > inicio_del_periodo`; tocar únicamente un
+  límite no cuenta como solapamiento.
+
+Los límites de cada día se convierten mediante la zona horaria, respetando los
+cambios de horario estacional; no se presupone que todos los días duren 24 horas.
+Un intervalo solapado conserva sus fechas reales, sin recortarlas al periodo.
 
 Las actividades devolverán `schedule` con `kind`, `role`, `date`, `at` y `end_at`.
 Una fecha sin hora usa `kind:date`; un instante conocido usa `kind:instant`; un
@@ -226,7 +283,7 @@ en medianoche. `tenant_id` y `content_hash` son internos y no se exponen.
 La colección pertenece a Sync. `/activities` no es `/activity`: esta última ruta
 representa el historial de cambios y operaciones de Monitoring. El calendario
 consulta lo ya sincronizado y no vuelve a leer todas las fuentes al abrirse.
-Una actividad ajena devuelve `404`; el cliente no puede elegir `tenant_id`.
+El cliente no puede elegir `tenant_id`; tampoco se exponen `deleted_at` ni credenciales.
 La creación y modificación de compromisos se realizan en las fuentes. No se
 define un POST/PATCH público sobre la colección central para editar el origen.
 
