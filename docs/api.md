@@ -9,9 +9,12 @@ Los identificadores y direcciones de este documento son ficticios.
 Están disponibles las rutas de autenticación de la API, la creación, listado
 paginado y prueba de conexiones en Sync, la creación de definiciones de
 sincronización, la solicitud y consulta de ejecuciones, el listado y detalle
-de actividades centralizadas y la API de entregas de académico. En local se accede a API por el puerto 3002, a Sync por el 3001
-y a académico por el 3101. El encaminamiento de todas las rutas bajo una entrada
-pública común, las reglas, el historial y el calendario
+de actividades centralizadas y la API de entregas de académico. La
+[entrada HTTPS local](../infra/gateway/README.md) sirve el frontend en
+`https://localhost:8443` y encamina `/api/v1/auth/...` a la API de cuentas y el
+resto de `/api/...` a Sync. Las rutas `/internal/...` quedan bloqueadas en esa
+entrada. En local se mantienen los puertos directos de API (3002), Sync (3001)
+y académico (3101) para comprobaciones. Las reglas, el historial y el calendario
 siguen pendientes. La ejecución en segundo plano de entregas académicas ya
 funciona. Las operaciones indicadas como previstas en este documento son diseño
 y todavía no están implementadas.

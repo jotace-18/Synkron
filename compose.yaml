@@ -300,11 +300,41 @@ services:
       retries: 5
       start_period: 5s
 
+  gateway:
+    image: caddy:2.11.9-alpine
+    user: "1000:1000"
+    init: true
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./infra/gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - gateway-data:/data
+      - gateway-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_started
+      sync:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS --cacert /data/caddy/pki/authorities/local/root.crt
+          https://localhost:8443/healthz >/dev/null
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
 volumes:
   sync-db-data:
   api-db-data:
   academic-db-data:
   rabbitmq-data:
+  gateway-data:
+  gateway-config:
 
 networks:
   default:

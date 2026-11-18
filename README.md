@@ -51,7 +51,7 @@ Synkron se divide en tres servicios:
 | **Automation** | Comprueba las reglas del usuario y pone en marcha las acciones que correspondan. |
 | **Monitoring** | Reúne los cambios, avisos y resultados para poder consultarlos. |
 
-Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Su base visual y su contenedor Nginx ya están disponibles; la entrada HTTPS, el acceso y las vistas de actividades y calendario siguen pendientes.
+Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Su base visual, el contenedor Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md) ya están disponibles. El acceso desde el frontend y las vistas de actividades y calendario siguen pendientes.
 
 Una API, la interfaz por la que se comunican las aplicaciones, recibe las peticiones del panel web y las dirige al servicio correspondiente. También se comprueba quién accede y qué información le pertenece.
 

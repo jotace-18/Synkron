@@ -31,5 +31,10 @@ docker compose up -d --build --wait web
 
 La pantalla está disponible en `http://127.0.0.1:3102` y el estado del servidor en
 `http://127.0.0.1:3102/healthz`. CI comprueba ESLint, compilación, Dockerfile y
-construcción de la imagen. La entrada HTTPS común y el acceso con sesión se
-incorporarán en los siguientes pasos.
+construcción de la imagen.
+
+La [entrada HTTPS común](../../infra/gateway/README.md) ya permite abrir la misma
+pantalla en `https://localhost:8443` y encamina las peticiones de autenticación y
+Sync. El formulario de acceso y las vistas de actividades y calendario todavía
+están pendientes. Para usar las próximas funciones con sesión, accede por esa
+entrada HTTPS e importa su certificado local en el navegador.

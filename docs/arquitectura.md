@@ -22,7 +22,7 @@ Cada backend tendrá una instancia de PostgreSQL en un contenedor independiente,
 | Monitoring | PostgreSQL de Monitoring. |
 | Entrada API: cuentas y sesiones | PostgreSQL de acceso. |
 
-Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tendrá su propio contenedor, consumirá la API y no necesitará base de datos.
+Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tiene su propio contenedor Nginx y no necesita base de datos. La entrada Caddy sirve HTTPS en `https://localhost:8443`, dirige las rutas de autenticación a la API de cuentas y las demás rutas API a Sync. Los backends conservan la comprobación de sesión y permisos. El formulario de acceso y las vistas de actividades y calendario todavía están pendientes.
 
 Esta separación permite gestionar cada base por separado, aunque el host y otros componentes compartidos siguen siendo dependencias comunes. Aumenta el consumo de recursos frente a una instancia compartida.
 

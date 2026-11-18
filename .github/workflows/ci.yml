@@ -271,9 +271,25 @@ jobs:
       - name: Ejecutar pruebas HTTP
         run: npm --prefix fixtures/task-api test
 
+  gateway:
+    name: Validar entrada HTTPS
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Validar configuración de Caddy
+        run: >-
+          docker run --rm --user 1000:1000
+          --volume "$PWD/infra/gateway/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.11.9-alpine
+          caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   docker:
     name: Comprobar imagen de ${{ matrix.service }}
-    needs: [sync, api, academic, task-api, web]
+    needs: [sync, api, academic, task-api, web, gateway]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

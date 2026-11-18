@@ -117,3 +117,21 @@ no un historial de eventos ni una instantánea entre peticiones. El borrado lóg
 y su contrato de origen están implementados en académico. El motor de Sync debe
 incorporar después la interpretación de esas marcas y su efecto en el calendario.
 No se añade una política de purga o restauración a este alcance inicial.
+
+
+## ADR-011. Entrada HTTPS local con Caddy
+
+La entrada web se publica en `https://localhost:8443` mediante Caddy. Recibe las
+peticiones del navegador y las dirige al frontend Nginx, a la API de cuentas o
+a Sync según la ruta. Mantiene las rutas completas y bloquea el espacio
+`/internal`; la comprobación interna de sesiones conserva su puerto separado.
+La autenticación y los permisos siguen siendo responsabilidad de los backends.
+
+El mismo origen permite utilizar las cookies `Secure` y `HttpOnly` existentes.
+Para el entorno local se utiliza la autoridad interna de Caddy, persistida en
+un volumen; se importa su certificado público en el navegador. La configuración
+se valida en CI y el encaminamiento se ha comprobado en local por HTTPS.
+
+Esta decisión define la entrada local de la aplicación. El dominio y los
+certificados se adaptarán al despliegue. Terraform podrá preparar máquinas y
+redes sin cambiar el contrato de las rutas que utiliza el frontend.
