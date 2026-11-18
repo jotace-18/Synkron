@@ -73,9 +73,10 @@ describe('Definition creation (HTTP, simulated internal authorization API)', () 
           return Promise.resolve(new Response(null, { status: authStatus }));
         const headers = new Headers(options?.headers);
         if (
-          options?.method !== 'POST' ||
-          headers.get('Origin') !== origin ||
-          headers.get('X-CSRF-Token') !== csrfToken
+          options?.method !== 'GET' &&
+          (options?.method !== 'POST' ||
+            headers.get('Origin') !== origin ||
+            headers.get('X-CSRF-Token') !== csrfToken)
         ) {
           return Promise.resolve(new Response(null, { status: 403 }));
         }
@@ -211,6 +212,44 @@ describe('Definition creation (HTTP, simulated internal authorization API)', () 
   it('preserves an explicitly disabled definition', async () => {
     const response = await post({ enabled: false }).expect(201);
     expect((response.body as DefinitionJson).enabled).toBe(false);
+  });
+
+  it('lists only the session owner definitions, paginates and rejects anonymous or invalid reads', async () => {
+    const first = (await post()).body as DefinitionJson;
+    const second = (
+      await post({ enabled: false, name: 'Disabled alternative' })
+    ).body as DefinitionJson;
+    const foreignConnection = await createBearer(otherOwner);
+    await app.get(DefinitionsService).create(otherOwner, {
+      name: 'Foreign definition',
+      source_connection_id: foreignConnection,
+      connector: 'academic.assignments',
+      enabled: true,
+    });
+
+    const response = await request(app.getHttpServer())
+      .get(route)
+      .set('Cookie', cookie)
+      .set('X-Tenant-ID', otherOwner)
+      .expect(200)
+      .expect('Cache-Control', 'no-store');
+    const definitions = response.body as DefinitionJson[];
+    expect(definitions.map(({ id }) => id)).toEqual([first.id, second.id]);
+    expect(response.text).not.toContain('Foreign definition');
+    expect(response.text).not.toContain(sourceToken);
+    expect(response.text).not.toContain('tenant_id');
+    const page = await request(app.getHttpServer())
+      .get(`${route}?limit=1&offset=1`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect((page.body as DefinitionJson[]).map(({ id }) => id)).toEqual([
+      second.id,
+    ]);
+    await request(app.getHttpServer()).get(route).expect(401);
+    await request(app.getHttpServer())
+      .get(`${route}?limit=0`)
+      .set('Cookie', cookie)
+      .expect(422);
   });
 
   it('ignores a forged owner header and uses the verified session owner', async () => {

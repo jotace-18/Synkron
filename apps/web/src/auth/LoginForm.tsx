@@ -4,9 +4,11 @@ import type { AuthSession } from './auth.types'
 
 interface LoginFormProps {
   onSuccess: (session: AuthSession) => void
+  onRegister: () => void
+  initialEmail?: string
 }
 
-function LoginForm({ onSuccess }: LoginFormProps) {
+function LoginForm({ onSuccess, onRegister, initialEmail = '' }: LoginFormProps) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,7 +34,7 @@ function LoginForm({ onSuccess }: LoginFormProps) {
       form.reset()
       onSuccess(session)
     } catch (error) {
-      if (error instanceof TypeError || error instanceof SyntaxError) {
+      if (error instanceof TypeError || error instanceof SyntaxError || error instanceof DOMException) {
         setError('No se pudo completar el acceso. Inténtalo de nuevo.')
       } else {
         setError(
@@ -59,6 +61,7 @@ function LoginForm({ onSuccess }: LoginFormProps) {
           name="email"
           type="email"
           autoComplete="username"
+          defaultValue={initialEmail}
           maxLength={254}
           disabled={pending}
           required
@@ -86,6 +89,9 @@ function LoginForm({ onSuccess }: LoginFormProps) {
         disabled={pending}
       >
         {pending ? 'Entrando…' : 'Iniciar sesión'}
+      </button>
+      <button className="secondary-button" type="button" disabled={pending} onClick={onRegister}>
+        Crear una cuenta
       </button>
     </form>
   )

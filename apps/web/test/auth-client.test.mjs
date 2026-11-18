@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getSession, login, logout } from '../src/auth/auth-client.ts'
+import { getSession, login, logout, register } from '../src/auth/auth-client.ts'
 
 const session = {
   user: {
@@ -39,6 +39,23 @@ test('distinguishes an absent session from an unavailable authentication service
 
   assert.equal(await getSession(), null)
   await assert.rejects(getSession(), /No se pudo comprobar tu sesión/)
+})
+
+test('registers with a fresh CSRF context without logging in and reports duplicate email safely', async (t) => {
+  const calls = mockFetch(t, [
+    Response.json({ csrf_token: 'register-context' }),
+    Response.json({ id: 'created-account' }, { status: 201 }),
+    Response.json({ csrf_token: 'duplicate-context' }),
+    Response.json({ message: 'private-database-detail' }, { status: 409 }),
+  ])
+  await register(credentials)
+  await assert.rejects(register(credentials), { message: 'El correo ya está registrado.' })
+  assert.deepEqual(calls.map(({ url }) => url), [
+    '/api/v1/auth/csrf', '/api/v1/auth/register', '/api/v1/auth/csrf', '/api/v1/auth/register',
+  ])
+  assert.equal(calls[1].options.headers['X-CSRF-Token'], 'register-context')
+  assert.deepEqual(JSON.parse(calls[1].options.body), credentials)
+  assert.equal(calls[3].options.headers['X-CSRF-Token'], 'duplicate-context')
 })
 
 test('uses a fresh CSRF context for each write and accepts an empty logout response', async (t) => {

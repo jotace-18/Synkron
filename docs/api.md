@@ -47,7 +47,7 @@ autenticada de actividades ya está disponible; el calendario sigue pendiente.
 | GET / PATCH | `/connections/{id}` | `200` detalle o cambio. |
 | POST | `/connections/{id}/test` | `200` resultado de prueba acotada. |
 | POST | `/sync-definitions` | `201`, definición creada; disponible. |
-| GET | `/sync-definitions` | `200`, listado; previsto. |
+| GET | `/sync-definitions` | `200`, listado propio paginado; disponible. |
 | GET / PATCH | `/sync-definitions/{id}` | `200` detalle o cambio. |
 | POST | `/sync-definitions/{id}/runs` | `202`, ejecución pendiente y `Location`; disponible. |
 | GET | `/sync-runs/{id}` | `200`, estado guardado por Sync; disponible. |
@@ -166,6 +166,15 @@ se siguen. El límite de espera es de 3 segundos y el de respuesta es de 64 KiB,
 contados durante la lectura, también cuando no hay `Content-Length` fiable.
 Una credencial que no puede descifrarse produce `503` sin contactar con el destino.
 El resultado se devuelve en esta petición; guardar la última prueba queda pendiente.
+
+Listado de sincronizaciones, `GET /api/v1/sync-definitions` (disponible):
+
+Requiere sesión y devuelve únicamente definiciones de la cuenta verificada, sin
+credenciales ni propietario en la respuesta. Admite `limit` entre 1 y 50 (20 por
+defecto) y `offset` entero no negativo (0 por defecto). El orden es `created_at`
+ascendente e `id` ascendente. Incluye alternativas deshabilitadas; la interfaz
+solo permite solicitar ejecuciones de las habilitadas. Devuelve `Cache-Control:
+no-store`; una sesión ausente produce `401` y una paginación inválida, `422`.
 
 Creación de sincronización, `POST /api/v1/sync-definitions` (disponible):
 

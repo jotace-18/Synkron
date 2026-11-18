@@ -45,6 +45,18 @@ export async function listActivities(
   return response.json() as Promise<Activity[]>
 }
 
+export async function listAllActivities(signal?: AbortSignal): Promise<Activity[]> {
+  const activities: Activity[] = []
+  for (;;) {
+    const page = await listActivities(activities.length, signal)
+    if (!Array.isArray(page)) {
+      throw new Error('El servicio ha devuelto una respuesta inesperada.')
+    }
+    activities.push(...page)
+    if (page.length < 20) return activities
+  }
+}
+
 export async function getActivity(
   id: string,
   signal?: AbortSignal,

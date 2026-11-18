@@ -28,6 +28,7 @@ const hourFormatter = new Intl.DateTimeFormat('es-ES', {
 interface ActivitiesCalendarProps {
   onSessionExpired: () => void
   onSelect: (id: string) => void
+  refreshVersion?: number
 }
 
 interface CalendarResult {
@@ -39,6 +40,7 @@ interface CalendarResult {
 export default function ActivitiesCalendar({
   onSessionExpired,
   onSelect,
+  refreshVersion = 0,
 }: ActivitiesCalendarProps) {
   const [referenceDate, setReferenceDate] = useState(() => getMadridDate())
   const [calendarView, setCalendarView] = useState<'month' | 'week' | 'day'>('month')
@@ -67,10 +69,11 @@ export default function ActivitiesCalendar({
     : weekdays
   const from = days[0].date
   const to = addCalendarDays(days[days.length - 1].date, 1)
-  const requestKey = `${from}/${to}/${retry}`
+  const requestKey = `${from}/${to}/${retry}/${refreshVersion}`
   const loading = result?.key !== requestKey
   const activities = loading ? [] : result.activities
   const error = loading ? null : result.error
+
 
   useEffect(() => {
     const timer = window.setInterval(() => setToday(getMadridDate()), 60_000)

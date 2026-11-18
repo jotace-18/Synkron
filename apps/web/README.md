@@ -1,6 +1,6 @@
 # Frontend de Synkron
 
-Aplicación React y TypeScript creada con Vite. Incluye inicio y cierre de sesión,
+Aplicación React y TypeScript creada con Vite. Incluye registro, inicio y cierre de sesión,
 restauración al recargar, agenda básica y calendario con vistas Mes, Semana y Día.
 El calendario ocupa el 90 % del ancho en escritorio, consulta todas las páginas
 del periodo visible y muestra eventos compactos con título, sigla de asignatura,
@@ -12,7 +12,15 @@ Fechas y horas usan Europe/Madrid; las actividades sin hora conservan su fecha.
 Las vistas semanal y diaria separan las actividades sin hora de las que tienen hora.
 Anterior, Hoy y Siguiente actúan sobre la vista elegida; el cambio entre vistas
 conserva la fecha de referencia. Pulsar el número de un día abre su vista diaria,
-que consulta únicamente esa jornada. Los filtros siguen pendientes.
+que consulta únicamente esa jornada.
+
+La agenda permite filtrar por tipo (Académico, Deporte o Planes) y por estado
+de entrega (entregadas o no entregadas). Al elegir Académico aparece el selector
+de asignatura, con opciones obtenidas de todas las actividades activas.
+La agenda obtiene todas las páginas antes de aplicar los filtros, para que no
+se limiten a los primeros resultados. El calendario no tiene estos filtros.
+El estado de entrega se aplica a las entregas académicas;
+al elegir Deporte o Planes se restablece. Limpiar filtros recupera la vista completa.
 
 Desde la raíz del repositorio, instala y arranca el entorno de desarrollo:
 
@@ -49,10 +57,11 @@ pantalla en `https://localhost:8443` y encamina las peticiones de autenticación
 Sync. Para probar el acceso, utiliza esa entrada e importa su certificado local
 en el navegador. El servidor de desarrollo de Vite todavía no tiene proxy API.
 
-Para levantar los servicios de acceso y actualizar el frontend:
+Para levantar el flujo completo y actualizar el frontend y la consulta de definiciones:
 
+    docker compose up -d --wait api academic rabbitmq sync-publisher sync-event-publisher sync-worker
+    docker compose up -d --build --wait sync web
     docker compose up -d --wait gateway
-    docker compose up -d --build --wait web
 
 El navegador gestiona la cookie HttpOnly; React conserva la información pública
 de sesión en memoria y la recupera con GET /api/v1/auth/session al recargar.
@@ -68,4 +77,20 @@ También comprueban fechas del calendario, paginación del periodo y caducidad d
 sesión durante la carga, así como notas cero y datos opcionales en el detalle.
 La presentación de actividades, el resaltado de hoy y el modal deben comprobarse
 en el navegador tras reconstruir web.
-El formulario de registro todavía está pendiente; el registro existe en la API.
+El registro pide confirmar la contraseña, comprueba su longitud y presenta el
+conflicto de correo duplicado. Crear una cuenta no inicia sesión: vuelve al acceso
+con el correo ya rellenado. Una cuenta nueva no tiene actividades ni definiciones;
+su configuración desde la web sigue pendiente.
+
+Con una cuenta que ya tenga definiciones, «Sincronizar ahora» permite elegir una
+habilitada, solicita la ejecución con CSRF y una clave de idempotencia, y consulta
+su estado. Un reintento de solicitud usa la misma clave; un fallo de consulta
+permite volver a consultar la ejecución existente. Al terminar, se recarga la agenda
+o el calendario conservando fecha, vista y filtros de la agenda. La ejecución
+continúa en el servidor si se cierra la página; su seguimiento visible actual se
+mantiene en memoria mientras está abierta.
+
+Se han revisado los estados de carga, vacío, errores con reintento y sesión
+caducada, así como los estilos para pantallas pequeñas. La revisión visual final
+corresponde al navegador: comprobar a unos 320 px, entrar y salir, abrir el modal,
+crear una cuenta de prueba y solicitar una sincronización con la cuenta de demo.

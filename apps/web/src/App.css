@@ -485,3 +485,100 @@ button:disabled { opacity: 0.65; cursor: wait; }
   .activity-dialog { padding: 20px; max-height: 90dvh; }
   .activity-detail-fields > div { grid-template-columns: 1fr; gap: 4px; }
 }
+
+.agenda-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.agenda-filter {
+  display: grid;
+  gap: 7px;
+  min-width: 180px;
+  max-width: 340px;
+  flex: 0 1 240px;
+}
+
+.agenda-filter > span {
+  color: #536b61;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.agenda-filter select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 36px 10px 12px;
+  border: 1px solid #b9ccc0;
+  border-radius: 10px;
+  background-color: white;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23176452' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  appearance: none;
+  color: #19372f;
+  cursor: pointer;
+}
+
+.agenda-filter select:focus-visible {
+  outline: 3px solid #2a806a;
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .agenda-filters { gap: 12px; }
+  .agenda-filter { flex: 1 1 180px; max-width: none; min-width: 0; }
+}
+
+.field-hint {
+  color: #536b61;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.access-panel > .access-notice {
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #edf5f0;
+  color: #176452;
+}
+
+.sync-panel {
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  border: 1px solid #dce5dd;
+  border-radius: 14px;
+  background: white;
+}
+
+.sync-controls,
+.sync-feedback {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sync-controls .agenda-filter {
+  flex: 0 1 360px;
+  max-width: 420px;
+}
+
+.sync-result { margin-top: 16px; line-height: 1.6; }
+.sync-result > p:first-child { font-weight: 600; }
+.sync-counts { margin-top: 4px; color: #536b61; font-size: 14px; }
+.sync-feedback { align-items: center; }
+.sync-feedback .form-error { flex: 1 1 240px; }
+.sync-feedback:not(:first-child) { margin-top: 12px; }
+
+@media (max-width: 600px) {
+  .app-header { flex-wrap: wrap; }
+  .account-email { max-width: min(160px, 42vw); }
+  .sync-panel { padding: 16px; }
+  .sync-controls .agenda-filter { min-width: 0; flex: 1 1 240px; }
+  .sync-controls .primary-button { width: 100%; }
+}

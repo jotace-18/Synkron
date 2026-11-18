@@ -22,7 +22,7 @@ Cada backend tendrá una instancia de PostgreSQL en un contenedor independiente,
 | Monitoring | PostgreSQL de Monitoring. |
 | Entrada API: cuentas y sesiones | PostgreSQL de acceso. |
 
-Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tiene su propio contenedor Nginx y no necesita base de datos. La entrada Caddy sirve HTTPS en `https://localhost:8443`, dirige las rutas de autenticación a la API de cuentas y las demás rutas API a Sync. Los backends conservan la comprobación de sesión y permisos. El formulario de acceso, la restauración de sesión al recargar y el cierre ya están conectados por HTTPS. Las vistas de actividades y calendario siguen pendientes.
+Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tiene su propio contenedor Nginx y no necesita base de datos. La entrada Caddy sirve HTTPS en `https://localhost:8443`, dirige las rutas de autenticación a la API de cuentas y las demás rutas API a Sync. Los backends conservan la comprobación de sesión y permisos. El formulario de acceso, la restauración de sesión al recargar y el cierre ya están conectados por HTTPS. Ya están disponibles la agenda con filtros, el calendario Mes/Semana/Día, el detalle en modal, el registro y la solicitud y consulta de sincronizaciones desde la web.
 
 Esta separación permite gestionar cada base por separado, aunque el host y otros componentes compartidos siguen siendo dependencias comunes. Aumenta el consumo de recursos frente a una instancia compartida.
 
@@ -115,7 +115,7 @@ Una sincronización incompleta puede haber cambiado parte de los datos. No se pr
 
 ## Estado de implementación y entrega
 
-El código actual cubre cuentas y sesiones, conexiones, cifrado, prueba acotada de destinos autorizados, la API editable de entregas académicas y su centralización asíncrona con RabbitMQ. También están implementados el outbox y el publicador de eventos de cambios y resultados. Existe una fuente ficticia estática de tareas. La ampliación de las fuentes, los consumidores de Automation y Monitoring, las reglas, el historial de intentos y el calendario siguen pendientes.
+El código actual cubre cuentas y sesiones, conexiones, cifrado, prueba acotada de destinos autorizados, la API editable de entregas académicas y su centralización asíncrona con RabbitMQ. También están implementados el outbox y el publicador de eventos de cambios y resultados. Existe una fuente ficticia estática de tareas. La ampliación de las fuentes, los consumidores de Automation y Monitoring, las reglas, el historial de intentos y las vistas de gestión restantes siguen pendientes. La agenda, el calendario y la solicitud de sincronizaciones desde React ya están implementados.
 
 El Hito 2 se cerrará con el alcance funcional inicial completo, no solo con la base de contenedores o una demostración parcial. El entorno deberá iniciar sus backends, bases, fuentes, RabbitMQ y frontend de forma reproducible; CI validará y publicará las imágenes en GHCR. Terraform y despliegue se trabajan después.
 

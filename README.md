@@ -2,7 +2,7 @@
 
 Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
-Es un proyecto en desarrollo. Ya funcionan la autenticación, la gestión básica de conexiones y la sincronización en segundo plano de entregas académicas y la publicación de eventos de cambios y resultados. La ampliación de las fuentes, Automation, Monitoring y el calendario siguen pendientes de implementación.
+Es un proyecto en desarrollo. Ya funcionan la autenticación, la gestión básica de conexiones y la sincronización en segundo plano de entregas académicas y la publicación de eventos de cambios y resultados. La ampliación de las fuentes, Automation y Monitoring siguen pendientes de implementación.
 
 ## Qué permitirá hacer
 
@@ -51,7 +51,7 @@ Synkron se divide en tres servicios:
 | **Automation** | Comprueba las reglas del usuario y pone en marcha las acciones que correspondan. |
 | **Monitoring** | Reúne los cambios, avisos y resultados para poder consultarlos. |
 
-Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Su base visual, el contenedor Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md) ya están disponibles. El acceso desde el frontend, la restauración de sesión al recargar y el cierre ya funcionan por HTTPS. Las vistas de actividades y calendario siguen pendientes.
+Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Su base visual, el contenedor Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md) ya están disponibles. El acceso desde el frontend, la restauración de sesión al recargar y el cierre ya funcionan por HTTPS. Ya están disponibles la agenda con filtros, el calendario Mes/Semana/Día, el detalle en modal, el registro y la solicitud y consulta de sincronizaciones desde la web.
 
 Una API, la interfaz por la que se comunican las aplicaciones, recibe las peticiones del panel web y las dirige al servicio correspondiente. También se comprueba quién accede y qué información le pertenece.
 
@@ -168,9 +168,9 @@ El recorrido de entregas se ha comprobado manualmente con altas, edición, retir
 
 Sync guarda los eventos `data.changed`, `sync.completed` y `sync.failed` en un outbox, en la misma transacción que el cambio o resultado. El proceso `sync-event-publisher` los publica con confirmación de RabbitMQ en `synkron.events.v1`; la cola `synkron.events.inspection.v1` permite observarlos. Se han comprobado los tres tipos, la repetición sin cambios y una caída real de Rabbit: el evento permaneció pendiente y se publicó automáticamente al recuperarse el broker, conservando su ID. Los futuros consumidores deberán deduplicar por `event_id`.
 
-El listado y detalle de actividades centralizadas ya están disponibles por HTTP con sesión autenticada. Permiten filtrar por periodo, tipo y conexión, con paginación y selección de zona horaria. Las actividades retiradas quedan excluidas y el detalle de una actividad ajena devuelve `404`. Se han comprobado fechas sin hora, intervalos solapados y cambios de horario estacional con PostgreSQL, así como listado y detalle con una sesión real. El calendario sigue pendiente.
+El listado y detalle de actividades centralizadas ya están disponibles por HTTP con sesión autenticada. Permiten filtrar por periodo, tipo y conexión, con paginación y selección de zona horaria. Las actividades retiradas quedan excluidas y el detalle de una actividad ajena devuelve `404`. Se han comprobado fechas sin hora, intervalos solapados y cambios de horario estacional con PostgreSQL, así como listado y detalle con una sesión real. El frontend permite consultarlas en agenda y calendario y solicitar nuevas sincronizaciones.
 
-Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, el historial de intentos y los reintentos funcionales, Automation, Monitoring y el frontend. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
+Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, el historial de intentos y los reintentos funcionales, Automation, Monitoring y las vistas de gestión correspondientes. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
 
 El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 

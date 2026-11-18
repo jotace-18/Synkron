@@ -37,7 +37,7 @@ Tareas:
 - [x] Crear cierre de sesión y comprobación de la cuenta actual.
 - [x] Probar acceso, expiración, cierre de sesión, CSRF y ausencia de secretos en el backend.
 - [x] Conectar el acceso y cierre desde React y comprobar errores y restauración de sesión en Firefox por HTTPS.
-- [ ] Añadir el formulario de registro en el frontend.
+- [x] Añadir el formulario de registro en el frontend, con confirmación de contraseña y acceso posterior explícito.
 
 ## US-02 — Mantener separados los datos de cada cuenta
 
@@ -400,7 +400,7 @@ para consultar mis compromisos y su procedencia.
 
 Criterios de aceptación:
 
-- La vista reúne las actividades de la cuenta y permite filtrar por periodo, fuente y tipo.
+- El calendario reúne las actividades de la cuenta y permite navegar por mes, semana y día. La agenda filtra por tipo, estado de entrega y asignatura académica.
 - El detalle conserva la información necesaria de cada tipo y sus relaciones.
 - Abrir la vista consulta lo ya centralizado, sin leer de nuevo todas las fuentes.
 - La vista inicial es de consulta; las modificaciones se hacen en el origen y llegan al sincronizar.
@@ -410,7 +410,9 @@ Criterios de aceptación:
 Tareas:
 
 - [x] Preparar la base React, el origen HTTPS común y el inicio, restauración y cierre de sesión.
-- [ ] Implementar agenda/calendario, filtros, detalles y estados de carga/error.
+- [x] Implementar agenda, calendario Mes/Semana/Día, detalle en modal y estados de carga/error.
+- [x] Añadir filtros solo en Agenda: tipo, entregadas/no entregadas y asignatura al elegir Académico.
+- [x] Solicitar sincronizaciones desde la web y consultar su estado hasta finalizar, actualizando las actividades visibles.
 - [ ] Conectar las vistas de gestión, ejecución, reglas y seguimiento.
 - [ ] Probar desde el navegador creación en fuente, importación, consulta conjunta y actualización posterior.
 

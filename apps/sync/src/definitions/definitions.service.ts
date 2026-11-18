@@ -7,10 +7,27 @@ import {
 import { DatabaseService } from '../database/database.service';
 import type { SyncDefinition } from './definition.types';
 import type { CreateDefinitionDto } from './dto/create-definition.dto';
+import type { ListDefinitionsDto } from './dto/list-definitions.dto';
 
 @Injectable()
 export class DefinitionsService {
   constructor(private readonly database: DatabaseService) {}
+
+  async list(
+    tenantId: string,
+    query: ListDefinitionsDto,
+  ): Promise<SyncDefinition[]> {
+    const result = await this.database.query<SyncDefinition>(
+      `SELECT id, name, source_connection_id, connector, source_collection,
+              enabled, created_at, updated_at
+       FROM sync.definitions
+       WHERE tenant_id = $1
+       ORDER BY created_at ASC, id ASC
+       LIMIT $2 OFFSET $3`,
+      [tenantId, query.limit, query.offset],
+    );
+    return result.rows;
+  }
 
   async create(
     tenantId: string,

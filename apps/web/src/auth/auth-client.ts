@@ -35,7 +35,7 @@ export async function getSession(
   const response = await fetch('/api/v1/auth/session', {
     credentials: 'same-origin',
     cache: 'no-store',
-    signal,
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000),
   })
 
   if (response.status === 401) {
@@ -49,10 +49,11 @@ export async function getSession(
   return readSession(response)
 }
 
-async function getCsrfToken(): Promise<string> {
+export async function getCsrfToken(signal?: AbortSignal): Promise<string> {
   const response = await fetch('/api/v1/auth/csrf', {
     credentials: 'same-origin',
     cache: 'no-store',
+    signal: signal ?? AbortSignal.timeout(10_000),
   })
 
   if (response.status !== 200) {
@@ -80,6 +81,7 @@ export async function login(
   const csrfToken = await getCsrfToken()
 
   const response = await fetch('/api/v1/auth/login', {
+    signal: AbortSignal.timeout(10_000),
     method: 'POST',
     credentials: 'same-origin',
     cache: 'no-store',
@@ -109,6 +111,7 @@ export async function logout(): Promise<void> {
   const csrfToken = await getCsrfToken()
 
   const response = await fetch('/api/v1/auth/logout', {
+    signal: AbortSignal.timeout(10_000),
     method: 'POST',
     credentials: 'same-origin',
     cache: 'no-store',
@@ -122,4 +125,25 @@ export async function logout(): Promise<void> {
   if (response.status !== 204) {
     throw new Error('No se pudo cerrar la sesión. Inténtalo de nuevo.')
   }
+}
+
+export async function register(credentials: LoginCredentials): Promise<void> {
+  const csrfToken = await getCsrfToken()
+  const response = await fetch('/api/v1/auth/register', {
+    signal: AbortSignal.timeout(10_000),
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': csrfToken,
+    },
+    body: JSON.stringify(credentials),
+  })
+
+  if (response.status === 409) throw new Error('El correo ya está registrado.')
+  if (response.status === 422) {
+    throw new Error('Revisa el correo y utiliza una contraseña de entre 15 y 128 caracteres.')
+  }
+  if (response.status !== 201) throw new Error('No se pudo crear la cuenta. Inténtalo de nuevo.')
 }

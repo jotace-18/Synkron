@@ -6,6 +6,8 @@ import ActivityDetails from './activities/ActivityDetails'
 import { getSession, logout } from './auth/auth-client'
 import type { AuthSession } from './auth/auth.types'
 import LoginForm from './auth/LoginForm'
+import RegisterForm from './auth/RegisterForm'
+import SyncPanel from './sync/SyncPanel'
 
 function App() {
   const [session, setSession] = useState<AuthSession | null>(null)
@@ -14,13 +16,21 @@ function App() {
   const [logoutPending, setLogoutPending] = useState(false)
   const [view, setView] = useState<'calendar' | 'agenda'>('calendar')
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null)
+  const [authView, setAuthView] = useState<'login' | 'register'>('login')
+  const [prefilledEmail, setPrefilledEmail] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [sessionRetry, setSessionRetry] = useState(0)
+  const [refreshVersion, setRefreshVersion] = useState(0)
 
   const closeActivity = useCallback(() => setSelectedActivityId(null), [])
+  const refreshActivities = useCallback(() => setRefreshVersion((value) => value + 1), [])
 
   const handleSessionExpired = useCallback(() => {
     setSelectedActivityId(null)
     setSession(null)
     setError(null)
+    setAuthView('login')
+    setNotice('Tu sesión ha caducado. Inicia sesión de nuevo para continuar.')
   }, [])
 
   useEffect(() => {
@@ -34,12 +44,12 @@ function App() {
       })
       .catch(() => {
         if (controller.signal.aborted) return
-        setError('No se pudo comprobar tu sesión. Recarga la página.')
+        setError('No se pudo comprobar tu sesión. Inténtalo de nuevo.')
         setChecking(false)
       })
 
     return () => controller.abort()
-  }, [])
+  }, [sessionRetry])
 
   async function handleLogout() {
     if (logoutPending) return
@@ -51,6 +61,8 @@ function App() {
       await logout()
       setSelectedActivityId(null)
       setSession(null)
+      setAuthView('login')
+      setNotice(null)
     } catch {
       setError('No se pudo cerrar la sesión. Inténtalo de nuevo.')
     } finally {
@@ -115,25 +127,34 @@ function App() {
 
             {error && <p className="form-error" role="alert">{error}</p>}
 
+            <SyncPanel
+              key={`sync:${session.user.id}`}
+              onSessionExpired={handleSessionExpired}
+              onFinished={refreshActivities}
+            />
+
             {view === 'calendar' ? (
               <ActivitiesCalendar
-                key={session.user.id}
+                key={`calendar:${session.user.id}`}
                 onSessionExpired={handleSessionExpired}
                 onSelect={setSelectedActivityId}
+                refreshVersion={refreshVersion}
               />
             ) : (
               <ActivitiesList
-                key={session.user.id}
+                key={`agenda:${session.user.id}`}
                 onSessionExpired={handleSessionExpired}
                 onSelect={setSelectedActivityId}
+                refreshVersion={refreshVersion}
               />
             )}
           </>
         ) : (
           <section className="access-panel" aria-labelledby="access-title">
             <p className="eyebrow">Tu agenda personal</p>
-            <h1 id="access-title">Todo tu día, en un lugar.</h1>
-            <p>Inicia sesión para consultar tus actividades.</p>
+            <h1 id="access-title">{authView === 'register' ? 'Crea tu cuenta.' : 'Todo tu día, en un lugar.'}</h1>
+            <p>{authView === 'register' ? 'Empieza a reunir tus actividades en Synkron.' : 'Inicia sesión para consultar tus actividades.'}</p>
+            {notice && <p className="access-notice" role="status">{notice}</p>}
 
             {error ? (
               <>
@@ -141,13 +162,34 @@ function App() {
                 <button
                   className="secondary-button"
                   type="button"
-                  onClick={() => window.location.reload()}
+                  onClick={() => {
+                    setError(null)
+                    setChecking(true)
+                    setSessionRetry((value) => value + 1)
+                  }}
                 >
-                  Recargar página
+                  Reintentar
                 </button>
               </>
+            ) : authView === 'register' ? (
+              <RegisterForm
+                onBack={() => setAuthView('login')}
+                onRegistered={(email) => {
+                  setPrefilledEmail(email)
+                  setNotice('Cuenta creada. Ya puedes iniciar sesión.')
+                  setAuthView('login')
+                }}
+              />
             ) : (
-              <LoginForm onSuccess={setSession} />
+              <LoginForm
+                initialEmail={prefilledEmail}
+                onRegister={() => { setNotice(null); setAuthView('register') }}
+                onSuccess={(currentSession) => {
+                  setNotice(null)
+                  setError(null)
+                  setSession(currentSession)
+                }}
+              />
             )}
           </section>
         )}

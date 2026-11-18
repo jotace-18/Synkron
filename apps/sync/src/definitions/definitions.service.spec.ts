@@ -77,6 +77,24 @@ describe('DefinitionsService.create', () => {
     expect(query.mock.calls[1][0]).toContain("'assignments'");
   });
 
+  it('lists a stable page scoped to the verified owner without selecting credentials', async () => {
+    const read = jest
+      .fn<Promise<{ rows: SyncDefinition[] }>, [string, unknown[]]>()
+      .mockResolvedValue({ rows: [definition] });
+    const reader = new DefinitionsService({
+      query: read,
+    } as unknown as DatabaseService);
+
+    await expect(reader.list(owner, { limit: 5, offset: 10 })).resolves.toEqual(
+      [definition],
+    );
+    expect(read.mock.calls[0][1]).toEqual([owner, 5, 10]);
+    expect(read.mock.calls[0][0]).toContain('WHERE tenant_id = $1');
+    expect(read.mock.calls[0][0]).toContain('ORDER BY created_at ASC, id ASC');
+    expect(read.mock.calls[0][0]).not.toContain('SELECT *');
+    expect(read.mock.calls[0][0]).not.toContain('credentials');
+  });
+
   it('preserves an explicitly disabled definition', async () => {
     query
       .mockReset()
