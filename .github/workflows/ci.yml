@@ -220,6 +220,35 @@ jobs:
           PGUSER: academic_test
           PGPASSWORD: ci-only-password
 
+  web:
+    name: Comprobar frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar lint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Compilar
+        run: npm run build
+
   task-api:
     name: Comprobar API de tareas simulada
     runs-on: ubuntu-latest
@@ -244,7 +273,7 @@ jobs:
 
   docker:
     name: Comprobar imagen de ${{ matrix.service }}
-    needs: [sync, api, academic, task-api]
+    needs: [sync, api, academic, task-api, web]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -260,6 +289,8 @@ jobs:
             context: apps/academic
           - service: task-api
             context: fixtures/task-api
+          - service: web
+            context: apps/web
 
     steps:
       - name: Descargar el código

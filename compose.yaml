@@ -280,6 +280,26 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  web:
+    build:
+      context: ./apps/web
+      target: runtime
+    ports:
+      - "127.0.0.1:3102:8080"
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
 volumes:
   sync-db-data:
   api-db-data:
