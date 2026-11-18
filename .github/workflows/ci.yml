@@ -249,6 +249,9 @@ jobs:
       - name: Compilar
         run: npm run build
 
+      - name: Ejecutar pruebas del cliente web
+        run: npm test
+
   task-api:
     name: Comprobar API de tareas simulada
     runs-on: ubuntu-latest

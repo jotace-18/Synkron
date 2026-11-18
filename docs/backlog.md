@@ -36,6 +36,8 @@ Tareas:
 - [x] Crear registro e inicio de sesión con contraseñas protegidas en la API.
 - [x] Crear cierre de sesión y comprobación de la cuenta actual.
 - [x] Probar acceso, expiración, cierre de sesión, CSRF y ausencia de secretos en el backend.
+- [x] Conectar el acceso y cierre desde React y comprobar errores y restauración de sesión en Firefox por HTTPS.
+- [ ] Añadir el formulario de registro en el frontend.
 
 ## US-02 — Mantener separados los datos de cada cuenta
 
@@ -407,7 +409,7 @@ Criterios de aceptación:
 
 Tareas:
 
-- [ ] Completar React, API general, sesiones y origen HTTPS común.
+- [x] Preparar la base React, el origen HTTPS común y el inicio, restauración y cierre de sesión.
 - [ ] Implementar agenda/calendario, filtros, detalles y estados de carga/error.
 - [ ] Conectar las vistas de gestión, ejecución, reglas y seguimiento.
 - [ ] Probar desde el navegador creación en fuente, importación, consulta conjunta y actualización posterior.
