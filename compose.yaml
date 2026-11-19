@@ -280,6 +280,92 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  monitoring-setup:
+    build:
+      context: ./apps/monitoring
+      target: runtime
+    init: true
+    command: ["npm", "run", "rabbitmq:setup"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  monitoring-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      POSTGRES_USER: ${MONITORING_DB_ADMIN_USER:?Falta MONITORING_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${MONITORING_DB_ADMIN_PASSWORD:?Falta MONITORING_DB_ADMIN_PASSWORD}
+      MONITORING_DB_USER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      MONITORING_DB_PASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+    volumes:
+      - monitoring-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/monitoring/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - monitoring-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  monitoring-migrate:
+    build:
+      context: ./apps/monitoring
+      target: build
+    init: true
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      PGHOST: monitoring-db
+      PGPORT: "5432"
+      PGDATABASE: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      PGUSER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      PGPASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+    volumes:
+      - ./apps/monitoring/migrations:/app/migrations:ro
+    networks:
+      - monitoring-data
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+
+  monitoring-consumer:
+    build:
+      context: ./apps/monitoring
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "rabbitmq:consumer"]
+    environment:
+      PGHOST: monitoring-db
+      PGPORT: "5432"
+      PGDATABASE: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      PGUSER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      PGPASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    networks:
+      - default
+      - monitoring-data
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+
   academic-web:
     build:
       context: ./apps/academic-web
@@ -360,6 +446,7 @@ volumes:
   rabbitmq-data:
   gateway-data:
   gateway-config:
+  monitoring-db-data:
 
 networks:
   default:
@@ -368,4 +455,6 @@ networks:
   api-data:
     internal: true
   academic-data:
+    internal: true
+  monitoring-data:
     internal: true
