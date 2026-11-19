@@ -271,17 +271,24 @@ export default function ActivitiesCalendar({
                               data-status={activity.status ?? 'unknown'}
                               data-mandatory={activity.details.mandatory === true}
                               onClick={() => onSelect(activity.id)}
-                              title={`${formatCalendarTitle(activity)}. ${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
-                              aria-label={`Ver detalle: ${formatCalendarTitle(activity)}. ${formatStatus(activity.status)}`}
+                              title={`${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
+                              aria-label={`Ver detalle: ${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
                             >
                             <span className="calendar-event-heading">
-                              <span className="calendar-event-title">{activity.title}</span>
+                              <span className="calendar-event-title">
+                                {activity.title}
+                              </span>
                               {typeof activity.details.course_abbreviation === 'string' && (
                                 <span className="calendar-event-course">
                                   ({activity.details.course_abbreviation})
                                 </span>
                               )}
                             </span>
+                            {activity.schedule.at && (
+                              <span className="calendar-event-time" aria-hidden="true">
+                                {hourFormatter.format(new Date(activity.schedule.at))}
+                              </span>
+                            )}
                             <span className="calendar-event-meta">
                               <span className="calendar-event-kind">
                               {formatActivityType(activity.type)}

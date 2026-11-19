@@ -295,17 +295,26 @@ button:disabled { opacity: 0.65; cursor: wait; }
 
 .calendar-events {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  width: 100%;
+  container-type: inline-size;
   gap: 6px;
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
 
+.calendar-events > li { min-width: 0; max-width: 100%; }
+
 .calendar-event {
   --event-color: #536b61;
   --event-background: #edf2ee;
   display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: 6px 8px;
   border: 1px solid var(--event-color);
   border-left-width: 3px;
@@ -339,8 +348,14 @@ button:disabled { opacity: 0.65; cursor: wait; }
 }
 
 .calendar-event:hover { box-shadow: 0 0 0 1px var(--event-color); }
-.calendar-event-heading { display: flex; align-items: baseline; gap: 6px; }
-.calendar-event-course { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.calendar-event-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  min-width: 0;
+  gap: 6px;
+}
+.calendar-event-course { min-width: 0; max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
 .calendar-event-title {
   min-width: 0;
   display: -webkit-box;
@@ -350,8 +365,9 @@ button:disabled { opacity: 0.65; cursor: wait; }
   font-weight: 650;
 }
 .calendar-event-meta {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
   gap: 8px;
   margin-top: 3px;
   overflow: hidden;
@@ -360,6 +376,23 @@ button:disabled { opacity: 0.65; cursor: wait; }
 }
 .calendar-event-kind { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .calendar-event-status { flex-shrink: 0; }
+.calendar-event-time { display: none; }
+
+.calendar-month .calendar-events { gap: 4px; }
+.calendar-month .calendar-event { display: flex; align-items: center; gap: 6px; border-radius: 4px; }
+.calendar-month .calendar-event-heading { flex: 1; }
+.calendar-month .calendar-event-title {
+  display: block;
+  -webkit-line-clamp: unset;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.calendar-month .calendar-event-time { display: block; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.calendar-month .calendar-event-meta { display: none; }
+
+@container (max-width: 160px) {
+  .calendar-month .calendar-event-time { display: none; }
+}
 
 .calendar-week td {
   height: 380px;
@@ -409,7 +442,7 @@ button:disabled { opacity: 0.65; cursor: wait; }
 .calendar-day .calendar-events { max-width: 880px; margin-top: 20px; gap: 12px; }
 .calendar-day .calendar-event { padding: 12px 14px; }
 .calendar-day .calendar-event-title { display: block; overflow: visible; }
-.calendar-day .calendar-event-meta { flex-wrap: wrap; white-space: normal; }
+.calendar-day .calendar-event-meta { display: flex; flex-wrap: wrap; white-space: normal; }
 .calendar-day .calendar-event-kind { overflow: visible; }
 
 @media (max-width: 600px) {

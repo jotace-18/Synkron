@@ -8,6 +8,10 @@ tipo, parte y estado. Los colores representan el estado y el fondo distingue las
 entregas obligatorias. El día actual se resalta en azul. Al pulsar un evento o
 un título de la agenda se consulta su detalle y se abre un modal con los datos
 académicos, que puede cerrarse con el botón o Escape.
+En Mes, cada actividad ocupa una fila dentro de su día, con título, sigla y hora
+cuando hay espacio. Los textos largos usan puntos suspensivos;
+la información completa sigue en el detalle. Las columnas no se ensanchan por su
+contenido y la altura de cada semana crece con el día que contiene más filas.
 Fechas y horas usan Europe/Madrid; las actividades sin hora conservan su fecha.
 Las vistas semanal y diaria separan las actividades sin hora de las que tienen hora.
 Anterior, Hoy y Siguiente actúan sobre la vista elegida; el cambio entre vistas

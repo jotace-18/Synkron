@@ -280,6 +280,31 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  academic-web:
+    build:
+      context: ./apps/academic-web
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3103:8080"
+    environment:
+      ACADEMIC_DEMO_TOKEN: ${ACADEMIC_DEMO_TOKEN:?Falta ACADEMIC_DEMO_TOKEN}
+    depends_on:
+      academic:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   web:
     build:
       context: ./apps/web
