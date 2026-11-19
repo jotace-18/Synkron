@@ -8,6 +8,10 @@ import type { AuthSession } from './auth/auth.types'
 import LoginForm from './auth/LoginForm'
 import RegisterForm from './auth/RegisterForm'
 import SyncPanel from './sync/SyncPanel'
+import MonitoringDashboard from './monitoring/MonitoringDashboard'
+import MonitoringRunDetails from './monitoring/MonitoringRunDetails'
+import './monitoring/monitoring.css'
+
 
 function App() {
   const [session, setSession] = useState<AuthSession | null>(null)
@@ -21,12 +25,26 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [sessionRetry, setSessionRetry] = useState(0)
   const [refreshVersion, setRefreshVersion] = useState(0)
+  const [section, setSection] =
+    useState<'activities' | 'monitoring'>('activities')
+
+  const [selectedRunId, setSelectedRunId] =
+    useState<string | null>(null)
+
+  const closeRun = useCallback(() => setSelectedRunId(null), [])
+
+  const openActivityFromMonitoring = useCallback((id: string) => {
+    setSelectedRunId(null)
+    setSelectedActivityId(id)
+  }, [])
 
   const closeActivity = useCallback(() => setSelectedActivityId(null), [])
   const refreshActivities = useCallback(() => setRefreshVersion((value) => value + 1), [])
 
   const handleSessionExpired = useCallback(() => {
     setSelectedActivityId(null)
+    setSelectedRunId(null)
+    setSection('activities')
     setSession(null)
     setError(null)
     setAuthView('login')
@@ -60,6 +78,8 @@ function App() {
     try {
       await logout()
       setSelectedActivityId(null)
+      setSelectedRunId(null)
+      setSection('activities')
       setSession(null)
       setAuthView('login')
       setNotice(null)
@@ -77,6 +97,24 @@ function App() {
           <span className="brand-mark" aria-hidden="true">S</span>
           <span className="brand-name">Synkron</span>
         </div>
+        {session && (
+          <nav className="view-switch workspace-navigation" aria-label="Secciones de Synkron">
+            <button
+              type="button"
+              aria-pressed={section === 'activities'}
+              onClick={() => setSection('activities')}
+            >
+              Mi agenda
+            </button>
+            <button
+              type="button"
+              aria-pressed={section === 'monitoring'}
+              onClick={() => setSection('monitoring')}
+            >
+              Centro de mandos
+            </button>
+          </nav>
+        )}
         {session && (
           <div className="account-menu">
             <span className="account-email" title={session.user.email}>
@@ -99,54 +137,76 @@ function App() {
           <p role="status">Comprobando tu sesión…</p>
         ) : session ? (
           <>
-            <div className="workspace-heading">
-              <div>
-                <p className="eyebrow">Tu agenda personal</p>
-                <h1>{view === 'calendar' ? 'Tu calendario' : 'Tu agenda'}</h1>
-                <p className="workspace-description">
-                  Entregas, entrenamientos y planes en una misma vista.
-                </p>
-              </div>
-              <div className="view-switch" role="group" aria-label="Vista de actividades">
-                <button
-                  type="button"
-                  aria-pressed={view === 'calendar'}
-                  onClick={() => setView('calendar')}
-                >
-                  Calendario
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={view === 'agenda'}
-                  onClick={() => setView('agenda')}
-                >
-                  Agenda
-                </button>
-              </div>
-            </div>
-
             {error && <p className="form-error" role="alert">{error}</p>}
 
-            <SyncPanel
-              key={`sync:${session.user.id}`}
-              onSessionExpired={handleSessionExpired}
-              onFinished={refreshActivities}
-            />
+            <div key={`activities:${session.user.id}`} hidden={section !== 'activities'}>
+              <div className="workspace-heading">
+                <div>
+                  <p className="eyebrow">Tu agenda personal</p>
+                  <h1>{view === 'calendar' ? 'Tu calendario' : 'Tu agenda'}</h1>
+                  <p className="workspace-description">
+                    Entregas, entrenamientos y planes en una misma vista.
+                  </p>
+                </div>
+                <div className="view-switch" role="group" aria-label="Vista de actividades">
+                  <button
+                    type="button"
+                    aria-pressed={view === 'calendar'}
+                    onClick={() => setView('calendar')}
+                  >
+                    Calendario
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={view === 'agenda'}
+                    onClick={() => setView('agenda')}
+                  >
+                    Agenda
+                  </button>
+                </div>
+              </div>
 
-            {view === 'calendar' ? (
-              <ActivitiesCalendar
-                key={`calendar:${session.user.id}`}
+              <SyncPanel
+                key={`sync:${session.user.id}`}
                 onSessionExpired={handleSessionExpired}
-                onSelect={setSelectedActivityId}
-                refreshVersion={refreshVersion}
+                onFinished={refreshActivities}
               />
-            ) : (
-              <ActivitiesList
-                key={`agenda:${session.user.id}`}
-                onSessionExpired={handleSessionExpired}
-                onSelect={setSelectedActivityId}
-                refreshVersion={refreshVersion}
-              />
+
+              {view === 'calendar' ? (
+                <ActivitiesCalendar
+                  key={`calendar:${session.user.id}`}
+                  onSessionExpired={handleSessionExpired}
+                  onSelect={setSelectedActivityId}
+                  refreshVersion={refreshVersion}
+                />
+              ) : (
+                <ActivitiesList
+                  key={`agenda:${session.user.id}`}
+                  onSessionExpired={handleSessionExpired}
+                  onSelect={setSelectedActivityId}
+                  refreshVersion={refreshVersion}
+                />
+              )}
+            </div>
+
+            {section === 'monitoring' && (
+              <section aria-labelledby="monitoring-title">
+                <div className="workspace-heading">
+                  <div>
+                    <p className="eyebrow">Seguimiento de sincronizaciones</p>
+                    <h1 id="monitoring-title">Centro de mandos</h1>
+                    <p className="workspace-description">
+                      Consulta los resultados, revisa los cambios e investiga los fallos.
+                    </p>
+                  </div>
+                </div>
+                <MonitoringDashboard
+                  key={`monitoring:${session.user.id}`}
+                  onSessionExpired={handleSessionExpired}
+                  onSelect={setSelectedRunId}
+                  refreshVersion={refreshVersion}
+                />
+              </section>
             )}
           </>
         ) : (
@@ -194,6 +254,15 @@ function App() {
           </section>
         )}
       </main>
+      {session && selectedRunId && !selectedActivityId && (
+        <MonitoringRunDetails
+          key={`run:${selectedRunId}`}
+          runId={selectedRunId}
+          onClose={closeRun}
+          onSessionExpired={handleSessionExpired}
+          onOpenActivity={openActivityFromMonitoring}
+        />
+      )}
       {session && selectedActivityId && (
         <ActivityDetails
           key={selectedActivityId}

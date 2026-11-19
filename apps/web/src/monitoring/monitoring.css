@@ -1,0 +1,327 @@
+.monitoring-dashboard {
+  display: grid;
+  gap: 24px;
+}
+
+.monitoring-toolbar,
+.monitoring-history-heading,
+.monitoring-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.monitoring-toolbar > p {
+  max-width: 65ch;
+  color: #536b61;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.monitoring-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.monitoring-stat {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid #dce5dd;
+  border-radius: 18px;
+  background: white;
+}
+
+.monitoring-stat h2 {
+  color: #536b61;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.monitoring-stat-value {
+  margin: 16px 0 10px;
+  color: #176452;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.monitoring-stat--failure .monitoring-stat-value {
+  color: #a53630;
+}
+
+.monitoring-stat-caption {
+  margin-top: 6px;
+  color: #536b61;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.monitoring-stat--last {
+  border-color: #176452;
+  background: #176452;
+  color: white;
+}
+
+.monitoring-stat--last h2,
+.monitoring-stat--last .monitoring-stat-caption {
+  color: #d7ebe2;
+}
+
+.monitoring-stat-result {
+  margin: 18px 0 10px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.monitoring-history {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid #dce5dd;
+  border-radius: 18px;
+  background: white;
+}
+
+.monitoring-history-heading {
+  margin-bottom: 24px;
+}
+
+.monitoring-history-heading h2 {
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+
+.monitoring-history-heading label {
+  display: grid;
+  gap: 7px;
+  color: #536b61;
+  font-size: 14px;
+}
+
+.monitoring-history-heading select {
+  min-height: 44px;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid #b9ccc0;
+  border-radius: 10px;
+  background: white;
+  color: #19372f;
+}
+
+.monitoring-table-scroll {
+  overflow-x: auto;
+}
+
+.monitoring-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.monitoring-table th,
+.monitoring-table td {
+  padding: 16px 14px;
+  border-bottom: 1px solid #e6ece7;
+  vertical-align: middle;
+}
+
+.monitoring-table th {
+  background: #f5f8f5;
+  color: #536b61;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.monitoring-table tbody tr:hover {
+  background: #f8faf7;
+}
+
+.monitoring-table td:nth-child(2) {
+  font-family: ui-monospace, monospace;
+}
+
+.monitoring-table td:nth-child(4),
+.monitoring-table td:nth-child(5) {
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-badge {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.monitoring-badge--completed {
+  background: #e3f3e9;
+  color: #176452;
+}
+
+.monitoring-badge--failed {
+  background: #fbe9e7;
+  color: #982c26;
+}
+
+.monitoring-pagination {
+  margin: 24px 0 0;
+}
+
+.monitoring-pagination > span {
+  color: #536b61;
+  font-size: 14px;
+}
+
+.monitoring-dialog {
+  width: min(760px, calc(100% - 32px));
+}
+
+.monitoring-dialog > p {
+  margin: 14px 0;
+  line-height: 1.6;
+}
+
+.monitoring-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.monitoring-counts > div {
+  padding: 14px;
+  border: 1px solid #e6ece7;
+  border-radius: 12px;
+  background: #f8faf7;
+}
+
+.monitoring-counts dt {
+  color: #536b61;
+  font-size: 13px;
+}
+
+.monitoring-counts dd {
+  margin: 8px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-run-error {
+  margin-top: 20px;
+  padding: 16px;
+  border-left: 3px solid #a53630;
+  border-radius: 8px;
+  background: #fbeeea;
+  color: #852d27;
+  line-height: 1.6;
+}
+
+.monitoring-run-error p {
+  margin-top: 8px;
+}
+
+.monitoring-changes {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+  }
+
+.monitoring-changes li {
+  padding: 16px;
+  border: 1px solid #dce5dd;
+  border-radius: 12px;
+}
+
+.monitoring-changes p {
+  margin: 8px 0;
+  color: #536b61;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.monitoring-changes button {
+  margin-top: 8px;
+}
+
+.monitoring-trace {
+  margin: 24px 0;
+  color: #536b61;
+  font-size: 13px;
+}
+
+.monitoring-trace summary {
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.monitoring-trace dt {
+  margin-top: 14px;
+  font-weight: 600;
+}
+
+.monitoring-trace dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.monitoring-dialog > .secondary-button:last-child {
+  margin-top: 20px;
+}
+
+.monitoring-table-scroll:focus-visible,
+.monitoring-history select:focus-visible,
+.monitoring-trace summary:focus-visible {
+  outline: 3px solid #2a806a;
+  outline-offset: 3px;
+}
+
+@media (max-width: 1100px) {
+  .app-header {
+    flex-wrap: wrap;
+  }
+
+  .workspace-navigation {
+    order: 3;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .account-menu {
+    margin-left: auto;
+  }
+
+  .monitoring-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .monitoring-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .monitoring-stat,
+  .monitoring-history {
+    padding: 18px;
+  }
+
+  .monitoring-toolbar > button {
+    width: 100%;
+  }
+
+  .monitoring-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .monitoring-pagination {
+    gap: 10px;
+  }
+}
