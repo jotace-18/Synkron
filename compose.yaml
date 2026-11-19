@@ -280,6 +280,29 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  monitoring:
+    build:
+      context: ./apps/monitoring
+      target: runtime
+    init: true
+    environment:
+      PGHOST: monitoring-db
+      PGPORT: "5432"
+      PGDATABASE: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      PGUSER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      PGPASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+      AUTH_API_INTERNAL_URL: http://api:3003
+      SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+    networks:
+      - default
+      - monitoring-data
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+      api:
+        condition: service_started
+
   monitoring-setup:
     build:
       context: ./apps/monitoring
@@ -427,6 +450,8 @@ services:
       api:
         condition: service_started
       sync:
+        condition: service_started
+      monitoring:
         condition: service_started
     healthcheck:
       test:
