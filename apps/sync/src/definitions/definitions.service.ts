@@ -29,6 +29,34 @@ export class DefinitionsService {
     return result.rows;
   }
 
+  async get(
+    tenantId: string,
+    definitionId: string,
+  ): Promise<SyncDefinition> {
+    const result = await this.database.query<SyncDefinition>(
+      `SELECT
+         id,
+         name,
+         source_connection_id,
+         connector,
+         source_collection,
+         enabled,
+         created_at,
+         updated_at
+       FROM sync.definitions
+       WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, definitionId],
+    );
+
+    const definition = result.rows[0];
+
+    if (!definition) {
+      throw new NotFoundException('Definición no encontrada');
+    }
+
+    return definition;
+  }
+
   async create(
     tenantId: string,
     input: CreateDefinitionDto,

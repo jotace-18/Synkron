@@ -23,7 +23,7 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 | RF-13 | Guardar qué reglas se comprobaron y qué acciones se realizaron. | Inicial |
 | RF-14 | Consultar y filtrar cambios, operaciones y avisos. | Inicial |
 | RF-15 | Consultar estadísticas de uso. | Inicial |
-| RF-16 | Programar sincronizaciones. | Después |
+| RF-16 | Programar sincronizaciones por intervalos o a una hora diaria, con recuperación sin acumular todas las ocasiones omitidas. | Inicial |
 | RF-17 | Reintentar fallos temporales cuando sea seguro. | Después |
 | RF-18 | Revisar y recuperar mensajes que no pudieron procesarse. | Después |
 | RF-19 | Enviar peticiones a través de conexiones autorizadas. | Después |
@@ -33,6 +33,12 @@ La prioridad indica si pertenece a la versión inicial, a una mejora posterior o
 | RF-23 | Disponer de fuentes académica, deportiva y de planes sociales editables y persistentes para demostrar el recorrido completo. | Inicial |
 | RF-24 | Conservar los detalles necesarios de cada tipo y las relaciones de origen al normalizar actividades, incluidas actualizaciones posteriores de notas. | Inicial |
 | RF-25 | Sincronizar hacia destinos externos además de la colección central. | Después |
+| RF-26 | Generar recordatorios de vencimiento para entregas pendientes, con tratamiento explícito de fechas sin hora y sin avisos duplicados. | Inicial |
+
+La programación y los recordatorios forman parte del alcance inicial acordado
+para Automation. Sus horarios, responsabilidades y orden de desarrollo se
+concretan en [Automation](automation.md); esta decisión de alcance no significa
+que las funciones estén implementadas.
 
 El destino inicial es interno a Sync. No se requiere una segunda conexión externa
 para importar actividades. Los tipos y campos de las tres fuentes se describen en

@@ -18,6 +18,9 @@ import { RunsController } from './runs/runs.controller';
 import { RunsService } from './runs/runs.service';
 import { RunJobsService } from './messaging/run-jobs.service';
 import { RunProcessorService } from './runs/run-processor.service';
+import { AutomationRunsController } from './internals/automation-runs.controller';
+import { AutomationServiceGuard } from './internals/automation-service.guard';
+import { AutomationDefinitionsController } from './internals/automation-definitions.controller';
 
 @Module({
   imports: [],
@@ -27,6 +30,8 @@ import { RunProcessorService } from './runs/run-processor.service';
     ActivitiesController,
     DefinitionsController,
     RunsController,
+    AutomationRunsController,
+    AutomationDefinitionsController
   ],
   providers: [
     ConnectionTargetPolicyService,
@@ -43,6 +48,7 @@ import { RunProcessorService } from './runs/run-processor.service';
     RunsService,
     RunJobsService,
     RunProcessorService,
+    AutomationServiceGuard,
   ],
 })
 export class AppModule {}

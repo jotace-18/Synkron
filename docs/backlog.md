@@ -6,7 +6,7 @@ Esta revisión del diseño no modifica el seguimiento remoto. La correspondencia
 de las nuevas historias y cambios de alcance con Issues y Project deberá revisarse
 al actualizar ese seguimiento.
 
-US-01 a US-13 y US-17 a US-19 forman parte de la implementación inicial que debe
+US-01 a US-13 y US-17 a US-21 forman parte de la implementación inicial que debe
 quedar completa en el Hito 2. US-14 corresponde a infraestructura, US-15 al
 despliegue posterior y US-16 a la validación de funcionamiento y rendimiento,
 con comprobaciones básicas desde el desarrollo y medidas finales en despliegue.
@@ -416,7 +416,53 @@ Tareas:
 - [ ] Conectar las vistas de gestión, ejecución, reglas y seguimiento.
 - [ ] Probar desde el navegador creación en fuente, importación, consulta conjunta y actualización posterior.
 
+## US-20 — Programar sincronizaciones
+
+Requisitos: RF-16; RI-03, RI-12; RIC-07; RD-02, RD-03.
+
+Como usuario, quiero programar mis sincronizaciones para mantener la agenda
+actualizada sin solicitarlas manualmente.
+
+Criterios de aceptación:
+
+- Se admite un intervalo de 15, 30 o 60 minutos o una hora diaria de Madrid.
+- La definición pertenece a la misma cuenta y el horario puede deshabilitarse.
+- Tras una parada se agrupan las ocasiones omitidas en una sola solicitud de recuperación.
+- Repetir la entrega de una ocasión no crea ejecuciones duplicadas en Sync.
+- El resultado de la sincronización sigue consultándose en Sync y Monitoring.
+
+Tareas:
+
+- [x] Acordar alcance y política de recuperación en [Automation](automation.md).
+- [ ] Preparar servicio, persistencia y API autenticada.
+- [ ] Implementar planificación y solicitudes persistentes e idempotentes a Sync.
+- [ ] Añadir configuración e historial al frontend.
+- [ ] Comprobar permisos, concurrencia, horario estacional y recuperación.
+
+## US-21 — Recibir recordatorios de entregas
+
+Requisitos: RF-12, RF-13, RF-26; RI-08, RI-12; RIC-07.
+
+Como usuario, quiero recibir recordatorios de entregas pendientes para anticipar
+sus vencimientos sin repetir el mismo aviso en cada revisión.
+
+Criterios de aceptación:
+
+- Automation consulta las actividades actuales de Sync mediante una API autorizada.
+- Con hora se usa el plazo configurado; sin hora se avisa a las 09:00 de Madrid del día anterior.
+- Se excluyen entregas retiradas o entregadas.
+- Monitoring conserva el aviso sin duplicarlo y permite marcarlo como leído.
+- La bandeja y la configuración se limitan al propietario.
+
+Tareas:
+
+- [x] Acordar alcance y tratamiento inicial de fechas sin hora.
+- [ ] Definir identidad del recordatorio y comportamiento al cambiar el vencimiento.
+- [ ] Implementar revisión periódica y entrega fiable de avisos a Monitoring.
+- [ ] Añadir configuración, bandeja y estado de lectura al frontend.
+- [ ] Comprobar repetición, modificaciones, retiradas y entregas completadas.
+
 ## Ampliaciones posteriores
 
-Revisiones programadas (RF-16), reintentos (RF-17), recuperación de mensajes fallidos (RF-18), acciones HTTP (RF-19) y sincronización hacia destinos externos (RF-25) tendrán historias propias. La cancelación de ejecuciones (RF-20) es opcional y distinta de modificar el estado de un compromiso en su fuente. Hevy y Strava no se integran ahora. Guardar solicitudes, centralizar actividades, controlar duplicados y mostrar fallos forma parte de la implementación inicial que debe completarse en el Hito 2.
+Reintentos (RF-17), recuperación de mensajes fallidos (RF-18), acciones HTTP (RF-19) y sincronización hacia destinos externos (RF-25) tendrán historias propias. La programación (RF-16) y los recordatorios (RF-26) se incluyen en US-20 y US-21 dentro del alcance inicial. La cancelación de ejecuciones (RF-20) es opcional y distinta de modificar el estado de un compromiso en su fuente. Hevy y Strava no se integran ahora. Guardar solicitudes, centralizar actividades, controlar duplicados y mostrar fallos forma parte de la implementación inicial que debe completarse en el Hito 2.
 

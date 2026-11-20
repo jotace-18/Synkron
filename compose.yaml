@@ -18,6 +18,7 @@ services:
       PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
       PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
       SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
       AUTH_API_INTERNAL_URL: http://api:3003
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
       SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
@@ -389,6 +390,100 @@ services:
         condition: service_healthy
 
 
+  automation:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      AUTH_API_INTERNAL_URL: http://api:3003
+      SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      SYNC_INTERNAL_URL: http://sync:3000
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      api:
+        condition: service_started
+      sync:
+        condition: service_started
+
+  automation-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      POSTGRES_USER: ${AUTOMATION_DB_ADMIN_USER:?Falta AUTOMATION_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${AUTOMATION_DB_ADMIN_PASSWORD:?Falta AUTOMATION_DB_ADMIN_PASSWORD}
+      AUTOMATION_DB_USER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      AUTOMATION_DB_PASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+    volumes:
+      - automation-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/automation/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - automation-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  automation-migrate:
+    build:
+      context: ./apps/automation
+      target: build
+    init: true
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+    volumes:
+      - ./apps/automation/migrations:/app/migrations:ro
+    networks:
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+
+  automation-scheduler:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "scheduler"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      SYNC_INTERNAL_URL: http://sync:3000
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      sync:
+        condition: service_started
+
+
   academic-web:
     build:
       context: ./apps/academic-web
@@ -453,6 +548,8 @@ services:
         condition: service_started
       monitoring:
         condition: service_started
+      automation:
+        condition: service_started
     healthcheck:
       test:
         - CMD-SHELL
@@ -472,6 +569,7 @@ volumes:
   gateway-data:
   gateway-config:
   monitoring-db-data:
+  automation-db-data:
 
 networks:
   default:
@@ -482,4 +580,6 @@ networks:
   academic-data:
     internal: true
   monitoring-data:
+    internal: true
+  automation-data:
     internal: true
