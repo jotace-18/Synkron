@@ -1,0 +1,665 @@
+name: synkron
+
+services:
+  sync:
+    build:
+      context: ./apps/sync
+      target: runtime
+    ports:
+      - "127.0.0.1:3001:3000"
+    init: true
+    networks:
+      - default
+      - sync-data
+    environment:
+      PGHOST: sync-db
+      PGPORT: "5432"
+      PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+      SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
+      AUTH_API_INTERNAL_URL: http://api:3003
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
+      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    depends_on:
+      sync-db:
+        condition: service_healthy
+
+  sync-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      POSTGRES_USER: ${SYNC_DB_ADMIN_USER:?Falta SYNC_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${SYNC_DB_ADMIN_PASSWORD:?Falta SYNC_DB_ADMIN_PASSWORD}
+      SYNC_DB_USER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      SYNC_DB_PASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+    volumes:
+      - sync-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/sync/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - sync-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: ./apps/api
+      target: runtime
+    ports:
+      - "127.0.0.1:3002:3000"
+    networks:
+      - default
+      - api-data
+    init: true
+    environment:
+      PGHOST: api-db
+      PGPORT: "5432"
+      PGDATABASE: ${API_DB_NAME:?Falta API_DB_NAME}
+      PGUSER: ${API_DB_USER:?Falta API_DB_USER}
+      PGPASSWORD: ${API_DB_PASSWORD:?Falta API_DB_PASSWORD}
+      APP_ORIGIN: ${APP_ORIGIN:?Falta APP_ORIGIN}
+      CSRF_SECRET: ${CSRF_SECRET:?Falta CSRF_SECRET}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      SESSION_IDLE_TTL_MINUTES: ${SESSION_IDLE_TTL_MINUTES:-30}
+      SESSION_ABSOLUTE_TTL_HOURS: ${SESSION_ABSOLUTE_TTL_HOURS:-12}
+      AUTH_LOGIN_MAX_ATTEMPTS_PER_ACCOUNT: ${AUTH_LOGIN_MAX_ATTEMPTS_PER_ACCOUNT:-5}
+      AUTH_LOGIN_MAX_ATTEMPTS_PER_IP: ${AUTH_LOGIN_MAX_ATTEMPTS_PER_IP:-30}
+      AUTH_LOGIN_WINDOW_MINUTES: ${AUTH_LOGIN_WINDOW_MINUTES:-15}
+      SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+    depends_on:
+      api-db:
+        condition: service_healthy
+
+
+  api-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${API_DB_NAME:?Falta API_DB_NAME}
+      POSTGRES_USER: ${API_DB_ADMIN_USER:?Falta API_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${API_DB_ADMIN_PASSWORD:?Falta API_DB_ADMIN_PASSWORD}
+      API_DB_USER: ${API_DB_USER:?Falta API_DB_USER}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:?Falta API_DB_PASSWORD}
+    volumes:
+      - api-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/api/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - api-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  task-api:
+    build:
+      context: ./fixtures/task-api
+    init: true
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      TASK_API_TOKEN: ${TASK_API_TOKEN:?Falta TASK_API_TOKEN}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  academic:
+    build:
+      context: ./apps/academic
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3101:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - default
+      - academic-data
+    environment:
+      PGHOST: academic-db
+      PGPORT: "5432"
+      PGDATABASE: ${ACADEMIC_DB_NAME:?Falta ACADEMIC_DB_NAME}
+      PGUSER: ${ACADEMIC_DB_USER:?Falta ACADEMIC_DB_USER}
+      PGPASSWORD: ${ACADEMIC_DB_PASSWORD:?Falta ACADEMIC_DB_PASSWORD}
+    depends_on:
+      academic-db:
+        condition: service_healthy
+
+  academic-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${ACADEMIC_DB_NAME:?Falta ACADEMIC_DB_NAME}
+      POSTGRES_USER: ${ACADEMIC_DB_ADMIN_USER:?Falta ACADEMIC_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${ACADEMIC_DB_ADMIN_PASSWORD:?Falta ACADEMIC_DB_ADMIN_PASSWORD}
+      ACADEMIC_DB_USER: ${ACADEMIC_DB_USER:?Falta ACADEMIC_DB_USER}
+      ACADEMIC_DB_PASSWORD: ${ACADEMIC_DB_PASSWORD:?Falta ACADEMIC_DB_PASSWORD}
+    volumes:
+      - academic-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/academic/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - academic-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:4.3.7-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  sync-publisher:
+    build:
+      context: ./apps/sync
+      target: runtime
+    command: ["node", "dist/messaging/publisher-process.js"]
+    init: true
+    restart: on-failure
+    stop_grace_period: 30s
+    networks:
+      - default
+      - sync-data
+    environment:
+      PGHOST: sync-db
+      PGPORT: "5432"
+      PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    depends_on:
+      sync-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  sync-event-publisher:
+    build:
+      context: ./apps/sync
+      target: runtime
+    command: ["node", "dist/messaging/event-publisher-process.js"]
+    init: true
+    restart: on-failure
+    stop_grace_period: 30s
+    networks:
+      - default
+      - sync-data
+    environment:
+      PGHOST: sync-db
+      PGPORT: "5432"
+      PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    depends_on:
+      sync-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  sync-worker:
+    build:
+      context: ./apps/sync
+      target: runtime
+    command: ["node", "dist/messaging/worker-process.js"]
+    init: true
+    restart: on-failure
+    stop_grace_period: 30s
+    networks:
+      - default
+      - sync-data
+    environment:
+      PGHOST: sync-db
+      PGPORT: "5432"
+      PGDATABASE: ${SYNC_DB_NAME:?Falta SYNC_DB_NAME}
+      PGUSER: ${SYNC_DB_USER:?Falta SYNC_DB_USER}
+      PGPASSWORD: ${SYNC_DB_PASSWORD:?Falta SYNC_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+      SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
+      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS}
+    depends_on:
+      sync-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  monitoring:
+    build:
+      context: ./apps/monitoring
+      target: runtime
+    init: true
+    environment:
+      PGHOST: monitoring-db
+      PGPORT: "5432"
+      PGDATABASE: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      PGUSER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      PGPASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+      AUTH_API_INTERNAL_URL: http://api:3003
+      SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      AUTOMATION_MONITORING_SERVICE_TOKEN: ${AUTOMATION_MONITORING_SERVICE_TOKEN:?Falta AUTOMATION_MONITORING_SERVICE_TOKEN}
+    networks:
+      - default
+      - monitoring-data
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  monitoring-setup:
+    build:
+      context: ./apps/monitoring
+      target: runtime
+    init: true
+    command: ["npm", "run", "rabbitmq:setup"]
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  monitoring-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      POSTGRES_USER: ${MONITORING_DB_ADMIN_USER:?Falta MONITORING_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${MONITORING_DB_ADMIN_PASSWORD:?Falta MONITORING_DB_ADMIN_PASSWORD}
+      MONITORING_DB_USER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      MONITORING_DB_PASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+    volumes:
+      - monitoring-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/monitoring/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - monitoring-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  monitoring-migrate:
+    build:
+      context: ./apps/monitoring
+      target: build
+    init: true
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      PGHOST: monitoring-db
+      PGPORT: "5432"
+      PGDATABASE: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      PGUSER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      PGPASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+    volumes:
+      - ./apps/monitoring/migrations:/app/migrations:ro
+    networks:
+      - monitoring-data
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+
+  monitoring-consumer:
+    build:
+      context: ./apps/monitoring
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "rabbitmq:consumer"]
+    environment:
+      PGHOST: monitoring-db
+      PGPORT: "5432"
+      PGDATABASE: ${MONITORING_DB_NAME:?Falta MONITORING_DB_NAME}
+      PGUSER: ${MONITORING_DB_USER:?Falta MONITORING_DB_USER}
+      PGPASSWORD: ${MONITORING_DB_PASSWORD:?Falta MONITORING_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    networks:
+      - default
+      - monitoring-data
+    depends_on:
+      monitoring-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+
+  automation:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      AUTH_API_INTERNAL_URL: http://api:3003
+      SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      SYNC_INTERNAL_URL: http://sync:3000
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      api:
+        condition: service_started
+      sync:
+        condition: service_started
+
+  automation-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      POSTGRES_USER: ${AUTOMATION_DB_ADMIN_USER:?Falta AUTOMATION_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${AUTOMATION_DB_ADMIN_PASSWORD:?Falta AUTOMATION_DB_ADMIN_PASSWORD}
+      AUTOMATION_DB_USER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      AUTOMATION_DB_PASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+    volumes:
+      - automation-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/automation/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - automation-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  automation-migrate:
+    build:
+      context: ./apps/automation
+      target: build
+    init: true
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+    volumes:
+      - ./apps/automation/migrations:/app/migrations:ro
+    networks:
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+
+  automation-scheduler:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "scheduler"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      SYNC_INTERNAL_URL: http://sync:3000
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      sync:
+        condition: service_started
+
+  automation-consumer:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "rabbitmq:consumer"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  automation-notifications:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "notifications:deliver"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      MONITORING_INTERNAL_URL: http://monitoring:3000
+      AUTOMATION_MONITORING_SERVICE_TOKEN: ${AUTOMATION_MONITORING_SERVICE_TOKEN:?Falta AUTOMATION_MONITORING_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      monitoring:
+        condition: service_started
+
+  automation-reminders:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "reminders"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      SYNC_INTERNAL_URL: http://sync:3000
+      AUTOMATION_SYNC_SERVICE_TOKEN: ${AUTOMATION_SYNC_SERVICE_TOKEN:?Falta AUTOMATION_SYNC_SERVICE_TOKEN}
+      MONITORING_INTERNAL_URL: http://monitoring:3000
+      AUTOMATION_MONITORING_SERVICE_TOKEN: ${AUTOMATION_MONITORING_SERVICE_TOKEN:?Falta AUTOMATION_MONITORING_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      sync:
+        condition: service_started
+      monitoring:
+        condition: service_started
+
+
+  academic-web:
+    build:
+      context: ./apps/academic-web
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3103:8080"
+    environment:
+      ACADEMIC_DEMO_TOKEN: ${ACADEMIC_DEMO_TOKEN:?Falta ACADEMIC_DEMO_TOKEN}
+    depends_on:
+      academic:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  web:
+    build:
+      context: ./apps/web
+      target: runtime
+    ports:
+      - "127.0.0.1:3102:8080"
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  gateway:
+    image: caddy:2.11.9-alpine
+    user: "1000:1000"
+    init: true
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./infra/gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - gateway-data:/data
+      - gateway-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_started
+      sync:
+        condition: service_started
+      monitoring:
+        condition: service_started
+      automation:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS --cacert /data/caddy/pki/authorities/local/root.crt
+          https://localhost:8443/healthz >/dev/null
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  sync-db-data:
+  api-db-data:
+  academic-db-data:
+  rabbitmq-data:
+  gateway-data:
+  gateway-config:
+  monitoring-db-data:
+  automation-db-data:
+
+networks:
+  default:
+  sync-data:
+    internal: true
+  api-data:
+    internal: true
+  academic-data:
+    internal: true
+  monitoring-data:
+    internal: true
+  automation-data:
+    internal: true

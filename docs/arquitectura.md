@@ -6,7 +6,7 @@ Los diagramas generales están en el [README](../README.md). Este documento expl
 
 | Servicio | Trabajo y datos propios |
 |---|---|
-| Sync | Conexiones, sincronizaciones, comparación de datos y resultados. |
+| Sync | Conexiones, importaciones, actividades centralizadas, comparación de datos y resultados. |
 | Automation | Reglas, condiciones, acciones y su seguimiento. |
 | Monitoring | Cambios, historial, avisos y estadísticas. |
 | Acceso y cuentas | Registro, comprobación de contraseñas y sesiones propias, incluido en la entrada API de NestJS. |
@@ -22,24 +22,41 @@ Cada backend tendrá una instancia de PostgreSQL en un contenedor independiente,
 | Monitoring | PostgreSQL de Monitoring. |
 | Entrada API: cuentas y sesiones | PostgreSQL de acceso. |
 
-Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tendrá su propio contenedor, consumirá la API y no necesitará base de datos.
+Cada backend solo accede a su base. La comunicación entre servicios se realiza por HTTP y RabbitMQ, sin consultas ni transacciones entre bases. Cada base se conecta mediante una red privada a los procesos de su servicio. El frontend tiene su propio contenedor Nginx y no necesita base de datos. La entrada Caddy sirve HTTPS en `https://localhost:8443`, dirige las rutas de autenticación a la API de cuentas y las demás rutas API a Sync. Los backends conservan la comprobación de sesión y permisos. El formulario de acceso, la restauración de sesión al recargar y el cierre ya están conectados por HTTPS. Ya están disponibles la agenda con filtros, el calendario Mes/Semana/Día, el detalle en modal, el registro y la solicitud y consulta de sincronizaciones desde la web.
 
 Esta separación permite gestionar cada base por separado, aunque el host y otros componentes compartidos siguen siendo dependencias comunes. Aumenta el consumo de recursos frente a una instancia compartida.
 
 Cada cuenta tendrá sus propios recursos. El campo interno `tenant_id` identifica a su propietario.
 
+## Fuentes y actividades centralizadas
+
+Académico, deporte y planes sociales son tres servicios de origen, descritos en [Servicios de origen](servicios-origen.md). Pueden ser módulos del proyecto personal o servicios independientes. Son distintos de los tres componentes internos Sync, Automation y Monitoring. Las fuentes de demostración se levantarán junto al sistema con persistencia propia; Synkron solo utilizará sus API y nunca consultará sus bases directamente.
+
+El destino inicial de las sincronizaciones es una colección interna de actividades, almacenada en PostgreSQL de Sync. El frontend consulta esa colección a través de la API general, con el propietario comprobado. Monitoring conserva el historial y los avisos; no es el almacén principal de los compromisos académicos, entrenamientos o planes.
+
+Cada actividad debe conservar título, información temporal, tipo, estado cuando corresponda y los detalles específicos necesarios, además de propietario, fuente, identidad externa y referencia de sincronización. Se utilizará un modelo híbrido: columnas comunes para identidad, permisos, fechas y consultas conjuntas, y un campo `details` de tipo JSONB con validación según el tipo de actividad. Solo se conservarán los detalles autorizados necesarios, no la respuesta completa de cada fuente. La parte común y sus restricciones temporales se definen en [Modelo de actividades](modelo-actividades.md), según [ADR-009](decisiones.md#adr-009-modelo-híbrido-de-actividades); su migración está implementada.
+
+La identidad del registro distingue propietario, conexión, colección de origen e identificador externo. Un examen y una entrega con el mismo ID externo no se confunden, ni dos actividades de fuentes diferentes. Una nueva importación conserva el ID central. El contrato de definiciones evitará configuraciones activas con correspondencias distintas para la misma conexión y colección; sus restricciones se implementarán al crear esas tablas.
+
+La fuente conserva la responsabilidad del dato. Una nota posterior actualiza el examen o entrega existente; un cambio de horario actualiza la misma actividad. Una sesión de estudio relacionada con una entrega es otro recurso con su propio horario: completarla no entrega la práctica. La sincronización debe conservar esa relación y sus referencias de origen sin utilizar claves foráneas entre bases.
+
+Los instantes con hora se normalizan a UTC y se muestran en la zona del usuario. Una fecha sin hora mantiene su significado de día, sin inventar una hora límite. El contrato común distingue `date`, `instant` e `interval` y separa vencimiento de comienzo; el intervalo requiere un final posterior al comienzo. Los filtros del calendario aplicarán esas reglas al implementarse.
+
+El calendario será una vista de consulta sobre la última información importada. Los formularios de demostración crean y modifican datos en los servicios de origen, mediante acceso autorizado; no escriben directamente en la colección central ni exponen sus credenciales al navegador. El motor no depende de los colores, etiquetas o composición visual del calendario.
+
 ```mermaid
 erDiagram
     CONNECTION ||--o{ SYNC_DEFINITION : source
-    CONNECTION ||--o{ SYNC_DEFINITION : target
     SYNC_DEFINITION ||--o{ FIELD_MAPPING : contains
     SYNC_DEFINITION ||--o{ SYNC_RUN : creates
     SYNC_DEFINITION ||--o{ RECORD_FINGERPRINT : tracks
+    CONNECTION ||--o{ CENTRAL_ACTIVITY : supplies
+    CENTRAL_ACTIVITY ||--o{ RECORD_FINGERPRINT : compares
     SYNC_RUN ||--o{ RUN_ATTEMPT : attempts
     SYNC_RUN ||--o{ OUTBOX_EVENT : emits
 ```
 
-Este modelo corresponde a Sync. Guarda las conexiones, la relación entre campos, las ejecuciones y una referencia del contenido ya procesado. Esa referencia permite distinguir datos nuevos, modificados y sin cambios entre revisiones.
+Este modelo conceptual corresponde a Sync. Guarda conexiones de origen, correspondencias de campos, ejecuciones, actividades centralizadas y referencias del contenido procesado. Estas permiten distinguir registros nuevos, modificados y sin cambios. El diagrama es conceptual: ya existen las tablas de conexiones, definiciones, ejecuciones, trabajos pendientes y actividades, con la huella de contenido en cada actividad. También existe el outbox de eventos; las correspondencias personalizadas y el historial de intentos del diagrama siguen por implementar.
 
 ## Sincronización y mensajes
 
@@ -47,11 +64,29 @@ Sync guarda la solicitud antes de aceptarla y deja pendiente el mensaje que perm
 
 RabbitMQ reparte las tareas entre los procesos de Sync. Automation y Monitoring reciben por separado los eventos que les interesan. Cada servicio registra los mensajes procesados para no repetir sus efectos. Si debe pedir otra acción, guarda también esa petición antes de dar el mensaje por terminado.
 
-Al confirmar un dato nuevo o modificado en el destino, Sync comunica `data.changed`. Incluye la referencia del registro y los campos afectados, sin copiar todo el contenido personal. Los eventos `sync.completed` y `sync.failed` indican el resultado de la sincronización.
+Sync adapta los registros de origen y guarda las actividades nuevas o modificadas en su propia base. La actualización de una actividad y el evento pendiente que la comunica se guardan en la misma transacción. Solo después de confirmar esa escritura se publica `data.changed`, con referencias de procedencia y campos afectados, sin copiar el contenido personal completo. Los eventos `sync.completed` y `sync.failed` indican el resultado de la sincronización.
 
 Automation comprueba las reglas del usuario. La acción `notify` pide a Monitoring que guarde un aviso; `start_sync` pide a Sync otra sincronización de la misma cuenta. Las acciones conservan su origen y tienen un límite de encadenamiento para evitar bucles.
 
-Los cambios se detectan durante cada revisión, manual al principio y programada más adelante. La primera versión no propaga borrados ni recibe cambios inmediatos mediante webhooks.
+Los cambios se detectan al ejecutar una sincronización solicitada por HTTP; la programación periódica y los webhooks siguen pendientes. El conector académico reconoce las retiradas explícitas del origen y conserva la actividad central como retirada. La ausencia de un registro en una respuesta no implica su borrado.
+
+El recorrido de entregas académicas ya funciona mediante publicador y worker,
+con toma atómica, resultado persistido y confirmación manual del mensaje. La
+emisión transaccional de eventos está implementada: `sync-event-publisher` lee
+el outbox y publica en el exchange durable de tipo `topic` `synkron.events.v1`.
+Solo marca cada evento tras la confirmación del broker. La cola durable
+`synkron.events.inspection.v1` recibe los tres tipos para inspección; los
+consumidores de Automation y Monitoring siguen pendientes. Se ha comprobado
+una caída real de Rabbit: el evento se conservó pendiente y se publicó con el
+mismo ID tras la recuperación automática. Puede haber reenvíos si el proceso cae
+entre la publicación y el commit; los consumidores deberán deduplicar por
+`event_id`. El worker recupera ejecuciones `running` con reserva
+caducada, cambia su token y protege las escrituras y el resultado frente a
+intentos antiguos. Se ha comprobado una caída después de adquirir el trabajo y
+antes de importar y otra después de confirmar el primer guardado. En ambos casos
+el worker normal recuperó la misma ejecución; tras el guardado parcial conservó
+el ID existente y creó únicamente la actividad pendiente. Las reservas y la
+protección de escrituras también tienen pruebas con PostgreSQL.
 
 ## Cuando algo falla
 
@@ -70,11 +105,19 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-Los estados básicos son pendiente (`queued`), en curso (`running`), completada (`completed`) y fallida (`failed`). La espera de reintento (`retry_wait`) se añadirá con esa función.
+Los estados básicos son pendiente (`queued`), en curso (`running`), completada (`completed`) y fallida (`failed`). Recuperar una reserva caducada mantiene el estado `running`, conserva el inicio y cambia el token. La espera de reintento funcional (`retry_wait`) se añadirá con esa función; las pausas actuales de reconexión no crean ese estado.
 
-Si una aplicación guarda un dato pero se pierde su respuesta, repetir el envío podría duplicarlo. Solo se repetirá automáticamente si el destino permite reconocer la operación o actualizar el mismo registro. En otro caso se guarda el error `external_outcome_unknown` para revisión.
+En el flujo inicial el destino es PostgreSQL de Sync: una restricción de identidad y las transacciones permitirán reconocer las actividades ya guardadas tras una interrupción. Una lectura incompleta del origen no equivale a una confirmación de escritura de nuevas actividades.
+
+Enviar datos a destinos externos queda como ampliación. Si se incorpora, deberá contemplar el caso en que el destino guarda un dato pero se pierde su respuesta. Solo será seguro repetir el envío cuando el destino reconozca la operación; el estado `external_outcome_unknown` se reserva para esa ampliación.
 
 Una sincronización incompleta puede haber cambiado parte de los datos. No se presupone que todos esos cambios puedan deshacerse. Los reintentos tendrán límite y esperas entre intentos; los mensajes que sigan fallando se apartarán para revisar su causa.
+
+## Estado de implementación y entrega
+
+El código actual cubre cuentas y sesiones, conexiones, cifrado, prueba acotada de destinos autorizados, la API editable de entregas académicas y su centralización asíncrona con RabbitMQ. También están implementados el outbox y el publicador de eventos de cambios y resultados. Existe una fuente ficticia estática de tareas. La ampliación de las fuentes, los consumidores de Automation y Monitoring, las reglas, el historial de intentos y las vistas de gestión restantes siguen pendientes. La agenda, el calendario y la solicitud de sincronizaciones desde React ya están implementados.
+
+El Hito 2 se cerrará con el alcance funcional inicial completo, no solo con la base de contenedores o una demostración parcial. El entorno deberá iniciar sus backends, bases, fuentes, RabbitMQ y frontend de forma reproducible; CI validará y publicará las imágenes en GHCR. Terraform y despliegue se trabajan después.
 
 ## Acceso y funcionamiento
 

@@ -1,0 +1,39 @@
+{
+    auto_https disable_redirects
+    skip_install_trust
+}
+
+https://localhost:8443 {
+    tls internal
+
+    route {
+        @auth path /api/v1/auth /api/v1/auth/*
+        handle @auth {
+            reverse_proxy api:3000
+        }
+
+        @monitoring path /api/v1/monitoring /api/v1/monitoring/* /api/v1/notifications /api/v1/notifications/*
+        handle @monitoring {
+            reverse_proxy monitoring:3000
+        }
+
+        @automation path /api/v1/automation /api/v1/automation/*
+        handle @automation {
+            reverse_proxy automation:3000
+        }
+
+        @api path /api /api/*
+        handle @api {
+            reverse_proxy sync:3000
+        }
+
+        @internal path /internal /internal/*
+        handle @internal {
+            respond "Not found" 404
+        }
+
+        handle {
+            reverse_proxy web:8080
+        }
+    }
+}
