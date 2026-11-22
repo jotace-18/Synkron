@@ -6,14 +6,21 @@ import {
   IsObject,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import type {
   CreateNotificationInput,
+  ReminderNotificationSource,
   RuleNotificationSource,
 } from '../notification.types';
+
+class NotificationSourceDto {
+  @IsIn(['rule', 'reminder'])
+  kind!: 'rule' | 'reminder';
+}
 
 export class RuleNotificationSourceDto implements RuleNotificationSource {
   @IsIn(['rule'])
@@ -31,6 +38,24 @@ export class RuleNotificationSourceDto implements RuleNotificationSource {
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
   @IsUUID('4')
   activity_id?: string;
+}
+
+export class ReminderNotificationSourceDto implements ReminderNotificationSource {
+  @IsIn(['reminder'])
+  kind!: 'reminder';
+
+  @IsUUID('4')
+  reminder_id!: string;
+
+  @IsUUID('4')
+  activity_id!: string;
+
+  @IsString()
+  @MaxLength(80)
+  @Matches(
+    /^(?:date:\d{4}-\d{2}-\d{2}|instant:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/,
+  )
+  deadline_key!: string;
 }
 
 export class CreateNotificationDto implements CreateNotificationInput {
@@ -51,6 +76,15 @@ export class CreateNotificationDto implements CreateNotificationInput {
   @IsDefined()
   @IsObject()
   @ValidateNested()
-  @Type(() => RuleNotificationSourceDto)
-  source!: RuleNotificationSourceDto;
+  @Type(() => NotificationSourceDto, {
+    discriminator: {
+      property: 'kind',
+      subTypes: [
+        { name: 'rule', value: RuleNotificationSourceDto },
+        { name: 'reminder', value: ReminderNotificationSourceDto },
+      ],
+    },
+    keepDiscriminatorProperty: true,
+  })
+  source!: RuleNotificationSourceDto | ReminderNotificationSourceDto;
 }

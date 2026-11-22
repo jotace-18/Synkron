@@ -16,8 +16,7 @@ FROM node:24.22.1-bookworm-slim AS production-dependencies
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
+RUN npm ci --omit=dev --loglevel=verbose
 
 FROM node:24.22.1-bookworm-slim AS runtime
 

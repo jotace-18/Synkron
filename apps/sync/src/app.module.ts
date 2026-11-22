@@ -21,6 +21,7 @@ import { RunProcessorService } from './runs/run-processor.service';
 import { AutomationRunsController } from './internals/automation-runs.controller';
 import { AutomationServiceGuard } from './internals/automation-service.guard';
 import { AutomationDefinitionsController } from './internals/automation-definitions.controller';
+import { AutomationActivitiesController } from './internals/automation-activities.controller';
 
 @Module({
   imports: [],
@@ -31,7 +32,8 @@ import { AutomationDefinitionsController } from './internals/automation-definiti
     DefinitionsController,
     RunsController,
     AutomationRunsController,
-    AutomationDefinitionsController
+    AutomationDefinitionsController,
+    AutomationActivitiesController,
   ],
   providers: [
     ConnectionTargetPolicyService,

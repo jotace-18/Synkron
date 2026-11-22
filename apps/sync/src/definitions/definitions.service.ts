@@ -29,10 +29,7 @@ export class DefinitionsService {
     return result.rows;
   }
 
-  async get(
-    tenantId: string,
-    definitionId: string,
-  ): Promise<SyncDefinition> {
+  async get(tenantId: string, definitionId: string): Promise<SyncDefinition> {
     const result = await this.database.query<SyncDefinition>(
       `SELECT
          id,

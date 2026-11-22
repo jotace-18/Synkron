@@ -6,9 +6,19 @@ export interface RuleNotificationSource {
   activity_id?: string;
 }
 
+export interface ReminderNotificationSource {
+  kind: 'reminder';
+  reminder_id: string;
+  activity_id: string;
+  deadline_key: string;
+}
+
+export type NotificationSource =
+  RuleNotificationSource | ReminderNotificationSource;
+
 export interface NotificationRequest {
   tenant_id: string;
   source_action_id: string;
   message: string;
-  source: RuleNotificationSource;
+  source: NotificationSource;
 }
