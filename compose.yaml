@@ -295,6 +295,7 @@ services:
       AUTH_API_INTERNAL_URL: http://api:3003
       SYNC_AUTH_SERVICE_TOKEN: ${SYNC_AUTH_SERVICE_TOKEN:?Falta SYNC_AUTH_SERVICE_TOKEN}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
+      AUTOMATION_MONITORING_SERVICE_TOKEN: ${AUTOMATION_MONITORING_SERVICE_TOKEN:?Falta AUTOMATION_MONITORING_SERVICE_TOKEN}
     networks:
       - default
       - monitoring-data
@@ -509,6 +510,30 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+  automation-notifications:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "notifications:deliver"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      MONITORING_INTERNAL_URL: http://monitoring:3000
+      AUTOMATION_MONITORING_SERVICE_TOKEN: ${AUTOMATION_MONITORING_SERVICE_TOKEN:?Falta AUTOMATION_MONITORING_SERVICE_TOKEN}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      monitoring:
+        condition: service_started
 
 
   academic-web:

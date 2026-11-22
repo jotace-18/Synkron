@@ -12,7 +12,7 @@ https://localhost:8443 {
             reverse_proxy api:3000
         }
 
-        @monitoring path /api/v1/monitoring /api/v1/monitoring/*
+        @monitoring path /api/v1/monitoring /api/v1/monitoring/* /api/v1/notifications /api/v1/notifications/*
         handle @monitoring {
             reverse_proxy monitoring:3000
         }

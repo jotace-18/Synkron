@@ -20,7 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migrate:up": "node-pg-migrate up --schema automation --migrations-schema automation --migrations-dir migrations",
     "scheduler": "node dist/schedules/scheduler-process.js",
-    "rabbitmq:consumer": "node dist/messaging/consumer-process.js"
+    "rabbitmq:consumer": "node dist/messaging/consumer-process.js",
+    "notifications:deliver": "node dist/monitoring-client/notification-delivery-process.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
