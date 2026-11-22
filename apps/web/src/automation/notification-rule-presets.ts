@@ -5,6 +5,11 @@ import type {
 } from './automation.types'
 
 export const NOTIFICATION_RULE_PRESETS = [
+  { value: 'exam_created', label: 'Se incorpora un examen' },
+  { value: 'exam_retired', label: 'Se retira un examen' },
+  { value: 'exam_grade_changed', label: 'Cambia la nota de un examen' },
+  { value: 'exam_date_changed', label: 'Cambia la fecha de un examen' },
+  { value: 'exam_status_changed', label: 'Cambia el estado de un examen' },
   {
     value: 'sync_completed',
     label: 'Una sincronización termina correctamente',
@@ -64,23 +69,23 @@ export function notificationRuleInput(
     conditions.push({
       field: 'payload.activity_type',
       operator: '==',
-      value: 'academic.assignment',
+      value: values.preset.startsWith('exam_') ? 'academic.exam' : 'academic.assignment',
     })
 
     if (
       values.preset === 'grade_changed' ||
-      values.preset === 'deadline_changed'
+      values.preset === 'deadline_changed' || values.preset === 'exam_grade_changed' || values.preset === 'exam_date_changed' || values.preset === 'exam_status_changed'
     ) {
       conditions.push({
         field: 'payload.changed_fields',
         operator: 'contains',
-        value: values.preset === 'grade_changed' ? 'grade' : 'schedule',
+        value: values.preset.endsWith('grade_changed') ? 'grade' : values.preset === 'exam_status_changed' ? 'status' : 'schedule',
       })
     } else {
       conditions.push({
         field: 'payload.change_type',
         operator: '==',
-        value: values.preset === 'assignment_created' ? 'created' : 'retired',
+        value: values.preset.endsWith('_created') ? 'created' : 'retired',
       })
     }
   }

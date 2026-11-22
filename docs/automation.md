@@ -81,13 +81,20 @@ no dependen de que llegue un evento nuevo desde Academic.
 - Con vencimiento que solo tiene fecha, se avisa a las 09:00 de Madrid del día
   anterior. Esto no asigna una hora de vencimiento a la actividad.
 - Las entregas retiradas o entregadas no generan nuevos recordatorios pendientes.
+- Los exámenes usan la fecha de celebración (`start`), con las mismas opciones de
+  antelación. Solo se recuerdan los programados; los realizados, cancelados,
+  retirados y pasados quedan excluidos. Para fechas sin hora, el día sigue vigente
+  hasta que termine en Madrid.
+- Las reglas de entregas conservan su filtro de `academic.assignment`. Los nuevos
+  casos de exámenes filtran explícitamente `academic.exam` (alta, retirada, nota,
+  fecha o estado).
 - Cada recordatorio conserva una identidad que impide repetirlo en cada revisión.
 
 ## Interfaz
 
 La sección Automatizaciones permite consultar, crear, editar y pausar
 programaciones y reglas, además de configurar recordatorios. El editor de reglas
-ofrece seis situaciones y acciones de aviso o inicio de sincronización. Las reglas
+ofrece situaciones de entregas y exámenes y acciones de aviso o inicio de sincronización. Las reglas
 con varias acciones o condiciones que el editor no representa se conservan y
 pueden activarse o pausarse; su edición sigue disponible mediante la API.
 

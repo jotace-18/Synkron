@@ -617,3 +617,8 @@ button:disabled { opacity: 0.65; cursor: wait; }
   .sync-controls .agenda-filter { min-width: 0; flex: 1 1 240px; }
   .sync-controls .primary-button { width: 100%; }
 }
+
+.calendar-event[data-status="scheduled"] { color: #4338a0; border-color: #7060be; background: #efecfc; }
+.calendar-event[data-status="completed"] { color: #166534; border-color: #227342; background: #e0efe1; }
+.calendar-event[data-status="cancelled"] { color: #64748b; border-color: #94a3b8; background: #f1f5f9; text-decoration: line-through; }
+.calendar-event[data-type="academic.exam"] { border-left-width: 5px; }

@@ -34,19 +34,8 @@ export function dueReminder(
     throw new Error('El instante de revisión no es válido');
   }
 
-  if (
-    !settings.enabled ||
-    activity.type !== 'academic.assignment' ||
-    !['pending', 'in_progress'].includes(activity.status ?? '')
-  ) {
-    return null;
-  }
-
+  if (!settings.enabled || !isReminderCandidate(activity)) return null;
   const schedule = activity.schedule;
-
-  if (schedule.role !== 'deadline') {
-    return null;
-  }
 
   let deadlineKey: string;
   let notifyAt: Date;
@@ -93,4 +82,15 @@ export function dueReminder(
     deadline_key: deadlineKey,
     notify_at: notifyAt,
   };
+}
+
+export function isReminderCandidate(activity: ReminderActivity): boolean {
+  return (
+    (activity.type === 'academic.assignment' &&
+      ['pending', 'in_progress'].includes(activity.status ?? '') &&
+      activity.schedule.role === 'deadline') ||
+    (activity.type === 'academic.exam' &&
+      activity.status === 'scheduled' &&
+      activity.schedule.role === 'start')
+  );
 }

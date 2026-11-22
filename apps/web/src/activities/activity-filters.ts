@@ -2,7 +2,7 @@ import type { Activity } from './activity.types'
 
 export interface ActivityFilters {
   category: 'all' | 'academic' | 'sport' | 'social'
-  delivery: 'all' | 'submitted' | 'unsubmitted'
+  delivery: 'all' | 'submitted' | 'unsubmitted' | 'scheduled' | 'completed' | 'cancelled'
   course: string
 }
 
@@ -22,6 +22,8 @@ export function filterActivities(
     }
 
     if (filters.delivery !== 'all') {
+      const examState = ['scheduled', 'completed', 'cancelled'].includes(filters.delivery)
+      if (examState) return activity.type === 'academic.exam' && activity.status === filters.delivery && (filters.category !== 'academic' || !filters.course || activity.details.course_name === filters.course)
       if (activity.type !== 'academic.assignment') return false
       if (filters.delivery === 'submitted' && activity.status !== 'submitted') return false
       if (filters.delivery === 'unsubmitted' &&

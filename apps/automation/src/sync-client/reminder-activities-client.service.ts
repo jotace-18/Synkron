@@ -15,7 +15,6 @@ export class ReminderActivitiesClientService {
   ): Promise<ReminderActivity[]> {
     const body = await this.request('/internal/automation/activities', {
       tenant_id: tenantId,
-      type: 'academic.assignment',
       timezone: 'Europe/Madrid',
       from: query.from,
       to: query.to,

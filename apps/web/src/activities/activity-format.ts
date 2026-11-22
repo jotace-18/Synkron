@@ -36,6 +36,9 @@ export function formatSchedule(schedule: ActivitySchedule): string {
 
 export function formatStatus(status: string | null): string {
   switch (status) {
+    case 'scheduled': return 'Programado'
+    case 'completed': return 'Realizado'
+    case 'cancelled': return 'Cancelado'
     case 'pending':
       return 'Pendiente'
     case 'in_progress':
@@ -116,4 +119,10 @@ export function getAssignmentFields(activity: Activity): { label: string; value:
       ? `${number.format(details.grade)} / 10` : 'Sin nota',
   })
   return fields
+}
+
+export function getExamFields(activity: Activity): {label: string; value: string}[] {
+ const fields = getAssignmentFields(activity).filter(({label}) => !['Obligatoriedad', 'Modalidad', 'Integrantes'].includes(label))
+ fields.splice(2, 0, { label: 'Temario', value: typeof activity.details.topics === 'string' ? activity.details.topics : 'Sin especificar' })
+ return fields
 }

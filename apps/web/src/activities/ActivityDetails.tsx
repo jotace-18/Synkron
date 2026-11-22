@@ -5,6 +5,7 @@ import {
   formatSchedule,
   formatStatus,
   getAssignmentFields,
+  getExamFields,
 } from './activity-format'
 import type { Activity } from './activity.types'
 
@@ -66,7 +67,7 @@ export default function ActivityDetails({
   }, [activityId, retry, onSessionExpired])
 
   const fields = activity?.type === 'academic.assignment'
-    ? getAssignmentFields(activity) : []
+    ? getAssignmentFields(activity) : activity?.type === 'academic.exam' ? getExamFields(activity) : []
 
   return (
     <dialog
@@ -113,7 +114,7 @@ export default function ActivityDetails({
           </div>
           <p className="activity-detail-schedule">{formatSchedule(activity.schedule)}</p>
           <p className="activity-detail-timezone">
-            {activity.schedule.kind === 'date' ? 'Sin hora de vencimiento.' : 'Horario de Madrid.'}
+            {activity.schedule.kind === 'date' ? 'Sin hora indicada.' : 'Horario de Madrid.'}
           </p>
           <dl className="activity-detail-fields">
             {fields.map(({ label, value }) => (

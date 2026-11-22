@@ -98,9 +98,9 @@ export default function ReminderSettingsPanel({
       aria-labelledby="reminder-settings-title"
       aria-busy={form === null && error === null || pending}
     >
-      <h2 id="reminder-settings-title">Recordatorios de entregas</h2>
+      <h2 id="reminder-settings-title">Recordatorios académicos</h2>
       <p className="automation-description">
-        Recibe un aviso antes de que venzan tus entregas pendientes.
+        Recibe un aviso antes de tus entregas pendientes y exámenes programados.
       </p>
 
       {form === null ? (
@@ -141,7 +141,7 @@ export default function ReminderSettingsPanel({
 
           <div className="form-field">
             <label htmlFor="reminder-lead">
-              Antelación para entregas con hora
+              Antelación para actividades con hora
             </label>
             <select
               id="reminder-lead"
@@ -160,9 +160,7 @@ export default function ReminderSettingsPanel({
           </div>
 
           <p className="automation-description">
-            Las entregas sin hora se recuerdan a las 09:00 de Madrid
-            del día anterior. Las entregadas o retiradas no generan
-            nuevos avisos.
+            Las actividades sin hora se recuerdan a las 09:00 de Madrid del día anterior. Las entregas completadas y los exámenes realizados o cancelados no generan nuevos avisos; tampoco las actividades retiradas.
           </p>
 
           {error && (

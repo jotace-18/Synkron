@@ -7,7 +7,7 @@ const academicOrigin: Plugin = {
   configureServer(server) {
     const origins = new Set(['http://127.0.0.1:5174', 'http://localhost:5174'])
     server.middlewares.use((request, response, next) => {
-      if (!request.url?.startsWith('/api/v1/assignments')) return next()
+      if (!/^\/api\/v1\/(?:assignments|exams)(?:\/|\?|$)/.test(request.url ?? '')) return next()
       const origin = request.headers.origin
       const write = !['GET', 'HEAD', 'OPTIONS'].includes(request.method ?? 'GET')
       if ((origin && !origins.has(origin)) || (write && !origin)) {
@@ -41,6 +41,7 @@ export default defineConfig(({ command, mode, isPreview }) => {
       strictPort: true,
       cors: false,
       proxy: developing ? {
+        '/api/v1/exams': { target: 'http://127.0.0.1:3101', changeOrigin: true, proxyTimeout: 10_000, headers: { Authorization: `Bearer ${token}` } },
         '/api/v1/assignments': {
           target: 'http://127.0.0.1:3101',
           changeOrigin: true,

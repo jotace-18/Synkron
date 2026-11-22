@@ -209,7 +209,7 @@ export default function ActivitiesCalendar({
           <p role="status">
             {activities.length === 0
               ? calendarView === 'day' ? 'No hay actividades para este día.' : 'No hay actividades en este periodo.'
-              : 'Horarios de Madrid · Verde: entregada · Ámbar: en curso · Rojo: pendiente'}
+              : 'Horarios de Madrid · Verde: entregada/realizado · Ámbar: en curso · Rojo: pendiente · Violeta: examen programado · Gris: cancelado'}
           </p>
         )}
       </div>
@@ -268,6 +268,7 @@ export default function ActivitiesCalendar({
                               type="button"
                               aria-haspopup="dialog"
                               className="calendar-event"
+                              data-type={activity.type}
                               data-status={activity.status ?? 'unknown'}
                               data-mandatory={activity.details.mandatory === true}
                               onClick={() => onSelect(activity.id)}

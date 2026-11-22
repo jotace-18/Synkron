@@ -18,10 +18,10 @@ Cada fuente mantiene sus datos y persistencia, permite introducir y modificar
 registros y ofrece una API de acceso autorizado. Synkron no lee sus bases de datos.
 
 La API estática `fixtures/task-api` permite comprobar conexiones. El backend
-`apps/academic` implementa la colección editable de entregas, con PostgreSQL,
+`apps/academic` implementa las colecciones editables de entregas y exámenes, con PostgreSQL,
 autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
 describen las rutas disponibles. Los demás recursos académicos, las fuentes de
-deporte y planes sociales y los formularios de entrada siguen pendientes.
+deporte y planes sociales siguen pendientes. Campus permite introducir y editar entregas y exámenes.
 
 ## Fuente académica
 
@@ -54,21 +54,50 @@ exportación autenticada conserva esa marca para el futuro motor de Sync.
 
 ### Exámenes
 
+Contrato acordado el 22/11/2026.
+
 | Dato | Alcance |
 |---|---|
-| Título | Identifica el examen en modo texto. |
-| Asignatura | Asignatura correspondiente. |
-| Temas | Tema o temas evaluados. |
-| Parte | Teoría o prácticas. |
-| Fecha y hora | Cuándo se celebra. |
-| Ponderación | Opcional, si se conoce. |
-| Estado | Valores concretos por cerrar. |
-| Nota | Opcional, incorporable o corregible después, con máximo dos decimales. |
+| Título | Obligatorio, entre 1 y 200 caracteres. |
+| Asignatura | Obligatoria. Campus reutiliza el selector de siglas y conserva nombre y abreviatura. |
+| Temas | Texto libre opcional, hasta 1000 caracteres. |
+| Parte | Teoría o prácticas (`theory`, `practice`). |
+| Fecha | Obligatoria; admite exámenes futuros y pasados. |
+| Hora | Opcional. Campus utiliza el horario de Madrid. |
+| Estado | Programado, realizado o cancelado (`scheduled`, `completed`, `cancelled`). Por defecto, programado. |
+| Ponderación | Opcional, de 0 a 100, con referencia a la asignatura completa (`course`) o a su parte (`section`). |
+| Nota | Opcional, de 0 a 10, con máximo dos decimales. |
 
-Actualizar una nota modifica el examen existente. La fecha del examen conserva
-su significado y la fecha de modificación permite reconocer la actualización.
-El evento que comunica ese cambio no es un segundo compromiso académico.
-No se incluye cálculo de medias o expedientes por el hecho de guardar notas.
+Una fecha sin hora conserva su significado de día. No se le asigna
+automáticamente medianoche ni otra hora de celebración. Cuando existe hora,
+el instante se comunica con zona horaria y se almacena en UTC.
+
+La ausencia de nota o ponderación no equivale a cero. La ponderación y su
+referencia se indican juntas o se dejan ambas vacías. No se calculan medias
+ni equivalencias entre ponderaciones.
+
+El estado se modifica explícitamente. El paso del tiempo o la incorporación
+de una nota no cambian automáticamente el estado del examen.
+
+Modificar fecha, temas, estado o nota actualiza el mismo examen, conservando
+su identidad. Publicar una nota no crea otro compromiso académico.
+
+Cancelar y retirar son operaciones distintas:
+
+- Un examen cancelado conserva su registro y se identifica como cancelado.
+- Retirarlo aplica borrado lógico: desaparece de las consultas normales y
+  su exportación mantiene la marca para que Sync retire la actividad.
+- Los exámenes realizados, cancelados o retirados no generan nuevos
+  recordatorios pendientes.
+
+La API y la exportación reutilizan la autenticación Bearer y la cuenta
+académica existentes. Cada cuenta solo accede a sus propios exámenes.
+
+Los campos, rutas y reglas de edición se concretan en el
+[contrato API de exámenes](api.md#contrato-de-exámenes).
+La representación temporal y los detalles de `academic.exam` se recogen en el
+[modelo común](modelo-actividades.md#contrato-de-exámenes).
+El recorrido de exámenes está implementado. Consulta la [guía de arranque y validación](examenes.md).
 
 ### Sesiones de estudio o trabajo
 

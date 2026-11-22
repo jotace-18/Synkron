@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AcademicImportService } from '../imports/academic-import.service';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import type { ClaimedSyncRun, SyncRunCounts } from './run.types';
 import { RunsService } from './runs.service';
 import { maintainRunLease, RunLeaseLostError } from './run-lease';
@@ -8,7 +8,7 @@ import { maintainRunLease, RunLeaseLostError } from './run-lease';
 export class RunProcessorService {
   constructor(
     private readonly runs: RunsService,
-    private readonly academic: AcademicImportService,
+    private readonly connectors: ConnectorRegistryService,
   ) {}
 
   async process(run: ClaimedSyncRun): Promise<void> {
@@ -45,7 +45,11 @@ export class RunProcessorService {
     );
 
     try {
-      counts = await this.academic.run(
+      const importer = this.connectors.get(
+        run.connector,
+        run.source_collection,
+      );
+      counts = await importer.run(
         run.tenant_id,
         run.source_connection_id,
         (progress) => {

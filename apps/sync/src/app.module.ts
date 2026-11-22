@@ -1,3 +1,6 @@
+import { AcademicExamsReaderService } from './connectors/academic/academic-exams-reader.service';
+import { AcademicExamsImportService } from './imports/academic-exams-import.service';
+import { ConnectorRegistryService } from './connectors/connector-registry.service';
 import { Module } from '@nestjs/common';
 import { ConnectionTargetPolicyService } from './connections/connection-target-policy.service';
 import { AppController } from './app.controller';
@@ -45,7 +48,10 @@ import { AutomationActivitiesController } from './internals/automation-activitie
     ConnectionProbeService,
     ActivitiesService,
     AcademicReaderService,
+    AcademicExamsReaderService,
+    AcademicExamsImportService,
     AcademicImportService,
+    ConnectorRegistryService,
     DefinitionsService,
     RunsService,
     RunJobsService,

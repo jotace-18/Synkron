@@ -14,7 +14,7 @@ export function assignmentCourseCode(assignment?: Assignment): string {
   )
 }
 
-export function assignmentDeadlineFields(assignment?: Assignment): {
+export function assignmentDeadlineFields(assignment?: Pick<Assignment, 'due_date' | 'due_at'>): {
   date: string
   time: string
 } {

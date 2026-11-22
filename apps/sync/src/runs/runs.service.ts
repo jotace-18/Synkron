@@ -1,3 +1,7 @@
+import {
+  CONNECTOR_SOURCES_JSON,
+  getConnector,
+} from '../connectors/connector-catalog';
 import { createHash, randomUUID } from 'node:crypto';
 import { isUUID } from 'class-validator';
 import {
@@ -110,7 +114,17 @@ export class RunsService {
         throw new ConflictException('La conexión está deshabilitada');
       }
 
-      if (definition.auth_type !== 'bearer' || !definition.has_credentials) {
+      const connector = getConnector(definition.connector);
+      if (
+        !connector ||
+        connector.source_collection !== definition.source_collection
+      ) {
+        throw new BadRequestException('Conector o colección no admitidos');
+      }
+      if (
+        definition.auth_type !== connector.auth_type ||
+        (connector.auth_type === 'bearer' && !definition.has_credentials)
+      ) {
         throw new BadRequestException(
           'La conexión académica requiere una credencial Bearer',
         );
@@ -162,13 +176,17 @@ export class RunsService {
          )
        )
        AND source_connection_id IS NOT NULL
-       AND connector = 'academic.assignments'
-       AND source_collection = 'assignments'
+       AND EXISTS (
+         SELECT 1 FROM jsonb_to_recordset($3::jsonb)
+           AS supported(connector text, source_collection text)
+         WHERE supported.connector = sync.runs.connector
+           AND supported.source_collection = sync.runs.source_collection
+       )
      RETURNING ${publicColumns},
                tenant_id, source_connection_id,
                connector, source_collection,
                claim_token, lease_expires_at`,
-      [tenantId, runId],
+      [tenantId, runId, CONNECTOR_SOURCES_JSON],
     );
 
     return result.rows[0] ?? null;
@@ -211,13 +229,17 @@ export class RunsService {
       `SELECT status, lease_expires_at,
               COALESCE(
                 source_connection_id IS NOT NULL
-                AND connector = 'academic.assignments'
-                AND source_collection = 'assignments',
+                AND EXISTS (
+                  SELECT 1 FROM jsonb_to_recordset($3::jsonb)
+                    AS supported(connector text, source_collection text)
+                  WHERE supported.connector = sync.runs.connector
+                    AND supported.source_collection = sync.runs.source_collection
+                ),
                 false
               ) AS source_supported
        FROM sync.runs
        WHERE tenant_id = $1 AND id = $2`,
-      [tenantId, runId],
+      [tenantId, runId, CONNECTOR_SOURCES_JSON],
     );
 
     return result.rows[0] ?? null;

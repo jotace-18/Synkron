@@ -1,3 +1,7 @@
+import type {
+  ConnectorName,
+  ConnectorSourceCollection,
+} from '../connectors/connector-catalog';
 import type { SyncRunErrorCode } from './sync-run-error';
 
 export type SyncRunStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -23,8 +27,8 @@ export interface ClaimedSyncRun extends SyncRun {
   status: 'running';
   tenant_id: string;
   source_connection_id: string;
-  connector: 'academic.assignments';
-  source_collection: 'assignments';
+  connector: ConnectorName;
+  source_collection: ConnectorSourceCollection;
   claim_token: string;
   lease_expires_at: Date;
 }

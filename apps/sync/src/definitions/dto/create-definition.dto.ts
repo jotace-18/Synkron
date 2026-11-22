@@ -1,6 +1,8 @@
+import { CONNECTOR_NAMES } from '../../connectors/connector-catalog';
+import type { ConnectorName } from '../../connectors/connector-catalog';
 import { Transform } from 'class-transformer';
 import {
-  Equals,
+  IsIn,
   IsBoolean,
   IsString,
   IsUUID,
@@ -20,8 +22,8 @@ export class CreateDefinitionDto {
   @IsUUID('4')
   source_connection_id!: string;
 
-  @Equals('academic.assignments')
-  connector!: 'academic.assignments';
+  @IsIn(CONNECTOR_NAMES)
+  connector!: ConnectorName;
 
   @IsBoolean()
   enabled: boolean = true;

@@ -2,7 +2,7 @@
 
 Frontend externo de Academic, separado de la agenda centralizada de Synkron.
 Utiliza React y TypeScript con una interfaz azul e índigo. Actualmente permite
-listar, crear, editar y retirar entregas. Dispone de contenedor e integración
+listar, crear, editar y retirar entregas y exámenes, con secciones independientes. Dispone de contenedor e integración
 en CI. El resumen centralizado por asignatura se implementará en Synkron.
 
 ## Arranque con Docker
@@ -14,7 +14,7 @@ docker compose up -d --build --wait academic-web
 ```
 
 Abrir http://127.0.0.1:3103. Compose también arranca Academic y su base de datos.
-Nginx sirve la interfaz y reenvía las peticiones de entregas a Academic.
+Nginx sirve la interfaz y reenvía las peticiones de entregas y exámenes a Academic.
 La credencial se incorpora en el servidor al arrancar; no se incluye en la
 imagen ni en el código del navegador.
 

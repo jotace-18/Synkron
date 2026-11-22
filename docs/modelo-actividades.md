@@ -1,8 +1,9 @@
 # Modelo común de actividades
 
-La tabla de actividades, su persistencia y la importación interna de entregas
-académicas están implementadas. Las consultas públicas, las ejecuciones y los
-eventos siguen pendientes. Las necesidades de cada fuente se describen en
+La tabla de actividades, su persistencia, la importación de entregas académicas,
+las consultas públicas, las ejecuciones y los eventos están implementados.
+La importación de exámenes, sus vistas y recordatorios también están implementados.
+Las necesidades de cada fuente se describen en
 [Servicios de origen](servicios-origen.md).
 
 ## Parte común y detalles
@@ -38,9 +39,9 @@ La conexión pertenece a `tenant_id`, también mediante integridad en la base.
 Una clave foránea compuesta referencia propietario y conexión juntos. No hay
 claves foráneas hacia las bases de datos de las fuentes.
 
-Las referencias a ejecuciones y sus eventos se incorporarán al implementar las
-tablas de ejecuciones y outbox. El calendario no consulta esos eventos para
-reconstruir el contenido de una actividad.
+Las ejecuciones y los eventos de outbox conservan las referencias necesarias
+para seguir la sincronización. El calendario consulta las actividades, sin
+reconstruir su contenido a partir de esos eventos.
 
 ## Tipos iniciales
 
@@ -223,6 +224,97 @@ El reintento reconoce las identidades existentes. En el recorrido asíncrono,
 sus eventos de outbox en la misma transacción. La aceptación de trabajos y el
 resultado de la ejecución se gestionan fuera del servicio de importación.
 
+## Contrato de exámenes
+
+El conector es `academic.exams`, la colección de origen `exams` y el tipo
+normalizado `academic.exam`. Su representación reutiliza la misma tabla,
+identidad y comparación de contenido que las entregas.
+
+| Campo central | Procedencia |
+|---|---|
+| `source_connection_id` | Conexión propia de la definición de sincronización. |
+| `source_collection` | Literal `exams`. |
+| `external_id` | `id` estable del examen en Academic. |
+| `type` | Literal `academic.exam`. |
+| `title` | `title` del examen. |
+| `status` | `scheduled`, `completed` o `cancelled`, sin conversión automática por fecha o nota. |
+| `source_updated_at` | `updated_at` del origen, normalizado a UTC. |
+| `details` | Solo `course_name`, `course_abbreviation`, `topics`, `section`, `weight_percent`, `weight_basis` y `grade`, con las reglas del contrato académico. |
+
+La asignatura es obligatoria; abreviatura y temas pueden ser nulos. La parte es
+`theory` o `practice`, la nota admite 0 a 10 con dos decimales y la ponderación
+usa porcentaje y referencia juntos o ambos nulos. Los detalles no incorporan
+campos específicos de entregas, como obligatoriedad, integrantes o modalidad.
+
+Un examen sin hora utiliza `exam_date` en el origen y este horario central:
+
+```json
+{
+  "kind": "date",
+  "role": "start",
+  "date": "2026-12-02",
+  "at": null,
+  "end_at": null
+}
+```
+
+Un examen con hora utiliza `exam_at`. Por ejemplo, las 09:00 de Madrid del
+02/12/2026 se representan normalizadas así:
+
+```json
+{
+  "kind": "instant",
+  "role": "start",
+  "date": null,
+  "at": "2026-12-02T08:00:00.000Z",
+  "end_at": null
+}
+```
+
+Ambas formas indican celebración o comienzo (`start`). Este contrato no incluye
+duración ni final del examen; `end_at` queda nulo. Campus interpreta la hora en
+Madrid y Sync conserva los días sin hora, sin transformarlos a medianoche UTC.
+
+La modificación de fecha, temas, estado o nota mantiene la identidad central.
+El cambio de fecha se comunica en `changed_fields` como `schedule`; el de nota,
+como `grade`. Repetir una sincronización sin cambios no genera otro evento.
+La colección evita confundir una entrega y un examen con el mismo ID externo.
+
+`cancelled` mantiene una actividad visible con ese estado. Solo una marca de
+`deleted_at` en la exportación produce retirada central, con las mismas reglas
+de identidad y conservación de contenido que las entregas.
+
+Los recordatorios de exámenes se calcularán antes de su celebración, con la
+antelación configurada cuando haya hora y a las 09:00 de Madrid del día anterior
+cuando solo se conozca el día. Se excluirán realizados, cancelados, retirados y
+exámenes pasados. Para fechas sin hora, el día se considera vigente hasta que
+termine en Madrid, sin atribuir una hora de celebración. Las reglas de avisos
+deberán permitir elegir exámenes explícitamente; las reglas existentes de
+entregas conservarán su alcance.
+
+### Preparación de Sync completada
+
+`connector-catalog.ts` es el catálogo de conectores admitidos y relaciona cada
+nombre con su colección, tipo de actividad y autenticación. Las definiciones,
+la validación de solicitudes y la selección de trabajos soportados usan este
+catálogo. El worker selecciona el importador mediante `ConnectorRegistryService`
+a partir del conector y la colección capturados en la ejecución, sin releer una
+definición que podría haber cambiado.
+
+`ActivityImportPipeline` comparte la comprobación de la conexión y credenciales,
+la lectura, la transformación completa antes de escribir, las altas y retiradas,
+los contadores y el control de cancelación. Cada importador aporta su lector y
+su transformación; la tubería verifica la conexión, colección y tipo resultantes
+antes de la primera escritura. Se conservan los controles de cuenta y de posesión
+de la ejecución durante las escrituras, los reintentos y las identidades existentes.
+
+Están registrados `academic.assignments` y `academic.exams`. Ambos comparten el
+lector HTTP paginado, con límite de tamaño, comprobación de destino autorizado
+y detección de identidades repetidas, y aportan validadores y transformaciones
+específicas. La migración `012_add_exam_connector.sql` admite ambos pares de
+conector y colección y conserva el historial anterior sin encolarlo de nuevo.
+No se modifican conexiones, definiciones, actividades ni ejecuciones existentes.
+
 ## Relaciones y límites de responsabilidad
 
 Las sesiones de trabajo podrán conservar en sus detalles una referencia estable
@@ -241,7 +333,7 @@ activas, filtrar por periodo, tipo y conexión y paginar. La selección temporal
 conserva las fechas sin hora y considera los solapamientos y la zona del calendario.
 El contrato está descrito en [API](api.md#consulta-de-actividades-centralizadas).
 
-Quedan para las próximas implementaciones los esquemas de `details` y los estados
-de los demás tipos y las correspondencias de las restantes colecciones y fuentes.
+Exámenes implementados; para los demás tipos
+siguen pendientes sus esquemas de `details`, estados y correspondencias de origen.
 La implementación actual cubre la parte común, el recorrido asíncrono de entregas
 académicas, las definiciones y ejecuciones y la lectura de actividades por HTTP.
