@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { isUUID } from 'class-validator';
 import {
   BadRequestException,
   ConflictException,
@@ -37,11 +38,19 @@ export class RunsService {
     tenantId: string,
     definitionId: string,
     requestKey: string = randomUUID(),
+    automationActionId?: string,
   ): Promise<SyncRun> {
     validateRunRequestKey(requestKey);
+    if (automationActionId !== undefined && !isUUID(automationActionId, '4')) {
+      throw new BadRequestException(
+        'El identificador de la acción no es válido',
+      );
+    }
+    const origin = automationActionId?.toLowerCase() ?? null;
+    const options = origin ? { automation_action_id: origin } : {};
     const keyHash = hash(requestKey);
     const fingerprint = hash(
-      `create-sync-run:${definitionId.toLowerCase()}:{}`,
+      `create-sync-run:${definitionId.toLowerCase()}:${JSON.stringify(options)}`,
     );
     return this.database.transaction<SyncRun>(async (client) => {
       await client.query(
@@ -110,8 +119,8 @@ export class RunsService {
       const inserted = await client.query<SyncRun>(
         `INSERT INTO sync.runs
            (tenant_id, definition_id, request_key_hash, request_fingerprint,
-            source_connection_id, connector, source_collection)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+            source_connection_id, connector, source_collection, automation_action_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING ${publicColumns}`,
         [
           tenantId,
@@ -121,6 +130,7 @@ export class RunsService {
           definition.source_connection_id,
           definition.connector,
           definition.source_collection,
+          origin,
         ],
       );
       await client.query(
@@ -220,7 +230,9 @@ export class RunsService {
     claimToken: string,
   ): Promise<SyncRun> {
     return this.database.transaction(async (client) => {
-      const result = await client.query<SyncRun>(
+      const result = await client.query<
+        SyncRun & { automation_action_id: string | null }
+      >(
         `UPDATE sync.runs
        SET status = 'completed',
            finished_at = clock_timestamp(),
@@ -237,7 +249,7 @@ export class RunsService {
          AND status = 'running'
          AND claim_token = $9
          AND lease_expires_at > clock_timestamp()
-       RETURNING ${publicColumns}`,
+       RETURNING ${publicColumns}, automation_action_id`,
         [
           tenantId,
           runId,
@@ -251,26 +263,32 @@ export class RunsService {
         ],
       );
 
-      const run = result.rows[0];
+      const storedRun = result.rows[0];
 
-      if (!run) {
+      if (!storedRun) {
         throw new ConflictException('La ejecución no está en curso');
       }
 
+      const { automation_action_id: automationActionId, ...run } = storedRun;
+
       await appendOutboxEvent(
         client,
-        createSyncCompletedEvent(tenantId, {
-          sync_run_id: run.id,
-          definition_id: run.definition_id,
-          counts: {
-            read: run.read_count,
-            created: run.created_count,
-            updated: run.updated_count,
-            unchanged: run.unchanged_count,
-            retired: run.retired_count,
-            ignored: run.ignored_count,
+        createSyncCompletedEvent(
+          tenantId,
+          {
+            sync_run_id: run.id,
+            definition_id: run.definition_id,
+            counts: {
+              read: run.read_count,
+              created: run.created_count,
+              updated: run.updated_count,
+              unchanged: run.unchanged_count,
+              retired: run.retired_count,
+              ignored: run.ignored_count,
+            },
           },
-        }),
+          automationActionId ?? undefined,
+        ),
       );
 
       return run;
@@ -287,7 +305,9 @@ export class RunsService {
     const safeError = toSafeRunError(error);
 
     return this.database.transaction(async (client) => {
-      const result = await client.query<SyncRun>(
+      const result = await client.query<
+        SyncRun & { automation_action_id: string | null }
+      >(
         `UPDATE sync.runs
        SET status = 'failed',
            finished_at = clock_timestamp(),
@@ -306,7 +326,7 @@ export class RunsService {
          AND status = 'running'
          AND claim_token = $11
          AND lease_expires_at > clock_timestamp()
-       RETURNING ${publicColumns}`,
+       RETURNING ${publicColumns}, automation_action_id`,
         [
           tenantId,
           runId,
@@ -322,27 +342,33 @@ export class RunsService {
         ],
       );
 
-      const run = result.rows[0];
+      const storedRun = result.rows[0];
 
-      if (!run) {
+      if (!storedRun) {
         throw new ConflictException('La ejecución no está en curso');
       }
 
+      const { automation_action_id: automationActionId, ...run } = storedRun;
+
       await appendOutboxEvent(
         client,
-        createSyncFailedEvent(tenantId, {
-          sync_run_id: run.id,
-          definition_id: run.definition_id,
-          counts: {
-            read: run.read_count,
-            created: run.created_count,
-            updated: run.updated_count,
-            unchanged: run.unchanged_count,
-            retired: run.retired_count,
-            ignored: run.ignored_count,
+        createSyncFailedEvent(
+          tenantId,
+          {
+            sync_run_id: run.id,
+            definition_id: run.definition_id,
+            counts: {
+              read: run.read_count,
+              created: run.created_count,
+              updated: run.updated_count,
+              unchanged: run.unchanged_count,
+              retired: run.retired_count,
+              ignored: run.ignored_count,
+            },
+            error: safeError,
           },
-          error: safeError,
-        }),
+          automationActionId ?? undefined,
+        ),
       );
 
       return run;

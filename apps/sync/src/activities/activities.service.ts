@@ -120,7 +120,7 @@ export class ActivitiesService {
     sourceConnectionId: string,
     sourceCollection: string,
     lease: ActivityRunLease,
-  ): Promise<void> {
+  ): Promise<string | null> {
     await client.query(
       `SELECT id
      FROM sync.runs
@@ -129,8 +129,11 @@ export class ActivitiesService {
       [tenantId, lease.run_id],
     );
 
-    const result = await client.query<{ id: string }>(
-      `SELECT id
+    const result = await client.query<{
+      id: string;
+      automation_action_id: string | null;
+    }>(
+      `SELECT id, automation_action_id
      FROM sync.runs
      WHERE tenant_id = $1
        AND id = $2
@@ -151,6 +154,8 @@ export class ActivitiesService {
     if (!result.rows[0]) {
       throw new RunLeaseLostError();
     }
+
+    return result.rows[0].automation_action_id;
   }
 
   async save(
@@ -185,15 +190,15 @@ export class ActivitiesService {
     ];
 
     return this.database.transaction<ActivitySaveResult>(async (client) => {
-      if (lease) {
-        await this.assertRunLease(
-          client,
-          tenantId,
-          activity.source_connection_id,
-          activity.source_collection,
-          lease,
-        );
-      }
+      const automationActionId = lease
+        ? await this.assertRunLease(
+            client,
+            tenantId,
+            activity.source_connection_id,
+            activity.source_collection,
+            lease,
+          )
+        : null;
       const inserted = await client.query<{ id: string }>(
         `INSERT INTO sync.activities (
            tenant_id, source_connection_id, source_collection, external_id,
@@ -211,12 +216,18 @@ export class ActivitiesService {
       );
 
       if (inserted.rows[0]) {
-        await this.recordChange(client, tenantId, lease, {
-          ...eventSource,
-          activity_id: inserted.rows[0].id,
-          change_type: 'created',
-          changed_fields: [],
-        });
+        await this.recordChange(
+          client,
+          tenantId,
+          lease,
+          {
+            ...eventSource,
+            activity_id: inserted.rows[0].id,
+            change_type: 'created',
+            changed_fields: [],
+          },
+          automationActionId,
+        );
 
         return { id: inserted.rows[0].id, outcome: 'created' };
       }
@@ -274,12 +285,18 @@ export class ActivitiesService {
            AND external_id = $4`,
         values,
       );
-      await this.recordChange(client, tenantId, lease, {
-        ...eventSource,
-        activity_id: stored.id,
-        change_type: 'updated',
-        changed_fields: lease ? changedActivityFields(stored, activity) : [],
-      });
+      await this.recordChange(
+        client,
+        tenantId,
+        lease,
+        {
+          ...eventSource,
+          activity_id: stored.id,
+          change_type: 'updated',
+          changed_fields: lease ? changedActivityFields(stored, activity) : [],
+        },
+        automationActionId,
+      );
       return { id: stored.id, outcome: 'updated' };
     });
   }
@@ -289,6 +306,7 @@ export class ActivitiesService {
     tenantId: string,
     lease: ActivityRunLease | undefined,
     payload: Omit<DataChangedPayload, 'sync_run_id'>,
+    automationActionId: string | null,
   ): Promise<void> {
     if (!lease) return;
 
@@ -301,10 +319,14 @@ export class ActivitiesService {
 
     await appendOutboxEvent(
       client,
-      createDataChangedEvent(tenantId, {
-        ...payload,
-        sync_run_id: lease.run_id,
-      }),
+      createDataChangedEvent(
+        tenantId,
+        {
+          ...payload,
+          sync_run_id: lease.run_id,
+        },
+        automationActionId ?? undefined,
+      ),
     );
   }
 
@@ -315,15 +337,15 @@ export class ActivitiesService {
   ): Promise<ActivityRetirementResult> {
     return this.database.transaction<ActivityRetirementResult>(
       async (client) => {
-        if (lease) {
-          await this.assertRunLease(
-            client,
-            tenantId,
-            retirement.source_connection_id,
-            retirement.source_collection,
-            lease,
-          );
-        }
+        const automationActionId = lease
+          ? await this.assertRunLease(
+              client,
+              tenantId,
+              retirement.source_connection_id,
+              retirement.source_collection,
+              lease,
+            )
+          : null;
         const existing = await client.query<{
           id: string;
           type: ActivityType;
@@ -374,15 +396,21 @@ export class ActivitiesService {
             retirement.source_updated_at,
           ],
         );
-        await this.recordChange(client, tenantId, lease, {
-          activity_id: stored.id,
-          source_connection_id: retirement.source_connection_id,
-          source_collection: retirement.source_collection,
-          activity_type: stored.type,
-          external_id: retirement.external_id,
-          change_type: 'retired',
-          changed_fields: ['deleted_at'],
-        });
+        await this.recordChange(
+          client,
+          tenantId,
+          lease,
+          {
+            activity_id: stored.id,
+            source_connection_id: retirement.source_connection_id,
+            source_collection: retirement.source_collection,
+            activity_type: stored.type,
+            external_id: retirement.external_id,
+            change_type: 'retired',
+            changed_fields: ['deleted_at'],
+          },
+          automationActionId,
+        );
         return { id: stored.id, outcome: 'retired' };
       },
     );

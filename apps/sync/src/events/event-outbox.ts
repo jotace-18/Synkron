@@ -8,9 +8,10 @@ export async function appendOutboxEvent(
   await client.query(
     `INSERT INTO sync.event_outbox (
        event_id, tenant_id, event_type, schema_version,
-       correlation_id, causation_id, occurred_at, producer, payload
+       correlation_id, causation_id, occurred_at, producer, payload,
+       automation_action_id
      ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9::jsonb
+       $1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9::jsonb, $10
      )`,
     [
       event.event_id,
@@ -22,6 +23,7 @@ export async function appendOutboxEvent(
       event.occurred_at,
       event.producer,
       JSON.stringify(event.payload),
+      event.automation_action_id ?? null,
     ],
   );
 }

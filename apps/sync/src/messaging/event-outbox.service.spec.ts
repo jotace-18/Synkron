@@ -69,6 +69,40 @@ describe('Pending event publication', () => {
     expect(transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves automation origin in publication and omits it for root events', async () => {
+    const actionId = '44444444-4444-4444-8444-444444444444';
+    query.mockReset().mockResolvedValue({ rows: [] });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          ...event,
+          occurred_at: new Date(event.occurred_at),
+          automation_action_id: actionId,
+        },
+      ],
+    });
+
+    await expect(service.publishNext(publish)).resolves.toBe(true);
+    expect(publish.mock.calls[0][0]).toEqual({
+      ...event,
+      automation_action_id: actionId,
+    });
+
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          ...event,
+          occurred_at: new Date(event.occurred_at),
+          automation_action_id: null,
+        },
+      ],
+    });
+
+    await expect(service.publishNext(publish)).resolves.toBe(true);
+    expect(publish.mock.calls[1][0]).toEqual(event);
+    expect(publish.mock.calls[1][0]).not.toHaveProperty('automation_action_id');
+  });
+
   it('propagates a send failure without marking the event as published', async () => {
     const error = new Error('Broker did not confirm');
     publish.mockRejectedValueOnce(error);

@@ -40,7 +40,12 @@ export class AutomationRunsController {
   ) {
     validateRunRequestKey(key);
 
-    const run = await this.runs.createQueued(body.tenant_id, definitionId, key);
+    const run = await this.runs.createQueued(
+      body.tenant_id,
+      definitionId,
+      key,
+      body.automation_action_id,
+    );
 
     response.location(`/api/v1/sync-runs/${run.id}`);
 

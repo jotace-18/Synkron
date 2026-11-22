@@ -251,6 +251,40 @@ describe('RunsService.createQueued (PostgreSQL integration)', () => {
     expect(await count()).toBe(1);
   });
 
+  it('preserves automation action origin on retry and rejects changing or removing it', async () => {
+    const actionId = randomUUID();
+    const key = `automation:${actionId}`;
+    const first = await service.createQueued(
+      owner,
+      definitionId,
+      key,
+      actionId,
+    );
+    const repeated = await service.createQueued(
+      owner,
+      definitionId,
+      key,
+      actionId.toUpperCase(),
+    );
+
+    expect(repeated).toEqual(first);
+    expect(first).not.toHaveProperty('automation_action_id');
+
+    const stored = await database.query<{ automation_action_id: string }>(
+      'SELECT automation_action_id FROM sync.runs WHERE tenant_id = $1 AND id = $2',
+      [owner, first.id],
+    );
+    expect(stored.rows).toEqual([{ automation_action_id: actionId }]);
+
+    await expect(
+      service.createQueued(owner, definitionId, key),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      service.createQueued(owner, definitionId, key, randomUUID()),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(await count()).toBe(1);
+  });
+
   it('deduplicates simultaneous requests across independent service instances', async () => {
     const anotherService = new RunsService(database);
     const results = await Promise.all(

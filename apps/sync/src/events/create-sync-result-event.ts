@@ -9,6 +9,7 @@ import type {
 export function createSyncCompletedEvent(
   tenantId: string,
   payload: SyncResultPayload,
+  automationActionId?: string,
 ): SyncCompletedEvent {
   return {
     event_id: randomUUID(),
@@ -19,6 +20,7 @@ export function createSyncCompletedEvent(
     causation_id: payload.sync_run_id,
     occurred_at: new Date().toISOString(),
     producer: 'sync',
+    ...(automationActionId ? { automation_action_id: automationActionId } : {}),
     payload,
   };
 }
@@ -26,6 +28,7 @@ export function createSyncCompletedEvent(
 export function createSyncFailedEvent(
   tenantId: string,
   payload: SyncFailedPayload,
+  automationActionId?: string,
 ): SyncFailedEvent {
   return {
     event_id: randomUUID(),
@@ -36,6 +39,7 @@ export function createSyncFailedEvent(
     causation_id: payload.sync_run_id,
     occurred_at: new Date().toISOString(),
     producer: 'sync',
+    ...(automationActionId ? { automation_action_id: automationActionId } : {}),
     payload,
   };
 }

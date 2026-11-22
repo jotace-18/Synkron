@@ -13,6 +13,7 @@ export interface SyncEventEnvelope<TType extends SyncEventType, TPayload> {
   causation_id: string;
   occurred_at: string;
   producer: 'sync';
+  automation_action_id?: string;
   payload: TPayload;
 }
 

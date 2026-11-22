@@ -483,6 +483,33 @@ services:
       sync:
         condition: service_started
 
+  automation-consumer:
+    build:
+      context: ./apps/automation
+      target: runtime
+    init: true
+    restart: on-failure
+    command: ["npm", "run", "rabbitmq:consumer"]
+    environment:
+      PGHOST: automation-db
+      PGPORT: "5432"
+      PGDATABASE: ${AUTOMATION_DB_NAME:?Falta AUTOMATION_DB_NAME}
+      PGUSER: ${AUTOMATION_DB_USER:?Falta AUTOMATION_DB_USER}
+      PGPASSWORD: ${AUTOMATION_DB_PASSWORD:?Falta AUTOMATION_DB_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
+    networks:
+      - default
+      - automation-data
+    depends_on:
+      automation-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
 
   academic-web:
     build:

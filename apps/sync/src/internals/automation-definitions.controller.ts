@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { DefinitionsService } from '../definitions/definitions.service';
 import { AutomationServiceGuard } from './automation-service.guard';
-import { AutomationRunRequestDto } from './dto/automation-run-request.dto';
+import { AutomationAccountDto } from './dto/automation-run-request.dto';
 
 @Controller('internal/automation/sync-definitions')
 @UseGuards(AutomationServiceGuard)
@@ -28,7 +28,7 @@ export class AutomationDefinitionsController {
       }),
     )
     definitionId: string,
-    @Query() query: AutomationRunRequestDto,
+    @Query() query: AutomationAccountDto,
   ) {
     const definition = await this.definitions.get(
       query.tenant_id,
