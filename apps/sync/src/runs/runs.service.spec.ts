@@ -86,6 +86,7 @@ describe('RunsService.createQueued', () => {
       definition.source_connection_id,
       definition.connector,
       definition.source_collection,
+      null, // Manual and scheduled requests have no automation action origin.
     ]);
     expect(query.mock.calls[4][1]).toEqual([owner, run.id]);
     expect(query).toHaveBeenCalledTimes(5);
