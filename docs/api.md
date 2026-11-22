@@ -53,12 +53,17 @@ autenticada de actividades ya está disponible; el calendario sigue pendiente.
 | GET | `/sync-runs/{id}` | `200`, estado guardado por Sync; disponible. |
 | GET | `/activities` | `200`, listado autenticado, filtrado y paginado; disponible. |
 | GET | `/activities/{id}` | `200`, detalle propio y activo con procedencia; disponible. |
-| GET / POST | `/automations` | `200` listado / `201` regla. |
-| GET / PATCH | `/automations/{id}` | `200` detalle o cambio. |
-| GET | `/automation-runs/{id}` | `200`, detalle de regla y acciones. |
+| GET / POST | `/automation/schedules` | `200` listado / `201` programación. |
+| GET / PUT | `/automation/schedules/{id}` | `200` detalle o actualización completa. |
+| GET / POST | `/automation/rules` | `200` listado / `201` regla. |
+| GET / PUT | `/automation/rules/{id}` | `200` detalle o actualización completa. |
+| GET / PUT | `/automation/reminders/settings` | `200`, configuración de recordatorios. |
+| GET | `/automation/history` | `200`, historial propio de solicitudes y acciones. |
 | GET | `/activity` | `200`, actividad, que puede tardar en reflejar un cambio. |
 | GET | `/usage` | `200`, agregados por periodo. |
 | GET | `/notifications` | `200`, notificaciones del usuario. |
+| GET | `/notifications/unread-count` | `200`, contador de no leídos. |
+| PATCH | `/notifications/{id}/read` | `200`, aviso leído; cuerpo `{}`. |
 
 `Location` indica la dirección donde consultar el recurso creado. Los listados tendrán páginas; el historial se podrá filtrar por tipo, estado y fechas con `type`, `status`, `from` y `to`. Los instantes con hora se guardarán en UTC y se mostrarán en la zona del usuario; una fecha sin hora conservará su significado de día, sin inventar una hora.
 
@@ -540,21 +545,41 @@ Estas comprobaciones distribuidas se realizaron manualmente. CI mantiene sus
 pruebas unitarias y de integración con PostgreSQL; no se presenta esa ejecución
 manual como una suite de CI con Rabbit real.
 
-## Reglas (previstas)
+## Automation y avisos
 
-Creación de automatización, `POST /api/v1/automations`:
+Creación de regla, `POST /api/v1/automation/rules`:
 
 ```json
 {
   "name": "Avisarme cuando cambien mis tareas",
   "trigger": {"event_type": "data.changed"},
-  "condition": {"field": "payload.change_type", "operator": "==", "value": "updated"},
+  "condition": {"mode": "all", "conditions": [{"field": "payload.change_type", "operator": "==", "value": "updated"}]},
   "actions": [{"type": "notify", "message": "Hay cambios en tus tareas"}],
   "enabled": true
 }
 ```
 
 Las reglas solo admiten campos y comparaciones definidos por Synkron. `notify` crea un aviso y `start_sync` solicita una sincronización de la misma cuenta.
+
+`GET /api/v1/automation/history` devuelve un array paginado con `limit` (1 a 50,
+20 por defecto) y `offset` (desde 0). Acepta `kind=schedule|rule|reminder` y
+`status=pending|accepted|failed|blocked|cancelled`; omitir un filtro incluye todos
+sus valores. Cada origen se filtra por la cuenta de la sesión antes de unir los
+resultados, ordenados por `created_at DESC, kind ASC, id DESC`. Incluye
+`action_type`, intentos, fechas, error, `result_id`, `sync_run_id` y `activity_id`
+cuando corresponden. `accepted` confirma aceptación, no finalización de Sync.
+
+`GET /api/v1/notifications` acepta la misma paginación y `status=unread|read`;
+sin `status` incluye ambos. El contador responde `{"unread": 2}`. Marcar como
+leído exige sesión, origen y CSRF válidos; repetir conserva el primer `read_at`.
+La procedencia `source.kind` distingue `rule` y `reminder`. La recepción interna
+deduplica por cuenta e ID de acción; repetir contenido idéntico devuelve el aviso
+existente y cambiarlo produce `409`.
+
+Todas estas rutas públicas exigen sesión y envían `Cache-Control: no-store`.
+Las escrituras exigen además comprobación de origen y CSRF. No aceptan
+`tenant_id` del navegador. Las rutas de entrega entre servicios se mantienen
+bajo `/internal/automation`, con token de servicio, y Caddy no las expone.
 
 ## Eventos
 

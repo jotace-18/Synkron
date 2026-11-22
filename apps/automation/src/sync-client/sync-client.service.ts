@@ -98,7 +98,20 @@ export class SyncClientService {
     tenantId: string,
     definitionId: string,
     requestId: string,
+    automationActionId?: string,
   ): Promise<string> {
+    if (
+      automationActionId !== undefined &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        automationActionId,
+      )
+    ) {
+      throw new SyncRequestError(
+        'invalid_origin',
+        false,
+        'El origen de la acción no es válido',
+      );
+    }
     const baseUrl = process.env.SYNC_INTERNAL_URL;
     const token = process.env.AUTOMATION_SYNC_SERVICE_TOKEN;
 
@@ -143,7 +156,12 @@ export class SyncClientService {
           'X-Synkron-Service-Token': token,
           'Idempotency-Key': `automation:${requestId.toLowerCase()}`,
         },
-        body: JSON.stringify({ tenant_id: tenantId }),
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          ...(automationActionId !== undefined
+            ? { automation_action_id: automationActionId.toLowerCase() }
+            : {}),
+        }),
       });
 
       if ([400, 404, 409, 422].includes(response.status)) {

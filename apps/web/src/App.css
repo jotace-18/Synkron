@@ -12,6 +12,7 @@
 
 .app-header {
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 24px;
   min-height: 88px;
   padding: 16px 0;
@@ -38,7 +39,8 @@
   letter-spacing: -0.04em;
 }
 
-.account-menu { gap: 18px; min-width: 0; }
+.account-menu { gap: 18px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.workspace-navigation { flex-wrap: wrap; max-width: 100%; }
 .account-email {
   max-width: 260px;
   overflow: hidden;

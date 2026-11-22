@@ -68,10 +68,23 @@ No se presupone que incluya ejecuciones anteriores a su creación.
 
 Todos los datos y consultas quedan limitados al usuario autenticado.
 
+## Avisos
+
+Monitoring recibe avisos de reglas y recordatorios por una API interna con token
+de servicio. Cada cuenta e ID de acción identifican una entrega: reenviar el
+mismo contenido conserva el aviso y su primera fecha de lectura; cambiar el
+contenido para esa identidad se rechaza con `409`.
+
+La cabecera de Synkron ofrece bandeja y contador de no leídos, filtros por lectura,
+paginación, marcado de lectura y enlaces al contexto. Listados y actualizaciones
+se limitan a la cuenta de la sesión. Marcar como leído exige origen y CSRF válidos;
+un ID de otra cuenta devuelve `404`.
+
 ## Ampliaciones posteriores
 
 - Seguimiento de ejecuciones en cola y en curso.
 - Duración de las sincronizaciones.
 - Comprobaciones de salud de los servicios.
 - Mensajes rechazados e incidencias de infraestructura.
-- Resultados de Automation y avisos.
+- Ampliar los indicadores de Automation; las acciones ya se consultan en su
+  propio historial y los avisos ya están disponibles en la bandeja.

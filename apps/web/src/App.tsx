@@ -11,7 +11,12 @@ import SyncPanel from './sync/SyncPanel'
 import MonitoringDashboard from './monitoring/MonitoringDashboard'
 import MonitoringRunDetails from './monitoring/MonitoringRunDetails'
 import './monitoring/monitoring.css'
-
+import ReminderSettingsPanel from './automation/ReminderSettingsPanel'
+import './automation/automation.css'
+import SchedulesPanel from './automation/SchedulesPanel'
+import RulesPanel from './automation/RulesPanel'
+import AutomationHistoryPanel from './automation/AutomationHistoryPanel'
+import NotificationInbox from './notifications/NotificationInbox'
 
 function App() {
   const [session, setSession] = useState<AuthSession | null>(null)
@@ -26,12 +31,16 @@ function App() {
   const [sessionRetry, setSessionRetry] = useState(0)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [section, setSection] =
-    useState<'activities' | 'monitoring'>('activities')
+    useState<'activities' | 'monitoring' | 'automation'>('activities')
 
   const [selectedRunId, setSelectedRunId] =
     useState<string | null>(null)
 
   const closeRun = useCallback(() => setSelectedRunId(null), [])
+  const openRun = useCallback((id: string) => {
+    setSelectedActivityId(null)
+    setSelectedRunId(id)
+  }, [])
 
   const openActivityFromMonitoring = useCallback((id: string) => {
     setSelectedRunId(null)
@@ -108,6 +117,13 @@ function App() {
             </button>
             <button
               type="button"
+              aria-pressed={section === 'automation'}
+              onClick={() => setSection('automation')}
+            >
+              Automatizaciones
+            </button>
+            <button
+              type="button"
               aria-pressed={section === 'monitoring'}
               onClick={() => setSection('monitoring')}
             >
@@ -117,6 +133,13 @@ function App() {
         )}
         {session && (
           <div className="account-menu">
+            <NotificationInbox
+              key={`notifications:${session.user.id}`}
+              onSessionExpired={handleSessionExpired}
+              onOpenActivity={openActivityFromMonitoring}
+              onOpenRun={openRun}
+              refreshVersion={refreshVersion}
+            />
             <span className="account-email" title={session.user.email}>
               {session.user.email}
             </span>
@@ -188,6 +211,43 @@ function App() {
                 />
               )}
             </div>
+
+            {section === 'automation' && (
+              <section aria-labelledby="automation-title">
+                <div className="workspace-heading">
+                  <div>
+                    <p className="eyebrow">Organización automática</p>
+                    <h1 id="automation-title">Automatizaciones</h1>
+                    <p className="workspace-description">
+                      Configura cuándo sincronizar y qué avisos recibir.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="automation-panels">
+                  <SchedulesPanel
+                    key={`schedules:${session.user.id}`}
+                    onSessionExpired={handleSessionExpired}
+                  />
+
+                  <RulesPanel
+                    key={`rules:${session.user.id}`}
+                    onSessionExpired={handleSessionExpired}
+                  />
+
+                  <ReminderSettingsPanel
+                    key={`reminders:${session.user.id}`}
+                    onSessionExpired={handleSessionExpired}
+                  />
+                  <AutomationHistoryPanel
+                    key={`automation-history:${session.user.id}`}
+                    onSessionExpired={handleSessionExpired}
+                    onOpenRun={openRun}
+                    onOpenActivity={openActivityFromMonitoring}
+                  />
+                </div>
+              </section>
+            )}
 
             {section === 'monitoring' && (
               <section aria-labelledby="monitoring-title">

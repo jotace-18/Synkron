@@ -2,7 +2,7 @@
 
 Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
-Es un proyecto en desarrollo. Ya funcionan la autenticación, la gestión básica de conexiones y la sincronización en segundo plano de entregas académicas y la publicación de eventos de cambios y resultados. La ampliación de las fuentes, Automation y Monitoring siguen pendientes de implementación.
+Es un proyecto en desarrollo. Ya funcionan las entregas académicas desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La ampliación a las demás fuentes sigue pendiente.
 
 ## Qué permitirá hacer
 
@@ -15,7 +15,7 @@ Es un proyecto en desarrollo. Ya funcionan la autenticación, la gestión básic
 
 Cada cuenta tendrá sus propias conexiones, actividades, reglas e historial. El motor será reutilizable con los servicios del proyecto personal o con otras fuentes compatibles; el calendario es una vista de esos datos y no condiciona los formatos de entrada.
 
-La primera versión se centrará en sincronizaciones iniciadas por el usuario y reglas que respondan a sus resultados y a los cambios detectados. Sync consultará las fuentes y guardará las actividades en su propia base de datos. Cambiar un registro en el origen actualizará la actividad existente al volver a sincronizar. La ejecución programada se añadirá después.
+El recorrido actual admite sincronizaciones manuales, por intervalos o a una hora diaria, además de reglas que responden a resultados y cambios. Sync consulta las fuentes y guarda las actividades en su propia base de datos. Cambiar un registro en el origen actualiza la actividad existente al volver a sincronizar.
 
 ## Fuentes y vista centralizada
 
@@ -51,7 +51,7 @@ Synkron se divide en tres servicios:
 | **Automation** | Comprueba las reglas del usuario y pone en marcha las acciones que correspondan. |
 | **Monitoring** | Reúne los cambios, avisos y resultados para poder consultarlos. |
 
-Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Su base visual, el contenedor Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md) ya están disponibles. El acceso desde el frontend, la restauración de sesión al recargar y el cierre ya funcionan por HTTPS. Ya están disponibles la agenda con filtros, el calendario Mes/Semana/Día, el detalle en modal, el registro y la solicitud y consulta de sincronizaciones desde la web.
+Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Se sirve mediante Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md). Ofrece acceso y registro, agenda con filtros, calendario Mes/Semana/Día, detalle de actividad, sincronizaciones, centro de mandos, configuración de automatizaciones, historial y bandeja de avisos. Campus tiene una interfaz independiente para crear, editar y retirar entregas.
 
 Una API, la interfaz por la que se comunican las aplicaciones, recibe las peticiones del panel web y las dirige al servicio correspondiente. También se comprueba quién accede y qué información le pertenece.
 
@@ -59,13 +59,16 @@ Cada persona tendrá una cuenta con correo y contraseña. La sesión se guardar�
 
 ```mermaid
 flowchart TB
-    U["Usuario / panel web"] -->|HTTPS| API["Acceso y autenticación"]
-    API -->|HTTP / JSON| S["Sync: sincronización"]
-    API -->|HTTP / JSON| A["Automation: reglas"]
-    API -->|HTTP / JSON| M["Monitoring: actividad y avisos"]
+    U["Usuario / panel web"] -->|HTTPS| G["Caddy: entrada HTTPS"]
+    G -->|HTTP / JSON| API["API: cuentas y sesiones"]
+    G -->|HTTP / JSON| S["Sync: sincronización"]
+    G -->|HTTP / JSON| A["Automation: reglas"]
+    G -->|HTTP / JSON| M["Monitoring: actividad y avisos"]
     S <-->|AMQP: tareas y eventos| Q[(RabbitMQ)]
-    A <-->|AMQP: eventos y acciones| Q
+    Q -->|AMQP: eventos| A
     Q -->|AMQP: cambios y resultados| M
+    A -->|HTTP interno: solicitudes| S
+    A -->|HTTP interno: avisos| M
     S -->|HTTP o HTTPS / JSON| X["Académico / deporte / planes"]
     S -->|SQL| DS[(PostgreSQL Sync)]
     A -->|SQL| DA[(PostgreSQL Automation)]
@@ -75,7 +78,7 @@ flowchart TB
 
 RabbitMQ guarda los mensajes pendientes y los reparte entre los servicios. Esto permite realizar una sincronización larga en segundo plano y comunicar su resultado sin mantener al usuario esperando.
 
-Cada backend tendrá su propia base de datos PostgreSQL en un contenedor independiente: Sync, Automation, Monitoring y el componente de cuentas y sesiones de la entrada API. Cada base tendrá credenciales y un volumen persistente propios. Los servicios intercambian información por HTTP y mensajes, sin acceder a las bases de otros servicios. Cada usuario solo puede acceder a sus propios recursos.
+Cada backend tiene su propia base de datos PostgreSQL en un contenedor independiente: Sync, Automation, Monitoring y el componente de cuentas y sesiones de la API. Cada base tiene credenciales y un volumen persistente propios. Los servicios intercambian información por HTTP y mensajes, sin acceder a las bases de otros servicios. Cada usuario solo puede acceder a sus propios recursos.
 
 Una sincronización recorre este camino:
 
@@ -98,8 +101,16 @@ sequenceDiagram
     S->>S: Guardar resultado y cambios pendientes de comunicar
     S->>Q: Comunicar cambios y resultado
     Q->>A: Comprobar reglas
-    A->>Q: Solicitar acciones
-    Q->>M: Actualizar actividad y avisos
+    Q->>M: Guardar cambios y resultados
+    A->>A: Guardar evaluaciones y acciones
+    opt Acción de aviso
+        A->>M: Solicitar aviso con ID persistido
+        M-->>A: Confirmar aviso nuevo o existente
+    end
+    opt Acción de sincronización
+        A->>S: Solicitar sincronización con origen de acción
+        S-->>A: Confirmar ejecución nueva o existente
+    end
     U->>S: Consultar actividades centralizadas mediante la API
     S-->>U: Datos para la agenda y el calendario
     U->>M: Consultar actividad
@@ -150,13 +161,20 @@ Las rutas parten de `/api/v1`. Los datos se intercambian en JSON y el acceso se 
 | `POST` | `/sync-definitions/{id}/runs` | Iniciar una sincronización. |
 | `GET` | `/sync-runs/{id}` | Consultar su estado y resultado. |
 | `GET` | `/activities` | Consultar actividades propias y activas, con filtros y paginación. |
-| `GET` | `/activities/{id}` | Consultar el detalle y procedencia de una actividad; previsto. |
-| `GET`, `POST` | `/automations` | Consultar o crear reglas. |
-| `GET` | `/activity` | Consultar cambios y operaciones. |
+| `GET` | `/activities/{id}` | Consultar el detalle y procedencia de una actividad. |
+| `GET`, `POST` | `/automation/schedules` | Consultar o crear programaciones. |
+| `GET`, `PUT` | `/automation/schedules/{id}` | Consultar o actualizar una programación. |
+| `GET`, `POST` | `/automation/rules` | Consultar o crear reglas. |
+| `GET`, `PUT` | `/automation/rules/{id}` | Consultar o actualizar una regla. |
+| `GET`, `PUT` | `/automation/reminders/settings` | Consultar o configurar recordatorios. |
+| `GET` | `/automation/history` | Consultar solicitudes y acciones por origen y estado. |
+| `GET` | `/monitoring/summary` | Consultar el resumen de sincronizaciones. |
+| `GET` | `/monitoring/runs` | Consultar resultados y cambios de sincronización. |
 | `GET` | `/notifications` | Consultar avisos. |
-| `GET` | `/usage` | Consultar el uso de la plataforma. |
+| `GET` | `/notifications/unread-count` | Contar avisos sin leer. |
+| `PATCH` | `/notifications/{id}/read` | Marcar un aviso como leído. |
 
-Al crear una conexión se indican nombre, dirección y forma de acceso. Una sincronización define la fuente y la correspondencia de campos con las actividades centralizadas. El destino inicial es interno a Sync y no requiere una segunda conexión externa. Una regla establece qué evento la activa, qué condiciones debe cumplir y qué acciones realizará. El [contrato API](docs/api.md) distingue las rutas disponibles de las previstas; `/activities` representa las actividades personales y `/activity` el historial de Monitoring.
+Al crear una conexión se indican nombre, dirección y forma de acceso. Una sincronización define la fuente y la correspondencia de campos con las actividades centralizadas. El destino inicial es interno a Sync y no requiere una segunda conexión externa. Una regla establece qué evento la activa, qué condiciones debe cumplir y qué acciones realizará. El [contrato API](docs/api.md) detalla rutas, permisos y paginación; `/activities` representa las actividades personales, `/monitoring/runs` los resultados de sincronización y `/automation/history` las acciones de Automation.
 
 ## Estado y cierre de implementación
 
@@ -170,7 +188,13 @@ Sync guarda los eventos `data.changed`, `sync.completed` y `sync.failed` en un o
 
 El listado y detalle de actividades centralizadas ya están disponibles por HTTP con sesión autenticada. Permiten filtrar por periodo, tipo y conexión, con paginación y selección de zona horaria. Las actividades retiradas quedan excluidas y el detalle de una actividad ajena devuelve `404`. Se han comprobado fechas sin hora, intervalos solapados y cambios de horario estacional con PostgreSQL, así como listado y detalle con una sesión real. El frontend permite consultarlas en agenda y calendario y solicitar nuevas sincronizaciones.
 
-Quedan por implementar exámenes, sesiones y eventos académicos generales, las fuentes de deporte y planes sociales, el historial de intentos y los reintentos funcionales, Automation, Monitoring y las vistas de gestión correspondientes. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. La API de entregas es una parte del servicio académico, que todavía debe ampliarse con sus otros recursos y formularios.
+Automation y Monitoring ya están integrados con API, PostgreSQL, consumidores y procesos independientes. La interfaz permite gestionar programaciones y reglas, configurar recordatorios, consultar intentos y errores y abrir avisos con su contexto. Se ha comprobado la recuperación de avisos tras una caída de Monitoring, la ausencia de duplicados, la cancelación de recordatorios al entregar una tarea y el límite de encadenamiento de sincronizaciones. Los detalles y el cierre de comprobaciones están en [Automation](docs/automation.md) y [Monitoring](docs/monitoring.md).
+
+El 22/11/2026 quedó cerrado el flujo funcional de entregas académicas: una edición de fecha en Campus se sincronizó con la actividad centralizada, generó un único aviso y quedó registrada en el historial. También pasaron las pruebas de PostgreSQL de avisos e historial, con deduplicación, conservación de lectura y separación entre cuentas.
+
+El workflow de CI incluye formato, lint, compilación, pruebas unitarias y migraciones e integración con PostgreSQL para Automation y Monitoring, además de construir sus imágenes. Las comprobaciones manuales con Rabbit real se mantienen diferenciadas de las pruebas automatizadas. La ejecución de los nuevos trabajos en GitHub queda por confirmar tras subir este checkpoint.
+
+Quedan por implementar exámenes, sesiones y eventos académicos generales y las fuentes de deporte y planes sociales. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. El cierre funcional de entregas académicas no equivale al cierre de todo el Hito 2.
 
 El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 

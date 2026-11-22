@@ -3,6 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { SyncRequestDispatcherService } from '../sync-requests/sync-request-dispatcher.service';
 import { SchedulerService } from './scheduler.service';
 import { SchedulingModule } from './scheduling.module';
+import { RuleSyncDispatcherService } from '../rules/rule-sync-dispatcher.service';
 
 let stopping = false;
 let wakeUp: (() => void) | undefined;
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
 
     const scheduler = app.get(SchedulerService);
     const dispatcher = app.get(SyncRequestDispatcherService);
+    const ruleDispatcher = app.get(RuleSyncDispatcherService);
 
     console.log('Planificador de Automation activo');
 
@@ -53,6 +55,10 @@ async function main(): Promise<void> {
         }
 
         console.log(`Solicitud ${result.request_id}: ${result.status}`);
+      }
+
+      for (let index = 0; index < 20 && !stopping; index += 1) {
+        if (!(await ruleDispatcher.dispatchOne())) break;
       }
 
       if (!stopping) {
