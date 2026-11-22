@@ -135,3 +135,81 @@ se valida en CI y el encaminamiento se ha comprobado en local por HTTPS.
 Esta decisión define la entrada local de la aplicación. El dominio y los
 certificados se adaptarán al despliegue. Terraform podrá preparar máquinas y
 redes sin cambiar el contrato de las rutas que utiliza el frontend.
+
+## ADR-012. Entrada estandarizada de actividades a la tubería
+
+Decisión implementada el 22/11/2026 para entregas y exámenes: núcleo común,
+transporte de consulta y recepción directa autenticada. La migración 013 añade
+fuentes, credenciales entrantes y operaciones duraderas.
+
+Los tres bloques —académico, deporte y planes sociales— utilizarán un mismo
+contrato de entrada al núcleo de Sync. Este contrato debe permitir integrar
+fuentes reales sin depender de las aplicaciones de demostración ni de sus
+formularios. El alcance son actividades con fecha o intervalo, con detalles y
+reglas específicos por tipo.
+
+El contrato conservará la identidad externa y la procedencia, categoría y tipo,
+título, fecha o intervalo, estado cuando corresponda, detalles autorizados e
+información de actualización o retirada. Se mantendrán las diferencias entre
+fecha sin hora, instante e intervalo y entre vencimiento y comienzo. La identidad
+seguirá distinguiendo propietario, conexión, colección e identificador externo.
+El propietario se obtiene del acceso comprobado; no se confía en uno indicado
+libremente en el contenido recibido.
+
+Cada adaptador traducirá y validará los datos de su fuente antes de entregarlos
+al contrato común. El núcleo compartirá control de identidad, deduplicación,
+persistencia, retiradas, seguimiento de ejecución y eventos. Los esquemas de
+detalles y los estados particulares seguirán definidos por tipo, conforme a
+ADR-009; recibir JSON no implica admitir datos arbitrarios sin validación.
+
+Se implementan dos modalidades que desembocan en el mismo núcleo: consulta de una
+fuente por un conector y envío directo de actividades normalizadas mediante una
+API autenticada. El contrato público define operaciones, credenciales, límites,
+idempotencia y correspondencia con las ejecuciones. Repetir un registro no
+debe duplicarlo; una retirada debe
+ser explícita y no deducirse de una respuesta incompleta. Los datos personales
+y las credenciales no se copiarán indiscriminadamente a eventos o registros.
+
+El trabajo se recoge en [US-22](backlog.md#us-22--estandarizar-la-entrada-de-actividades-a-sync).
+El contrato v1 está definido en [Entrada estandarizada](entrada-estandarizada.md):
+operaciones, contexto comprobado, campos, autenticación de fuente, idempotencia,
+límites y respuestas implementadas. Ambos transportes reutilizan las reservas,
+el worker, la identidad, las huellas, los contadores y los eventos existentes.
+Las nuevas rutas requieren aplicar la migración 013; su prueba real está
+documentada y pendiente de ejecución en el entorno local.
+
+## ADR-013. Documentación interactiva de la API
+
+Portal público de los cinco servicios implementado el 22/11/2026.
+
+Las API de los servicios dispondrán de especificaciones OpenAPI y una interfaz
+de documentación interactiva tipo Swagger UI. Permitirá consultar endpoints,
+parámetros, esquemas, ejemplos y respuestas y ejecutar peticiones autorizadas.
+La primera versión publica OpenAPI 3.0.4 con Swagger UI en `/api/docs`, mediante
+la integración oficial `@nestjs/swagger` 11, compatible con NestJS 11. Los
+archivos de la interfaz se sirven desde Sync, sin CDN. El documento de la
+entrada se define explícitamente y utiliza los tipos OpenAPI de la integración
+para conservar los contratos de operaciones y sus esquemas específicos.
+
+Swagger obtiene un CSRF actual antes de las escrituras de administración y usa
+la sesión del navegador. La recepción directa utiliza el Bearer de la fuente,
+sin cookies. No persiste la autorización al recargar ni permite ejecutar
+peticiones hacia otro origen. El selector reúne Cuentas, Sync, Automation, Monitoring y Academic; cada servicio
+genera su documento a partir de las rutas y los contratos explícitos de sus
+esquemas. Academic se identifica como origen externo y se prueba a través de
+`/academic`, limitado a sus colecciones públicas. La [guía de Swagger](swagger.md)
+detalla el alcance y las comprobaciones.
+
+La entrada estandarizada de ADR-012 tendrá prioridad en esa documentación. Se
+distinguirán las API de origen de las de Synkron y se podrá elegir el servicio
+que se desea consultar. La documentación pública excluirá las rutas internas;
+las pruebas desde la interfaz conservarán los permisos, sesiones y protección
+CSRF de los endpoints reales. Los ejemplos utilizarán valores ficticios.
+
+El trabajo se recoge en [US-23](backlog.md#us-23--consultar-y-probar-la-api-mediante-documentación-interactiva).
+La primera versión acompañará a la entrada estandarizada. El orden acordado
+prioriza después un recorrido funcional de deporte y posteriormente de planes
+sociales, conservando como pendientes las ampliaciones académicas. La
+[prioridad del backlog](backlog.md#prioridad-de-trabajo-acordada-el-22112026)
+detalla esta estrategia de cobertura de los tres bloques antes de profundizar
+en todas sus actividades.

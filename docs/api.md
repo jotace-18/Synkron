@@ -4,6 +4,15 @@ El panel se comunicará con Synkron mediante esta API. Las rutas empiezan por `/
 
 Los identificadores y direcciones de este documento son ficticios.
 
+## Swagger y documentos OpenAPI
+
+El portal `https://localhost:8443/api/docs` reúne los contratos públicos de
+Cuentas, Sync, Automation, Monitoring y Academic mediante un selector. Incluye
+parámetros, cuerpos, respuestas, errores y ejemplos de las 50 operaciones
+implementadas, con sus permisos reales. La [guía de Swagger](swagger.md) detalla
+el arranque, la autenticación y la descarga de cada documento. Las rutas internas
+quedan fuera de estos contratos y bloqueadas en el gateway.
+
 ## Estado del contrato
 
 Están disponibles las rutas de autenticación de la API, la creación, listado
@@ -26,6 +35,20 @@ y todavía no están implementadas.
 El destino inicial de una sincronización es la colección de actividades de Sync.
 Las tres fuentes se describen en [Servicios de origen](servicios-origen.md). Sus
 contratos de entrada son distintos de la representación común y de la vista.
+
+## Entrada estandarizada disponible
+
+Sync incorpora administración de fuentes en `/api/v1/ingestion-sources`, recepción
+Bearer en `POST /api/v1/ingestions` y resultados en `GET /api/v1/ingestions/{id}`.
+La administración requiere sesión y CSRF; cada fuente tiene una credencial de
+entrada propia, con pausa, rotación y revocación. El `202` confirma persistencia
+del trabajo, y `Idempotency-Key` permite reintentar sin crear otra ejecución.
+
+La [guía de entrada estandarizada](entrada-estandarizada.md) incluye contratos,
+límites, migración 013 y prueba completa. Swagger UI está disponible en
+`/api/docs` y el documento OpenAPI en `/api/docs/openapi.json`, a través del
+mismo gateway. El selector permite consultar también las API de los demás módulos; las rutas
+internas quedan excluidas.
 
 ## Servicio académico de origen
 

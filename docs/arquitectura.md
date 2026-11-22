@@ -44,6 +44,17 @@ Los instantes con hora se normalizan a UTC y se muestran en la zona del usuario.
 
 El calendario será una vista de consulta sobre la última información importada. Los formularios de demostración crean y modifican datos en los servicios de origen, mediante acceso autorizado; no escriben directamente en la colección central ni exponen sus credenciales al navegador. El motor no depende de los colores, etiquetas o composición visual del calendario.
 
+La entrada estandarizada de [ADR-012](decisiones.md#adr-012-entrada-estandarizada-de-actividades-a-la-tubería)
+admite lectura por conectores y recepción directa autenticada. Ambos transportes
+entregan instrucciones validadas al mismo núcleo de identidad, deduplicación,
+persistencia y eventos. El modo `pull` conserva los conectores actuales; el modo
+`push` utiliza una fuente privada con colección y tipos permitidos y una
+credencial entrante guardada solo como hash. El JSON recibido no elige cuenta
+ni conexión. La aceptación HTTP guarda operación, ejecución y trabajo en una
+transacción; el worker procesa la copia persistida sin consultar una URL externa.
+La [guía de entrada](entrada-estandarizada.md) describe migración, permisos,
+resultados y ejemplos. Deporte y planes registrarán sus esquemas al incorporarse.
+
 ```mermaid
 erDiagram
     CONNECTION ||--o{ SYNC_DEFINITION : source

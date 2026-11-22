@@ -1,3 +1,6 @@
+import type { StoredIngestionImporter } from '../src/ingestions/stored-ingestion.importer';
+import { ConnectorImportTransport } from '../src/imports/connector-import.transport';
+import { ActivityImportPipeline } from '../src/imports/activity-import.pipeline';
 import { randomUUID } from 'node:crypto';
 import { DatabaseService } from '../src/database/database.service';
 import { CredentialsService } from '../src/credentials/credentials.service';
@@ -63,17 +66,20 @@ describe('Exam execution integration', () => {
       deleted_at: null,
     };
     const importer = new AcademicExamsImportService(
-      db,
-      credentials,
+      new ConnectorImportTransport(
+        db,
+        credentials,
+        new ActivityImportPipeline(new ActivitiesService(db)),
+      ),
       {
         readAll: () => Promise.resolve([source]),
       } as unknown as AcademicExamsReaderService,
-      new ActivitiesService(db),
     );
     const runs = new RunsService(db),
       registry = new ConnectorRegistryService(
         {} as AcademicImportService,
         importer,
+        {} as StoredIngestionImporter,
       ),
       processor = new RunProcessorService(runs, registry);
     const execute = async () => {

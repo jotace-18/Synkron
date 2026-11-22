@@ -17,6 +17,31 @@ operaciones actuales de conexiones están probadas; esto no cierra el frontend,
 los demás servicios ni el hito. El alcance de entrada se detalla en
 [Servicios de origen](servicios-origen.md).
 
+## Prioridad de trabajo acordada el 22/11/2026
+
+Se prioriza disponer de un recorrido funcional en los tres bloques antes de
+completar todas las actividades de cada uno. Entregas y exámenes proporcionan
+el recorrido académico ya implementado y comprobado.
+
+1. Completar la entrada estandarizada de la tubería (US-22), con un contrato
+   acotado para actividades académicas, deportivas y sociales y recepción directa
+   autenticada. Mantener compatibles las integraciones actuales.
+2. Abordar el bloque de deporte: acordar una primera actividad representativa y
+   completar su recorrido desde una fuente editable hasta Sync, calendario,
+   detalle y seguimiento, utilizando la entrada común.
+3. Aplicar el mismo criterio a planes sociales para disponer de un recorrido
+   funcional en cada bloque.
+4. Retomar las sesiones de estudio/trabajo y los eventos académicos generales,
+   ampliar las actividades de deporte y planes y completar sus detalles.
+
+La documentación interactiva de la API queda registrada en US-23. Su primera
+versión acompaña al contrato estandarizado; el refinamiento del portal no
+debe retrasar el inicio del bloque de deporte.
+
+Este orden busca que, si el plazo obliga a recortar profundidad, los tres bloques
+tengan una integración funcional. Las actividades y requisitos aplazados siguen
+pendientes; esta priorización no supone dar por completado todo el Hito 2.
+
 ## US-01 — Registrarse e iniciar sesión
 
 Requisitos: RF-01; CU-01.
@@ -461,6 +486,66 @@ Tareas:
 - [ ] Implementar revisión periódica y entrega fiable de avisos a Monitoring.
 - [ ] Añadir configuración, bandeja y estado de lectura al frontend.
 - [ ] Comprobar repetición, modificaciones, retiradas y entregas completadas.
+
+## US-22 — Estandarizar la entrada de actividades a Sync
+
+Decisión: [ADR-012](decisiones.md#adr-012-entrada-estandarizada-de-actividades-a-la-tubería).
+Implementación de la entrada completada el 22/11/2026; despliegue de la migración
+y comprobación real del nuevo recorrido pendientes en el entorno local.
+
+Como integrador, quiero incorporar actividades académicas, deportivas y sociales
+mediante un contrato común para conectar fuentes reales sin depender de las
+aplicaciones de demostración.
+
+Criterios de aceptación:
+
+- Los adaptadores de los tres bloques entregan el mismo contrato al núcleo, con identidad externa, procedencia, tipo, título, información temporal, estado opcional y detalles validados por tipo.
+- Las fechas sin hora, instantes, intervalos y retiradas explícitas mantienen su significado.
+- La consulta mediante conectores y la recepción directa autenticada reutilizan identidad, deduplicación, persistencia, seguimiento y eventos.
+- El propietario se obtiene de la autenticación y los recursos de la fuente se comprueban para esa cuenta.
+- Repetir una entrada conserva la identidad central y evita cambios y efectos duplicados cuando el contenido no cambia.
+- Las integraciones existentes de entregas y exámenes conservan su comportamiento y sus datos.
+
+Tareas:
+
+- [x] Formalizar y documentar el contrato común, sus operaciones, validación, límites y política de compatibilidad en [Entrada estandarizada](entrada-estandarizada.md).
+- [x] Separar validaciones comunes y adaptadores específicos, eliminando el acoplamiento del validador de exámenes con el de entregas.
+- [x] Consolidar la entrada de los conectores existentes mediante ese contrato, separando el transporte de lectura del núcleo de validación y persistencia.
+- [ ] Registrar los esquemas de deporte y planes al incorporar sus actividades, reutilizando el contrato y núcleo comunes.
+- [x] Implementar la API autenticada de recepción directa, permisos por fuente, pausa/rotación/revocación, idempotencia y ejecuciones trazables.
+- [x] Documentar un script externo, ejemplos JSON y Swagger UI, independientes de Campus.
+- [x] Añadir pruebas de altas, actualizaciones, repeticiones, retiradas, errores, aislamiento y aceptación atómica; pasar la regresión unitaria.
+- [ ] Aplicar la migración 013 y ejecutar las nuevas pruebas PostgreSQL y el recorrido manual documentado.
+
+## US-23 — Consultar y probar la API mediante documentación interactiva
+
+Decisión: [ADR-013](decisiones.md#adr-013-documentación-interactiva-de-la-api).
+Portal de los cinco servicios implementado junto a US-22. Queda comprobar el
+selector y las peticiones reales tras reconstruir los contenedores.
+
+Como integrador, quiero consultar los endpoints, sus contratos y ejemplos y
+probar peticiones autorizadas desde una interfaz para conectar una fuente sin
+tener que deducir el funcionamiento de la API a partir de su código.
+
+Criterios de aceptación:
+
+- Los servicios generan documentos OpenAPI y una interfaz tipo Swagger UI permite consultar rutas, parámetros, cuerpos, respuestas y ejemplos.
+- La entrada estandarizada de US-22 queda documentada con un ejemplo de integración completo, incluidos autenticación, identidad y repetición de solicitudes.
+- Se puede seleccionar la documentación del servicio correspondiente; se distingue Academic como API de origen de las API de Synkron.
+- Las peticiones de prueba respetan los permisos y la autenticación reales, incluida la sesión y el token CSRF donde corresponda.
+- Las rutas internas no se incluyen en el portal público ni se habilitan a través del gateway para permitir pruebas desde él.
+- Las especificaciones se pueden descargar y no incluyen credenciales ni datos personales reales en los ejemplos.
+
+Tareas:
+
+- [x] Publicar el documento OpenAPI de entrada y Swagger UI con `@nestjs/swagger` 11 en Sync, sin CDN.
+- [x] Generar documentos públicos de Cuentas, Sync, Automation, Monitoring y Academic desde sus rutas y contratos explícitos.
+- [x] Documentar la entrada estandarizada y las consultas públicas básicas de Sync.
+- [x] Añadir esquemas de entrada/salida, campos opcionales, errores y ejemplos ficticios de esta integración.
+- [x] Incorporar selector de servicio y encaminamiento de sus documentos por el gateway, con Academic identificado como origen externo.
+- [x] Integrar Bearer de fuente y sesión con CSRF en Swagger UI; añadir pruebas de permisos.
+- [x] Comprobar cobertura de todas las rutas públicas, generación real con Swagger y referencias de esquemas mediante pruebas con dependencias simuladas.
+- [ ] Comprobar el selector, TLS y peticiones reales de cada servicio en el entorno de contenedores.
 
 ## Ampliaciones posteriores
 

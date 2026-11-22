@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "action": "upsert",
+  "external_id": "external-exam-001",
+  "source_updated_at": null,
+  "activity": {
+    "type": "academic.exam",
+    "title": "Examen desde una fuente externa",
+    "schedule": {
+      "kind": "date",
+      "role": "start",
+      "date": "2026-12-02",
+      "at": null,
+      "end_at": null
+    },
+    "status": "scheduled",
+    "details": {
+      "course_name": "Cloud Computing",
+      "course_abbreviation": "CC",
+      "topics": "Temas 1 y 2",
+      "section": "theory",
+      "weight_percent": null,
+      "weight_basis": null,
+      "grade": null
+    }
+  }
+}

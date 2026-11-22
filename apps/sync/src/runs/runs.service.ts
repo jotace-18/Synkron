@@ -176,11 +176,18 @@ export class RunsService {
          )
        )
        AND source_connection_id IS NOT NULL
-       AND EXISTS (
-         SELECT 1 FROM jsonb_to_recordset($3::jsonb)
-           AS supported(connector text, source_collection text)
-         WHERE supported.connector = sync.runs.connector
-           AND supported.source_collection = sync.runs.source_collection
+       AND (
+         EXISTS (
+           SELECT 1 FROM jsonb_to_recordset($3::jsonb)
+             AS supported(connector text, source_collection text)
+           WHERE supported.connector = sync.runs.connector
+             AND supported.source_collection = sync.runs.source_collection
+         ) OR (
+           connector = 'standard.ingestion' AND EXISTS (
+             SELECT 1 FROM sync.ingestions i
+             WHERE i.tenant_id = sync.runs.tenant_id AND i.run_id = sync.runs.id
+           )
+         )
        )
      RETURNING ${publicColumns},
                tenant_id, source_connection_id,
@@ -229,11 +236,18 @@ export class RunsService {
       `SELECT status, lease_expires_at,
               COALESCE(
                 source_connection_id IS NOT NULL
-                AND EXISTS (
-                  SELECT 1 FROM jsonb_to_recordset($3::jsonb)
-                    AS supported(connector text, source_collection text)
-                  WHERE supported.connector = sync.runs.connector
-                    AND supported.source_collection = sync.runs.source_collection
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM jsonb_to_recordset($3::jsonb)
+                      AS supported(connector text, source_collection text)
+                    WHERE supported.connector = sync.runs.connector
+                      AND supported.source_collection = sync.runs.source_collection
+                  ) OR (
+                    connector = 'standard.ingestion' AND EXISTS (
+                      SELECT 1 FROM sync.ingestions i
+                      WHERE i.tenant_id = sync.runs.tenant_id AND i.run_id = sync.runs.id
+                    )
+                  )
                 ),
                 false
               ) AS source_supported

@@ -1,3 +1,4 @@
+import type { StoredIngestionImporter } from '../ingestions/stored-ingestion.importer';
 import type { AcademicExamsImportService } from '../imports/academic-exams-import.service';
 import { BadRequestException } from '@nestjs/common';
 import type { AcademicImportService } from '../imports/academic-import.service';
@@ -8,6 +9,7 @@ describe('ConnectorRegistryService', () => {
   const registry = new ConnectorRegistryService(
     importer,
     importer as unknown as AcademicExamsImportService,
+    importer as unknown as StoredIngestionImporter,
   );
 
   it('selects the assignment importer from the captured connector and collection', () => {

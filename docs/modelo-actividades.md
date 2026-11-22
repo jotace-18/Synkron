@@ -301,12 +301,14 @@ catálogo. El worker selecciona el importador mediante `ConnectorRegistryService
 a partir del conector y la colección capturados en la ejecución, sin releer una
 definición que podría haber cambiado.
 
-`ActivityImportPipeline` comparte la comprobación de la conexión y credenciales,
-la lectura, la transformación completa antes de escribir, las altas y retiradas,
-los contadores y el control de cancelación. Cada importador aporta su lector y
-su transformación; la tubería verifica la conexión, colección y tipo resultantes
-antes de la primera escritura. Se conservan los controles de cuenta y de posesión
-de la ejecución durante las escrituras, los reintentos y las identidades existentes.
+`ConnectorImportTransport` comprueba la conexión y credenciales y realiza la
+lectura y transformación de origen. `ActivityImportPipeline` recibe operaciones
+normalizadas y un contexto comprobado, sin depender de ese transporte. Valida el
+conjunto completo antes de escribir: procedencia, identidad, campos comunes,
+horario y esquema de estado y detalles del tipo. Comparte las altas y retiradas,
+contadores y cancelación, y conserva los controles de cuenta y de posesión de la
+ejecución durante las escrituras. El [contrato de entrada](entrada-estandarizada.md)
+describe esta separación y la recepción directa que sigue pendiente.
 
 Están registrados `academic.assignments` y `academic.exams`. Ambos comparten el
 lector HTTP paginado, con límite de tamaño, comprobación de destino autorizado

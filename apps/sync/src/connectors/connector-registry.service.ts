@@ -1,3 +1,5 @@
+import { StoredIngestionImporter } from '../ingestions/stored-ingestion.importer';
+import { DIRECT_INGESTION_CONNECTOR } from './connector-catalog';
 import { AcademicExamsImportService } from '../imports/academic-exams-import.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AcademicImportService } from '../imports/academic-import.service';
@@ -23,6 +25,7 @@ export class ConnectorRegistryService {
   constructor(
     academic: AcademicImportService,
     exams: AcademicExamsImportService,
+    private readonly ingestion: StoredIngestionImporter,
   ) {
     this.importers = {
       'academic.assignments': academic,
@@ -31,6 +34,8 @@ export class ConnectorRegistryService {
   }
 
   get(name: string, sourceCollection: string): ConnectorImporter {
+    if (name === DIRECT_INGESTION_CONNECTOR && sourceCollection.trim())
+      return this.ingestion;
     const connector = getConnector(name);
     if (!connector || connector.source_collection !== sourceCollection) {
       throw new BadRequestException('Conector o colección no admitidos');

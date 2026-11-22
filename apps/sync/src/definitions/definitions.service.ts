@@ -22,7 +22,7 @@ export class DefinitionsService {
       `SELECT id, name, source_connection_id, connector, source_collection,
               enabled, created_at, updated_at
        FROM sync.definitions
-       WHERE tenant_id = $1
+       WHERE tenant_id = $1 AND source_mode = 'pull'
        ORDER BY created_at ASC, id ASC
        LIMIT $2 OFFSET $3`,
       [tenantId, query.limit, query.offset],
@@ -42,7 +42,7 @@ export class DefinitionsService {
          created_at,
          updated_at
        FROM sync.definitions
-       WHERE tenant_id = $1 AND id = $2`,
+       WHERE tenant_id = $1 AND id = $2 AND source_mode = 'pull'`,
       [tenantId, definitionId],
     );
 
@@ -73,7 +73,7 @@ export class DefinitionsService {
           `SELECT id, enabled, auth_type,
                   credentials_encrypted IS NOT NULL AS has_credentials
            FROM sync.connections
-           WHERE tenant_id = $1 AND id = $2
+           WHERE tenant_id = $1 AND id = $2 AND input_mode = 'pull'
            FOR SHARE`,
           [tenantId, input.source_connection_id],
         );

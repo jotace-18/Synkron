@@ -1,3 +1,4 @@
+import type { StoredIngestionImporter } from '../ingestions/stored-ingestion.importer';
 import type { AcademicExamsImportService } from '../imports/academic-exams-import.service';
 import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import type { AcademicImportService } from '../imports/academic-import.service';
@@ -94,6 +95,7 @@ describe('RunProcessorService', () => {
           run: importRun,
         } as unknown as AcademicImportService,
         { run: importRun } as unknown as AcademicExamsImportService,
+        { run: importRun } as unknown as StoredIngestionImporter,
       ),
     );
   });

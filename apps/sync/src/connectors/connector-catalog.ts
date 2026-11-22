@@ -44,3 +44,7 @@ export const CONNECTOR_SOURCES_JSON = JSON.stringify(
     source_collection: CONNECTOR_CATALOG[connector].source_collection,
   })),
 );
+
+export const DIRECT_INGESTION_CONNECTOR = 'standard.ingestion' as const;
+export type RunConnectorName =
+  ConnectorName | typeof DIRECT_INGESTION_CONNECTOR;

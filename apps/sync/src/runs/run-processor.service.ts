@@ -72,6 +72,9 @@ export class RunProcessorService {
       throw leaseFailure.error;
     }
 
+    if (importFailure?.error instanceof RunLeaseLostError)
+      throw importFailure.error;
+
     if (importFailure) {
       await this.runs.fail(
         run.tenant_id,

@@ -1,6 +1,6 @@
-import { isCalendarDate, isTimestamp } from './academic-source-dates';
+import { isCalendarDate, isTimestamp } from './date-validators';
 
-describe('Academic source dates', () => {
+describe('Date validators', () => {
   describe('isCalendarDate', () => {
     it.each(['2026-11-24', '2024-02-29', '2000-02-29', '0099-01-01'])(
       'accepts the real calendar day %s without inventing a time',

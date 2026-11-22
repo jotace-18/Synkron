@@ -40,7 +40,7 @@ export class ConnectionsService {
               credentials_encrypted IS NOT NULL AS has_credentials,
               enabled, created_at, updated_at
        FROM sync.connections
-       WHERE tenant_id = $1
+       WHERE tenant_id = $1 AND input_mode = 'pull'
        ORDER BY created_at DESC, id DESC
        LIMIT $2 OFFSET $3`,
       [tenantId, limit, offset],
@@ -61,7 +61,7 @@ export class ConnectionsService {
     }>(
       `SELECT id, base_url, auth_type, credentials_encrypted
        FROM sync.connections
-       WHERE tenant_id = $1 AND id = $2`,
+       WHERE tenant_id = $1 AND id = $2 AND input_mode = 'pull'`,
       [tenantId, connectionId],
     );
 

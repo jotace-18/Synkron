@@ -1,7 +1,4 @@
-import type {
-  ConnectorName,
-  ConnectorSourceCollection,
-} from '../connectors/connector-catalog';
+import type { RunConnectorName } from '../connectors/connector-catalog';
 import type { SyncRunErrorCode } from './sync-run-error';
 
 export type SyncRunStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -27,8 +24,8 @@ export interface ClaimedSyncRun extends SyncRun {
   status: 'running';
   tenant_id: string;
   source_connection_id: string;
-  connector: ConnectorName;
-  source_collection: ConnectorSourceCollection;
+  connector: RunConnectorName;
+  source_collection: string;
   claim_token: string;
   lease_expires_at: Date;
 }

@@ -1,3 +1,5 @@
+import { ConnectorImportTransport } from '../src/imports/connector-import.transport';
+import { ActivityImportPipeline } from '../src/imports/activity-import.pipeline';
 import { randomUUID } from 'node:crypto';
 import {
   BadGatewayException,
@@ -51,6 +53,8 @@ describe('Academic import (PostgreSQL integration, simulated source HTTP)', () =
         AcademicReaderService,
         ActivitiesService,
         AcademicImportService,
+        ActivityImportPipeline,
+        ConnectorImportTransport,
       ],
     }).compile();
     await module.init();

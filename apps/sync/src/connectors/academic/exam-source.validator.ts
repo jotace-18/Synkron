@@ -1,30 +1,31 @@
+import {
+  EXAM_SECTIONS,
+  EXAM_STATUSES,
+} from '../../activities/academic/academic-details.rules';
 import { BadGatewayException } from '@nestjs/common';
-import { parseAcademicAssignment } from './assignment-source.validator';
 import type { AcademicExamSource } from './exam-source.types';
+import { hasAcademicSourceFields } from './academic-source-fields';
+import { isOneOf, isRecord, isText } from '../../validation/value-validators';
+import { isCalendarDate, isTimestamp } from '../../validation/date-validators';
+
+function isAcademicExam(value: unknown): value is AcademicExamSource {
+  if (!isRecord(value)) return false;
+
+  return (
+    hasAcademicSourceFields(value) &&
+    isOneOf(value.section, EXAM_SECTIONS) &&
+    isOneOf(value.status, EXAM_STATUSES) &&
+    (value.topics === null || isText(value.topics, 1000)) &&
+    (value.exam_date === null
+      ? isTimestamp(value.exam_at)
+      : isCalendarDate(value.exam_date) && value.exam_at === null)
+  );
+}
 
 export function parseAcademicExam(value: unknown): AcademicExamSource {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
+  if (!isAcademicExam(value)) {
     throw new BadGatewayException('Academic devolvió un examen inválido');
-  const item = value as Record<string, unknown>;
-  if (
-    !['scheduled', 'completed', 'cancelled'].includes(String(item.status)) ||
-    !['theory', 'practice'].includes(String(item.section)) ||
-    !(
-      item.topics === null ||
-      (typeof item.topics === 'string' &&
-        item.topics.trim().length > 0 &&
-        [...item.topics].length <= 1000)
-    )
-  )
-    throw new BadGatewayException('Academic devolvió un examen inválido');
-  parseAcademicAssignment({
-    ...item,
-    due_date: item.exam_date,
-    due_at: item.exam_at,
-    status: 'pending',
-    mandatory: false,
-    work_mode: 'individual',
-    group_members: [],
-  });
-  return value as AcademicExamSource;
+  }
+
+  return value;
 }

@@ -4,6 +4,13 @@ Synkron conecta servicios de la vida personal y reúne sus actividades en un esp
 
 Es un proyecto en desarrollo. Ya funcionan las entregas y los exámenes académicos desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La ampliación a las demás fuentes sigue pendiente.
 
+Sync también admite [entrada estandarizada](docs/entrada-estandarizada.md) desde
+fuentes externas: credenciales por fuente, envío JSON idempotente y procesamiento
+mediante el mismo worker. [Swagger UI](docs/swagger.md) está en `/api/docs`, con selector para Cuentas, Sync,
+Automation, Monitoring y Academic; hay un
+[ejemplo con Node](examples/ingestions/README.md) independiente de Campus. Esta
+ampliación requiere la migración 013 y su comprobación real en el entorno local.
+
 ## Qué permitirá hacer
 
 - Conectar fuentes académicas, deportivas y de planes sociales y elegir qué actividades incorporar.

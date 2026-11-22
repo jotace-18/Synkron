@@ -1,11 +1,16 @@
 # Entrada HTTPS local
 
 Caddy recibe las peticiones en `https://localhost:8443`. Comparte la red de los
-servicios y conserva las rutas al reenviarlas:
+servicios y encamina sus API públicas:
 
 | Ruta | Destino |
 | --- | --- |
 | `/api/v1/auth` y sus subrutas | API de cuentas, puerto interno 3000. |
+| `/api/v1/automation` y sus subrutas | Automation, puerto interno 3000. |
+| `/api/v1/monitoring`, `/api/v1/notifications` y sus subrutas | Monitoring, puerto interno 3000. |
+| `/api/docs/{accounts,automation,monitoring,academic}/openapi.json` | Documento del servicio indicado; se reescribe a `/api/docs/openapi.json`. |
+| `/academic/api/v1/assignments`, `/academic/api/v1/exams` y sus subrutas | Academic; se elimina el prefijo `/academic`. |
+| Resto de `/academic` y sus subrutas | Respuesta pública `404`. |
 | Resto de `/api` y sus subrutas | Sync, puerto interno 3000. |
 | `/internal` y sus subrutas | Respuesta pública `404`. |
 | Resto | Frontend Nginx, puerto interno 8080. |
@@ -52,3 +57,20 @@ Los puertos HTTP locales de los backends y del frontend se mantienen para
 comprobaciones directas. El navegador utilizará la entrada HTTPS común para las
 funciones con sesión. La configuración de dominio y certificados públicos se
 adaptará al entorno de despliegue; Terraform podrá preparar esa infraestructura.
+
+## Portal de documentación
+
+`/api/docs` sirve Swagger UI desde Sync. Las rutas exactas
+`/api/docs/{accounts,automation,monitoring,academic}/openapi.json` se encaminan al
+documento público de cada backend. `/api/docs/openapi.json` conserva el documento
+de Sync. La [guía del portal](../../docs/swagger.md) explica su arranque.
+
+El gateway permite probar Academic bajo `/academic/api/v1/assignments` y
+`/academic/api/v1/exams`, incluidas sus subrutas públicas, eliminando `/academic`
+al reenviar. El resto de `/academic/*` devuelve 404. No se publica una ruta
+genérica hacia sus endpoints internos. Después de modificar el Caddyfile con el
+gateway ya arrancado, recarga su configuración:
+
+```bash
+docker compose exec gateway caddy reload --config /etc/caddy/Caddyfile
+```
