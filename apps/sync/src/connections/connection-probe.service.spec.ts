@@ -3,14 +3,14 @@ import { ConnectionProbeService } from './connection-probe.service';
 import { ConnectionTargetPolicyService } from './connection-target-policy.service';
 
 describe('ConnectionProbeService', () => {
-  const address = 'http://task-api:3000/tasks';
+  const address = 'http://source.test:3000/tasks';
   let previousOrigins: string | undefined;
   let fetchMock: jest.SpiedFunction<typeof fetch>;
   let service: ConnectionProbeService;
 
   beforeEach(() => {
     previousOrigins = process.env.SYNC_ALLOWED_CONNECTION_ORIGINS;
-    process.env.SYNC_ALLOWED_CONNECTION_ORIGINS = 'http://task-api:3000';
+    process.env.SYNC_ALLOWED_CONNECTION_ORIGINS = 'http://source.test:3000';
     fetchMock = jest.spyOn(globalThis, 'fetch');
     fetchMock.mockRejectedValue(new Error('Unexpected request'));
     service = new ConnectionProbeService(new ConnectionTargetPolicyService());

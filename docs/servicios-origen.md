@@ -17,7 +17,7 @@ módulos propios. No son los componentes internos Sync, Automation y Monitoring.
 Cada fuente mantiene sus datos y persistencia, permite introducir y modificar
 registros y ofrece una API de acceso autorizado. Synkron no lee sus bases de datos.
 
-La API estática `fixtures/task-api` permite comprobar conexiones. El backend
+El backend
 `apps/academic` implementa las colecciones editables de entregas y exámenes, con PostgreSQL,
 autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
 describen las rutas disponibles. Los demás recursos académicos siguen pendientes. La fuente Otros dispone ya

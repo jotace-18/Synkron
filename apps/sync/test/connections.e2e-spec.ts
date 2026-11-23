@@ -147,7 +147,7 @@ describe('ConnectionsService (integration)', () => {
     try {
       const created = await connections.createWithoutAuth(owner, {
         name: 'Private connection',
-        base_url: 'http://task-api:3000/tasks',
+        base_url: 'http://source.test:3000/tasks',
       });
 
       for (const id of [created.id, randomUUID()]) {

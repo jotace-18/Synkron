@@ -19,7 +19,7 @@ describe('ConnectionsService', () => {
   const connectionId = '22222222-2222-4222-8222-222222222222';
   const storedConnection = {
     id: connectionId,
-    base_url: 'http://task-api:3000/tasks',
+    base_url: 'http://source.test:3000/tasks',
     auth_type: 'none',
     credentials_encrypted: null,
   };

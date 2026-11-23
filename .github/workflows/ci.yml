@@ -552,28 +552,6 @@ jobs:
       - name: Ejecutar pruebas de Otros
         run: npm test
 
-  task-api:
-    name: Comprobar API de tareas simulada
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Descargar el código
-        uses: actions/checkout@v4
-
-      - name: Preparar Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-
-      - name: Comprobar sintaxis
-        run: |
-          node --check fixtures/task-api/src/server.js
-          node --check fixtures/task-api/test/server.test.js
-
-      - name: Ejecutar pruebas HTTP
-        run: npm --prefix fixtures/task-api test
-
   gateway:
     name: Validar entrada HTTPS
     runs-on: ubuntu-latest
@@ -602,7 +580,6 @@ jobs:
         academic-web,
         sport-web,
         personal-web,
-        task-api,
         web,
         gateway,
         supporting-services,
@@ -624,8 +601,6 @@ jobs:
             context: apps/sport
           - service: personal
             context: apps/personal
-          - service: task-api
-            context: fixtures/task-api
           - service: web
             context: apps/web
           - service: academic-web

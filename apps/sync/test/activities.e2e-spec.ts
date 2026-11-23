@@ -54,7 +54,7 @@ describe('Activities table (integration)', () => {
   async function createConnection(tenantId: string): Promise<string> {
     const result = await database.query<{ id: string }>(
       `INSERT INTO sync.connections (tenant_id, name, base_url, auth_type)
-       VALUES ($1, 'Activities test', 'http://task-api:3000/tasks', 'none')
+       VALUES ($1, 'Activities test', 'http://source.test:3000/tasks', 'none')
        RETURNING id`,
       [tenantId],
     );
