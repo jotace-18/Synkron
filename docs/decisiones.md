@@ -194,7 +194,7 @@ para conservar los contratos de operaciones y sus esquemas específicos.
 Swagger obtiene un CSRF actual antes de las escrituras de administración y usa
 la sesión del navegador. La recepción directa utiliza el Bearer de la fuente,
 sin cookies. No persiste la autorización al recargar ni permite ejecutar
-peticiones hacia otro origen. El selector reúne Cuentas, Sync, Automation, Monitoring y Academic; cada servicio
+peticiones hacia otro origen. El selector reúne Cuentas, Sync, Automation, Monitoring, Academic y Sport; cada servicio
 genera su documento a partir de las rutas y los contratos explícitos de sus
 esquemas. Academic se identifica como origen externo y se prueba a través de
 `/academic`, limitado a sus colecciones públicas. La [guía de Swagger](swagger.md)

@@ -8,9 +8,11 @@ servicios y encamina sus API públicas:
 | `/api/v1/auth` y sus subrutas | API de cuentas, puerto interno 3000. |
 | `/api/v1/automation` y sus subrutas | Automation, puerto interno 3000. |
 | `/api/v1/monitoring`, `/api/v1/notifications` y sus subrutas | Monitoring, puerto interno 3000. |
-| `/api/docs/{accounts,automation,monitoring,academic}/openapi.json` | Documento del servicio indicado; se reescribe a `/api/docs/openapi.json`. |
+| `/api/docs/{accounts,automation,monitoring,academic,sport}/openapi.json` | Documento del servicio indicado; se reescribe a `/api/docs/openapi.json`. |
 | `/academic/api/v1/assignments`, `/academic/api/v1/exams` y sus subrutas | Academic; se elimina el prefijo `/academic`. |
 | Resto de `/academic` y sus subrutas | Respuesta pública `404`. |
+| `/sport/api/v1/gym-sessions` y sus subrutas | Sport; se elimina el prefijo `/sport`. |
+| Resto de `/sport` y sus subrutas | Respuesta pública `404`. |
 | Resto de `/api` y sus subrutas | Sync, puerto interno 3000. |
 | `/internal` y sus subrutas | Respuesta pública `404`. |
 | Resto | Frontend Nginx, puerto interno 8080. |
@@ -61,7 +63,7 @@ adaptará al entorno de despliegue; Terraform podrá preparar esa infraestructur
 ## Portal de documentación
 
 `/api/docs` sirve Swagger UI desde Sync. Las rutas exactas
-`/api/docs/{accounts,automation,monitoring,academic}/openapi.json` se encaminan al
+`/api/docs/{accounts,automation,monitoring,academic,sport}/openapi.json` se encaminan al
 documento público de cada backend. `/api/docs/openapi.json` conserva el documento
 de Sync. La [guía del portal](../../docs/swagger.md) explica su arranque.
 
@@ -74,3 +76,8 @@ gateway ya arrancado, recarga su configuración:
 ```bash
 docker compose exec gateway caddy reload --config /etc/caddy/Caddyfile
 ```
+
+La fuente deportiva publica su documento en `/api/docs/sport/openapi.json` y sus
+operaciones de gimnasio bajo `/sport/api/v1/gym-sessions` y subrutas. Caddy elimina
+`/sport` al reenviar; las demás rutas de ese prefijo devuelven 404. Sport utiliza
+su propio Bearer y se levanta explícitamente para consultar su documento.

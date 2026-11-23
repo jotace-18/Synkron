@@ -7,8 +7,8 @@ Los identificadores y direcciones de este documento son ficticios.
 ## Swagger y documentos OpenAPI
 
 El portal `https://localhost:8443/api/docs` reúne los contratos públicos de
-Cuentas, Sync, Automation, Monitoring y Academic mediante un selector. Incluye
-parámetros, cuerpos, respuestas, errores y ejemplos de las 50 operaciones
+Cuentas, Sync, Automation, Monitoring, Academic y Sport mediante un selector. Incluye
+parámetros, cuerpos, respuestas, errores y ejemplos de las 56 operaciones
 implementadas, con sus permisos reales. La [guía de Swagger](swagger.md) detalla
 el arranque, la autenticación y la descarga de cada documento. Las rutas internas
 quedan fuera de estos contratos y bloqueadas en el gateway.

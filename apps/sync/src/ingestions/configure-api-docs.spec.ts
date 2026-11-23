@@ -113,7 +113,7 @@ describe('Swagger browser authentication', () => {
     ).rejects.toThrow('CSRF válido');
   });
 
-  it('protects writes in every Synkron module and keeps Academic authentication separate', async () => {
+  it('protects writes in every Synkron module and keeps external source authentication separate', async () => {
     const fetchCsrf = jest.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ csrf_token: 'current-csrf' }),
@@ -135,14 +135,16 @@ describe('Swagger browser authentication', () => {
       ).toBe('current-csrf');
     }
     expect(fetchCsrf).toHaveBeenCalledTimes(7);
-    const academic = await intercept({
-      url: '/academic/api/v1/exams',
-      method: 'POST',
-      headers: { Authorization: 'Bearer academic-test-only' },
-    });
-    expect(academic.credentials).toBe('omit');
-    expect(academic.headers.Authorization).toBe('Bearer academic-test-only');
-    expect(academic.headers['X-CSRF-Token']).toBeUndefined();
+    for (const source of ['academic', 'sport']) {
+      const external = await intercept({
+        url: `/${source}/api/v1/${source === 'sport' ? 'gym-sessions' : 'exams'}`,
+        method: 'POST',
+        headers: { Authorization: 'Bearer source-test-only' },
+      });
+      expect(external.credentials).toBe('omit');
+      expect(external.headers.Authorization).toBe('Bearer source-test-only');
+      expect(external.headers['X-CSRF-Token']).toBeUndefined();
+    }
     expect(fetchCsrf).toHaveBeenCalledTimes(7);
   });
 });

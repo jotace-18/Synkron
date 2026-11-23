@@ -20,8 +20,10 @@ registros y ofrece una API de acceso autorizado. Synkron no lee sus bases de dat
 La API estática `fixtures/task-api` permite comprobar conexiones. El backend
 `apps/academic` implementa las colecciones editables de entregas y exámenes, con PostgreSQL,
 autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
-describen las rutas disponibles. Los demás recursos académicos, las fuentes de
-deporte y planes sociales siguen pendientes. Campus permite introducir y editar entregas y exámenes.
+describen las rutas disponibles. Los demás recursos académicos y la fuente de
+planes sociales siguen pendientes. `apps/sport` incorpora la API de gimnasio con
+PostgreSQL y credenciales propias; su interfaz y publicación en Sync están
+pendientes. Campus permite introducir y editar entregas y exámenes.
 
 ## Fuente académica
 
@@ -133,16 +135,38 @@ disciplina ni fija todavía un esquema de tablas o almacenamiento.
 
 | Actividad | Datos acordados |
 |---|---|
-| Gimnasio | Título, fecha, hora, tipo de entrenamiento —push, pull, legs, upper, lower, etc.—, solo/acompañado, nombres opcionales y sensaciones opcionales. |
+| Gimnasio | Fecha, hora, duración en minutos, modalidad push/pull/leg/upper/lower/otros y solo/acompañado. Título automático y estados programado/realizado/cancelado. |
 | Fútbol | Modalidad sala/7/11, posición, goles, asistencias, ubicación y distancia recorrida opcional. |
 | Senderismo | Nombre de ruta, acompañantes opcionales, distancia, desnivel positivo acumulado y ubicación. |
 | Carrera | Distancia y tiempo empleado. |
 | Otros deportes | Registro básico y flexible para actividades poco frecuentes. |
 
-Deporte y tipo de entrenamiento son datos distintos: gimnasio identifica el
-deporte y `legs` describe la sesión. Ir acompañado sin facilitar nombres es
-distinto de entrenar solo. Las sensaciones pueden registrarse opcionalmente;
-no se ha acordado una escala numérica.
+### Primera actividad: gimnasio
+
+Alcance acordado el 23/11/2026 para `sport.gym`:
+
+- Fecha y hora de inicio obligatorias, introducidas en horario de Madrid.
+- Duración obligatoria, expresada en minutos enteros positivos.
+- Modalidad seleccionable: push, pull, leg, upper, lower u otros.
+- Selección explícita de solo o acompañado; no se solicitan nombres.
+- Estado programado, realizado o cancelado (`scheduled`, `completed`, `cancelled`).
+  Permite registrar tanto sesiones futuras como entrenamientos ya realizados.
+- Título generado a partir de la modalidad, por ejemplo «Gimnasio · Push».
+
+La fuente guarda la duración y calcula el final a partir del inicio. Sync recibe
+un intervalo de comienzo, con sus instantes normalizados a UTC. El cambio de
+fecha, duración, modalidad, compañía o estado actualiza la misma sesión. El
+estado se modifica explícitamente, sin deducirlo del paso del tiempo.
+
+Cancelar conserva la sesión visible como cancelada. Retirar comunica una baja
+explícita y conserva su identidad para la sincronización. Los nombres de
+acompañantes, sensaciones, ejercicios, series, pesos y repeticiones no forman
+parte de este primer recorrido. La propuesta anterior de nombres y sensaciones
+queda aplazada respecto al alcance simplificado acordado.
+
+El [plan de gimnasio](deporte.md) recoge los subpuntos de implementación. El
+backend de la fuente está implementado; la interfaz y la habilitación de su
+esquema en Sync siguen pendientes.
 
 El desnivel de senderismo es el positivo acumulado, medido en metros ascendidos,
 no la diferencia de altura entre inicio y final ni el descenso acumulado.
@@ -154,8 +178,8 @@ Hevy se contempla como integración futura del proyecto personal. No se utiliza
 su API ni se añaden ahora ejercicios, series, pesos o repeticiones al alcance.
 La referencia a Strava describe el tipo de información de carrera, sin requerir
 un conector actual. Registrar actividades frecuentes no supone todavía patrones
-de repetición automática. Se debe cerrar si el deporte registra solo sesiones
-realizadas o también permite planificar sesiones futuras.
+de repetición automática. Para gimnasio ya se admite planificar sesiones futuras;
+el alcance concreto de las demás disciplinas se cerrará al incorporarlas.
 
 ## Fuente de planes sociales
 
@@ -215,7 +239,8 @@ mediante la API de Synkron, sin necesitar contactar con cada fuente al abrirlo.
   funcional ya descrito.
 - Escala de notas y base de ponderaciones; guardar o no fecha de publicación e
   historial de correcciones.
-- Unidades de distancia, definición de duración y planificación de deporte.
+- Unidades de distancia, duración y planificación de las disciplinas deportivas
+  restantes; gimnasio ya utiliza minutos y admite sesiones futuras y realizadas.
 - Descripción y cancelación en planes sociales.
 - Identidades entre colecciones, relaciones y mapeos al modelo central; política
   si varias configuraciones importan el mismo recurso.

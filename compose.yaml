@@ -177,6 +177,58 @@ services:
       retries: 10
       start_period: 10s
 
+  sport:
+    build:
+      context: ./apps/sport
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3104:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - default
+      - sport-data
+    environment:
+      PGHOST: sport-db
+      PGPORT: "5432"
+      PGDATABASE: ${SPORT_DB_NAME:?Falta SPORT_DB_NAME}
+      PGUSER: ${SPORT_DB_USER:?Falta SPORT_DB_USER}
+      PGPASSWORD: ${SPORT_DB_PASSWORD:?Falta SPORT_DB_PASSWORD}
+    depends_on:
+      sport-db:
+        condition: service_healthy
+
+  sport-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${SPORT_DB_NAME:?Falta SPORT_DB_NAME}
+      POSTGRES_USER: ${SPORT_DB_ADMIN_USER:?Falta SPORT_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${SPORT_DB_ADMIN_PASSWORD:?Falta SPORT_DB_ADMIN_PASSWORD}
+      SPORT_DB_USER: ${SPORT_DB_USER:?Falta SPORT_DB_USER}
+      SPORT_DB_PASSWORD: ${SPORT_DB_PASSWORD:?Falta SPORT_DB_PASSWORD}
+    volumes:
+      - sport-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/sport/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - sport-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   rabbitmq:
     image: rabbitmq:4.3.7-management
     hostname: rabbitmq
@@ -645,6 +697,7 @@ volumes:
   sync-db-data:
   api-db-data:
   academic-db-data:
+  sport-db-data:
   rabbitmq-data:
   gateway-data:
   gateway-config:
@@ -658,6 +711,8 @@ networks:
   api-data:
     internal: true
   academic-data:
+    internal: true
+  sport-data:
     internal: true
   monitoring-data:
     internal: true

@@ -13,9 +13,10 @@ consultas y respuestas. El gateway reúne los documentos sin mezclar sus API.
 | Sync | Conexiones y prueba, definiciones, ejecuciones, actividades, fuentes y recepción directa | Sesión para gestión y consulta; `IngestionToken` solo para enviar y consultar entradas. |
 | Automation | Programaciones, reglas, ajustes de recordatorios e historial | Sesión y CSRF automático en escrituras. |
 | Monitoring | Resumen, resultados, cambios y bandeja de avisos | Sesión; CSRF automático al marcar un aviso como leído. |
+| Deporte · fuente externa | Sesiones de gimnasio: creación, consulta, exportación, edición parcial y retirada | `SportBearer`, credencial propia de la fuente deportiva. |
 | Academic · fuente externa | Entregas y exámenes: creación, consulta, exportación, edición parcial y retirada | `AcademicBearer`, distinto de la sesión de Synkron y de `IngestionToken`. |
 
-Las rutas de usuario existentes suman 50 operaciones HTTP. No se incluyen rutas
+Las rutas de usuario existentes suman 56 operaciones HTTP. No se incluyen rutas
 internas de autenticación entre servicios, ejecución de acciones ni creación
 interna de avisos. Tampoco se presenta la ruta raíz de salud como una operación
 de negocio ni se añaden operaciones CRUD que no existan en los controladores.
@@ -40,6 +41,7 @@ no convierte la API de otro servicio en un sustituto.
 | Automation | `/api/docs/automation/openapi.json` |
 | Monitoring | `/api/docs/monitoring/openapi.json` |
 | Academic | `/api/docs/academic/openapi.json` |
+| Deporte | `/api/docs/sport/openapi.json` |
 
 Cada backend sirve su JSON en `/api/docs/openapi.json`; el gateway encamina las
 rutas de la tabla al servicio correspondiente. Swagger y sus recursos estáticos
@@ -59,7 +61,7 @@ redirecciones con credenciales.
 Desde la raíz del repositorio, con las migraciones de los servicios ya aplicadas:
 
 ```bash
-docker compose up -d --build api sync automation monitoring academic
+docker compose up -d --build api sync automation monitoring academic sport
 docker compose up -d gateway
 docker compose exec gateway caddy reload --config /etc/caddy/Caddyfile
 ```
@@ -68,7 +70,7 @@ Compose levanta las bases y demás dependencias declaradas. Los workers,
 publicadores y consumidores se necesitan para ejecutar los recorridos
 asíncronos, pero no para consultar los documentos.
 
-1. Abre el portal y cambia entre los cinco servicios. Cada uno debe mostrar sus
+1. Abre el portal y cambia entre los seis servicios. Cada uno debe mostrar sus
    propios grupos y un contrato descargable.
 2. En Cuentas, consulta la sesión o inicia sesión con una cuenta de prueba.
 3. En Sync, prueba una consulta de actividades o conexiones. Para una
@@ -106,3 +108,7 @@ siguen siendo la validación efectiva de las peticiones.
 La compilación y las pruebas locales no sustituyen la comprobación de gateway,
 TLS, selector y peticiones reales en el navegador. Ese recorrido se realiza en
 el entorno de contenedores siguiendo los pasos anteriores.
+
+El backend deportivo requiere su bloque `SPORT_*`, migraciones y cuenta propia.
+Consulta la [guía de Sport](deporte.md#arranque-del-backend). Su incorporación al selector
+no implica que `sport.gym` ya esté habilitado en la recepción estandarizada.

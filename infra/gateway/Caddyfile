@@ -25,6 +25,23 @@ https://localhost:8443 {
             reverse_proxy monitoring:3000
         }
 
+        @sportDocs path /api/docs/sport/openapi.json
+        handle @sportDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy sport:3000
+        }
+
+        @sportApi path /sport/api/v1/gym-sessions /sport/api/v1/gym-sessions/*
+        handle @sportApi {
+            uri strip_prefix /sport
+            reverse_proxy sport:3000
+        }
+
+        @sportPrivate path /sport /sport/*
+        handle @sportPrivate {
+            respond "Not found" 404
+        }
+
         @academicDocs path /api/docs/academic/openapi.json
         handle @academicDocs {
             rewrite * /api/docs/openapi.json

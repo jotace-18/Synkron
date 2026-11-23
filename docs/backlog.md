@@ -26,9 +26,9 @@ el recorrido académico ya implementado y comprobado.
 1. Completar la entrada estandarizada de la tubería (US-22), con un contrato
    acotado para actividades académicas, deportivas y sociales y recepción directa
    autenticada. Mantener compatibles las integraciones actuales.
-2. Abordar el bloque de deporte: acordar una primera actividad representativa y
-   completar su recorrido desde una fuente editable hasta Sync, calendario,
-   detalle y seguimiento, utilizando la entrada común.
+2. Abordar el bloque de deporte con gimnasio como primera actividad, conforme
+   a [US-24](#us-24--incorporar-el-primer-recorrido-deportivo-de-gimnasio) y su
+   [plan](deporte.md): fuente editable, entrada común, calendario y seguimiento.
 3. Aplicar el mismo criterio a planes sociales para disponer de un recorrido
    funcional en cada bloque.
 4. Retomar las sesiones de estudio/trabajo y los eventos académicos generales,
@@ -546,6 +546,33 @@ Tareas:
 - [x] Integrar Bearer de fuente y sesión con CSRF en Swagger UI; añadir pruebas de permisos.
 - [x] Comprobar cobertura de todas las rutas públicas, generación real con Swagger y referencias de esquemas mediante pruebas con dependencias simuladas.
 - [ ] Comprobar el selector, TLS y peticiones reales de cada servicio en el entorno de contenedores.
+
+## US-24 — Incorporar el primer recorrido deportivo de gimnasio
+
+Contrato de producto acordado el 23/11/2026. Backend implementado y ciclo de
+vida validado manualmente; interfaz e integración pendientes.
+[Plan de trabajo](deporte.md).
+
+Como usuario, quiero registrar sesiones de gimnasio y verlas en mi agenda de
+Synkron para organizar entrenamientos junto a mis compromisos académicos.
+
+Criterios de aceptación:
+
+- Se conservan fecha, hora, duración en minutos, modalidad y solo/acompañado.
+- Las modalidades son push, pull, leg, upper, lower y otros; el título es automático.
+- Los estados son programado, realizado y cancelado, admitiendo sesiones futuras y pasadas.
+- El origen mantiene los IDs al editar y diferencia cancelar de retirar.
+- `sport.gym` entra por la API común autenticada como intervalo de comienzo.
+- Calendario, detalle y seguimiento reutilizan la colección y eventos existentes.
+
+Tareas:
+
+- [x] Acordar los datos, estados, título y semántica temporal del primer recorrido.
+- [x] Implementar persistencia y API autorizada de la fuente deportiva, con Swagger, Compose y CI; ciclo de vida validado manualmente el 23/11/2026.
+- [ ] Añadir una interfaz básica para introducir y mantener sesiones.
+- [ ] Habilitar el esquema de gimnasio y conectar la recepción estandarizada.
+- [ ] Adaptar calendario, filtros, detalle y documentación Swagger.
+- [ ] Comprobar el ciclo de vida, deduplicación y separación entre cuentas, y documentar el arranque.
 
 ## Ampliaciones posteriores
 

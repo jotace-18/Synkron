@@ -7,7 +7,7 @@ Es un proyecto en desarrollo. Ya funcionan las entregas y los exámenes académi
 Sync también admite [entrada estandarizada](docs/entrada-estandarizada.md) desde
 fuentes externas: credenciales por fuente, envío JSON idempotente y procesamiento
 mediante el mismo worker. [Swagger UI](docs/swagger.md) está en `/api/docs`, con selector para Cuentas, Sync,
-Automation, Monitoring y Academic; hay un
+Automation, Monitoring, Academic y Sport; hay un
 [ejemplo con Node](examples/ingestions/README.md) independiente de Campus. Esta
 ampliación requiere la migración 013 y su comprobación real en el entorno local.
 
@@ -221,3 +221,7 @@ Los [servicios de origen](docs/servicios-origen.md) describen las entradas acord
 
 El [modelo común de actividades](docs/modelo-actividades.md) define identidad,
 campos compartidos y reglas temporales para la próxima implementación.
+
+La [fuente deportiva](docs/deporte.md) dispone de backend de gimnasio con
+persistencia, credenciales propias y Swagger. Su interfaz y conexión a la entrada
+estandarizada son los siguientes pasos del [plan de deporte](docs/deporte.md).
