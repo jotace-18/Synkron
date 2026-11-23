@@ -7,7 +7,7 @@ import {
 } from '../monitoring-client/monitoring-client.service';
 import { ReminderActivitiesClientService } from '../sync-client/reminder-activities-client.service';
 import type { ReminderActivity } from '../sync-client/reminder-activity.types';
-import { madridDate } from './due-reminder';
+import { isReminderCandidate, madridDate } from './due-reminder';
 
 interface PendingReminder {
   id: string;
@@ -76,7 +76,7 @@ export class ReminderDispatcherService {
             client,
             reminder,
             'reminder_obsolete',
-            'La entrega ya no cumple las condiciones del recordatorio.',
+            'La actividad ya no cumple las condiciones del recordatorio.',
           );
         }
 
@@ -110,7 +110,7 @@ export class ReminderDispatcherService {
         const message =
           error instanceof NotificationRequestError
             ? error.message
-            : 'No se pudo comprobar el estado actual de la entrega.';
+            : 'No se pudo comprobar el estado actual de la actividad.';
 
         await client.query(
           `UPDATE automation.reminder_requests
@@ -159,18 +159,8 @@ export class ReminderDispatcherService {
     deadlineKey: string,
     now: Date,
   ): boolean {
-    if (
-      activity.type !== 'academic.assignment' ||
-      !['pending', 'in_progress'].includes(activity.status ?? '')
-    ) {
-      return false;
-    }
-
+    if (!isReminderCandidate(activity)) return false;
     const schedule = activity.schedule;
-
-    if (schedule.role !== 'deadline') {
-      return false;
-    }
 
     if (schedule.kind === 'date') {
       return (

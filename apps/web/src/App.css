@@ -617,3 +617,62 @@ button:disabled { opacity: 0.65; cursor: wait; }
   .sync-controls .agenda-filter { min-width: 0; flex: 1 1 240px; }
   .sync-controls .primary-button { width: 100%; }
 }
+
+.calendar-event[data-status="scheduled"] { color: #4338a0; border-color: #7060be; background: #efecfc; }
+.calendar-event[data-status="completed"] { color: #166534; border-color: #227342; background: #e0efe1; }
+.calendar-event[data-status="cancelled"] { color: #64748b; border-color: #94a3b8; background: #f1f5f9; text-decoration: line-through; }
+.calendar-event[data-type="academic.exam"] { border-left-width: 5px; }
+
+/* Source refresh and canonical gym activities. */
+.source-connection { margin-top: 1.25rem; border-top: 1px solid var(--border, #d6e3dc); padding-top: 1rem; }
+.source-connection summary { cursor: pointer; color: var(--primary, #176956); font-weight: 600; }
+.source-connection > p { max-width: 72ch; }
+.source-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; max-width: 64rem; }
+.source-form label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.source-form input, .source-form select { width: 100%; min-width: 0; padding: .7rem; border: 1px solid #b5cdc0; border-radius: .5rem; background: white; color: inherit; font: inherit; }
+.source-form button { justify-self: start; }
+.sync-source-results { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: .75rem; }
+.sync-source-results li { padding: .75rem 1rem; border: 1px solid #d6e3dc; border-radius: .6rem; background: #f7faf8; }
+.sync-source-results li > span { margin-left: 1rem; }
+.sync-source-results p { margin: .4rem 0 0; }
+.calendar-event[data-type="sport.gym"][data-status="scheduled"] { color: #9a451d; border-color: #ba6a3e; background: #fff0e4; }
+@media (max-width: 700px) { .source-form { grid-template-columns: 1fr; } }
+
+/* Personal keeps its rose identity; completion and cancellation retain their state colors. */
+.calendar-event:is([data-type="personal.event"], [data-type="social.plan"]) { border-left-width: 4px; }
+.calendar-event:is([data-type="personal.event"], [data-type="social.plan"])[data-status="pending"] {
+  --event-color: #9d366b;
+  --event-background: #faedf4;
+  color: var(--event-color);
+  border-color: var(--event-color);
+  background: var(--event-background);
+}
+.calendar-event:is([data-type="personal.event"], [data-type="social.plan"])[data-status="completed"] { --event-color: #227342; }
+.calendar-event:is([data-type="personal.event"], [data-type="social.plan"])[data-status="cancelled"] { --event-color: #94a3b8; }
+.activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) { border-top: 4px solid #b45788; }
+.activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) .activity-detail-summary span:first-child,
+.activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) .activity-detail-summary span[data-status="pending"] { background: #faedf4; color: #88315c; }
+.activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) .activity-detail-summary span[data-status="cancelled"] { background: #f1f5f9; color: #64748b; }
+
+.activity-card:is([data-type="personal.event"], [data-type="social.plan"]) { border-left: 4px solid #b45788; }
+.activity-card:is([data-type="personal.event"], [data-type="social.plan"])[data-status="completed"] { border-left-color: #227342; }
+.activity-card:is([data-type="personal.event"], [data-type="social.plan"])[data-status="cancelled"] { border-left-color: #94a3b8; }
+
+/* The three blocks share the same card treatment, each with its own accent. */
+.activity-card[data-type^="academic."] { border-left: 4px solid #7060be; }
+.activity-card[data-type^="sport."] { border-left: 4px solid #ba6a3e; }
+.activity-card:is([data-type^="academic."], [data-type^="sport."]):is([data-status="completed"], [data-status="submitted"]) { border-left-color: #227342; }
+.activity-card:is([data-type^="academic."], [data-type^="sport."])[data-status="cancelled"] { border-left-color: #94a3b8; }
+.activity-dialog[data-type^="academic."] { border-top: 4px solid #7060be; }
+.activity-dialog[data-type^="academic."] .activity-detail-summary span:first-child { background: #efecfc; color: #4338a0; }
+.activity-dialog[data-type^="sport."] { border-top: 4px solid #ba6a3e; }
+.activity-dialog[data-type^="sport."] .activity-detail-summary span:first-child { background: #fff0e4; color: #9a451d; }
+.activity-dialog[data-type^="academic."] .activity-detail-summary span[data-status="pending"] { background: #fbe4df; color: #923d39; }
+.activity-dialog[data-type^="academic."] .activity-detail-summary span[data-status="in_progress"] { background: #fff0cb; color: #80500d; }
+.activity-dialog[data-type^="academic."] .activity-detail-summary span[data-status="scheduled"] { background: #efecfc; color: #4338a0; }
+.activity-dialog[data-type^="sport."] .activity-detail-summary span[data-status="scheduled"] { background: #fff0e4; color: #9a451d; }
+.activity-dialog:is([data-type^="academic."], [data-type^="sport."]) .activity-detail-summary span[data-status="cancelled"] { background: #f1f5f9; color: #64748b; }
+.sync-execution-details { margin-top: 10px; }
+.sync-execution-details > summary { cursor: pointer; color: #536b61; font-size: 14px; }
+.sync-execution-details ul { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.sync-execution-details li { background: white; }

@@ -141,7 +141,7 @@ describe('Sync definitions table (PostgreSQL integration)', () => {
     async (connector) => {
       await expect(insertDefinition({ connector })).rejects.toMatchObject({
         code: '23514',
-        constraint: 'definitions_connector_valid',
+        constraint: 'definitions_connector_collection_valid',
       });
     },
   );
@@ -151,7 +151,7 @@ describe('Sync definitions table (PostgreSQL integration)', () => {
     async (collection) => {
       await expect(insertDefinition({ collection })).rejects.toMatchObject({
         code: '23514',
-        constraint: 'definitions_collection_valid',
+        constraint: 'definitions_connector_collection_valid',
       });
     },
   );

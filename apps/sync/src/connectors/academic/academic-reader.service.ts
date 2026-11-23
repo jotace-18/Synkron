@@ -3,17 +3,17 @@ import { ConnectionTargetPolicyService } from '../../connections/connection-targ
 import type { AcademicAssignmentSource } from './assignment-source.types';
 import { parseAcademicAssignment } from './assignment-source.validator';
 
-@Injectable()
-export class AcademicReaderService {
-  constructor(private readonly targets: ConnectionTargetPolicyService) {}
+export class AcademicSourceReader<T extends { id: string }> {
+  constructor(
+    private readonly targets: ConnectionTargetPolicyService,
+    private readonly parse: (value: unknown) => T,
+    private readonly collectionLabel = 'entregas',
+  ) {}
 
-  async readAll(
-    address: string,
-    token: string,
-  ): Promise<AcademicAssignmentSource[]> {
+  async readAll(address: string, token: string): Promise<T[]> {
     const limit = 20;
     const maxPages = 100;
-    const assignments: AcademicAssignmentSource[] = [];
+    const assignments: T[] = [];
     const seenIds = new Set<string>();
 
     for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
@@ -29,7 +29,7 @@ export class AcademicReaderService {
 
         if (seenIds.has(identity)) {
           throw new BadGatewayException(
-            'Academic devolvió entregas repetidas durante la paginación',
+            `Academic devolvió ${this.collectionLabel} ${this.collectionLabel === 'entregas' ? 'repetidas' : 'repetidos'} durante la paginación`,
           );
         }
 
@@ -52,7 +52,7 @@ export class AcademicReaderService {
     token: string,
     limit = 20,
     offset = 0,
-  ): Promise<AcademicAssignmentSource[]> {
+  ): Promise<T[]> {
     if (
       !Number.isInteger(limit) ||
       limit < 1 ||
@@ -80,7 +80,7 @@ export class AcademicReaderService {
       if (response.status !== 200) {
         await response.body?.cancel();
         throw new BadGatewayException(
-          'Academic no devolvió una página de entregas',
+          `Academic no devolvió una página de ${this.collectionLabel}`,
         );
       }
 
@@ -120,15 +120,22 @@ export class AcademicReaderService {
         );
       }
 
-      return (items as unknown[]).map(parseAcademicAssignment);
+      return (items as unknown[]).map(this.parse);
     } catch (error) {
       if (error instanceof BadGatewayException) {
         throw error;
       }
 
       throw new BadGatewayException(
-        'No se pudo leer la página de entregas de Academic',
+        `No se pudo leer la página de ${this.collectionLabel} de Academic`,
       );
     }
+  }
+}
+
+@Injectable()
+export class AcademicReaderService extends AcademicSourceReader<AcademicAssignmentSource> {
+  constructor(targets: ConnectionTargetPolicyService) {
+    super(targets, parseAcademicAssignment);
   }
 }

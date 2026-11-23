@@ -1,9 +1,9 @@
 # Servicio académico
 
-Agenda académica de origen de Synkron, con NestJS y PostgreSQL. La API de entregas
-permite crear, consultar, editar todos sus datos y eliminar registros conservando
-una marca para sincronizar el borrado. Exámenes, sesiones de trabajo, eventos
-generales y formularios de entrada se incorporarán después.
+Agenda académica de origen de Synkron, con NestJS y PostgreSQL. Las API de entregas y exámenes
+permiten crear, consultar, editar todos sus datos y eliminar registros conservando
+una marca para sincronizar el borrado. Campus permite crear y editar ambas actividades. Las sesiones de trabajo y los
+eventos generales quedan pendientes. Consulta la [guía de exámenes](../../docs/examenes.md).
 
 ## Preparación local
 

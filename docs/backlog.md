@@ -17,6 +17,31 @@ operaciones actuales de conexiones están probadas; esto no cierra el frontend,
 los demás servicios ni el hito. El alcance de entrada se detalla en
 [Servicios de origen](servicios-origen.md).
 
+## Prioridad de trabajo acordada el 22/11/2026
+
+Se prioriza disponer de un recorrido funcional en los tres bloques antes de
+completar todas las actividades de cada uno. Entregas y exámenes proporcionan
+el recorrido académico ya implementado y comprobado.
+
+1. Completar la entrada estandarizada de la tubería (US-22), con un contrato
+   acotado para actividades académicas, deportivas y sociales y recepción directa
+   autenticada. Mantener compatibles las integraciones actuales.
+2. Abordar el bloque de deporte con gimnasio como primera actividad, conforme
+   a [US-24](#us-24--incorporar-el-primer-recorrido-deportivo-de-gimnasio) y su
+   [plan](deporte.md): fuente editable, entrada común, calendario y seguimiento.
+3. Incorporar el bloque **Otros** (US-25): recados, citas y quedadas bajo un
+   contrato personal común, antes de ampliar las actividades de cada bloque.
+4. Retomar las sesiones de estudio/trabajo y los eventos académicos generales,
+   ampliar las actividades de deporte y Otros y completar sus detalles.
+
+La documentación interactiva de la API queda registrada en US-23. Su primera
+versión acompaña al contrato estandarizado; el refinamiento del portal no
+debe retrasar el inicio del bloque de deporte.
+
+Este orden busca que, si el plazo obliga a recortar profundidad, los tres bloques
+tengan una integración funcional. Las actividades y requisitos aplazados siguen
+pendientes; esta priorización no supone dar por completado todo el Hito 2.
+
 ## US-01 — Registrarse e iniciar sesión
 
 Requisitos: RF-01; CU-01.
@@ -338,13 +363,13 @@ Tareas:
 Requisitos: RF-23, RF-24; RI-16; CU-15, CU-17.
 
 Como usuario, quiero introducir y actualizar datos académicos, deportivos y
-sociales en sus servicios para alimentar Synkron con actividades propias.
+personales en sus servicios para alimentar Synkron con actividades propias.
 
 Criterios de aceptación:
 
 - Académico permite entregas, exámenes, sesiones de estudio/trabajo y eventos generales con los campos descritos en el contrato de origen.
 - Deporte conserva los datos comunes y los específicos de gimnasio, fútbol, senderismo y carrera; otros deportes admiten un registro sencillo.
-- Planes sociales admite título, fecha/hora, ubicación y participantes opcionales; las propuestas adicionales se cierran antes de implementarse.
+- Otros admite asunto y día obligatorios, hora y duración opcionales, lista opcional de personas y estado pendiente/realizado/cancelado; contrato acordado en US-25.
 - Los datos persisten al reiniciar. Solo se exponen los registros autorizados por cuenta o credencial.
 - Cada registro mantiene su ID al modificarse. Las notas opcionales pueden añadirse después con máximo dos decimales.
 - Las sesiones de estudio pueden relacionarse con entregas o exámenes, sin compartir su estado de finalización.
@@ -461,6 +486,158 @@ Tareas:
 - [ ] Implementar revisión periódica y entrega fiable de avisos a Monitoring.
 - [ ] Añadir configuración, bandeja y estado de lectura al frontend.
 - [ ] Comprobar repetición, modificaciones, retiradas y entregas completadas.
+
+## US-22 — Estandarizar la entrada de actividades a Sync
+
+Decisión: [ADR-012](decisiones.md#adr-012-entrada-estandarizada-de-actividades-a-la-tubería).
+Implementación de la entrada completada el 22/11/2026; despliegue de la migración
+y comprobación real del nuevo recorrido pendientes en el entorno local.
+
+Como integrador, quiero incorporar actividades académicas, deportivas y sociales
+mediante un contrato común para conectar fuentes reales sin depender de las
+aplicaciones de demostración.
+
+Criterios de aceptación:
+
+- Los adaptadores de los tres bloques entregan el mismo contrato al núcleo, con identidad externa, procedencia, tipo, título, información temporal, estado opcional y detalles validados por tipo.
+- Las fechas sin hora, instantes, intervalos y retiradas explícitas mantienen su significado.
+- La consulta mediante conectores y la recepción directa autenticada reutilizan identidad, deduplicación, persistencia, seguimiento y eventos.
+- El propietario se obtiene de la autenticación y los recursos de la fuente se comprueban para esa cuenta.
+- Repetir una entrada conserva la identidad central y evita cambios y efectos duplicados cuando el contenido no cambia.
+- Las integraciones existentes de entregas y exámenes conservan su comportamiento y sus datos.
+
+Tareas:
+
+- [x] Formalizar y documentar el contrato común, sus operaciones, validación, límites y política de compatibilidad en [Entrada estandarizada](entrada-estandarizada.md).
+- [x] Separar validaciones comunes y adaptadores específicos, eliminando el acoplamiento del validador de exámenes con el de entregas.
+- [x] Consolidar la entrada de los conectores existentes mediante ese contrato, separando el transporte de lectura del núcleo de validación y persistencia.
+- [ ] Registrar los esquemas de deporte y planes al incorporar sus actividades, reutilizando el contrato y núcleo comunes.
+- [x] Implementar la API autenticada de recepción directa, permisos por fuente, pausa/rotación/revocación, idempotencia y ejecuciones trazables.
+- [x] Documentar un script externo, ejemplos JSON y Swagger UI, independientes de Campus.
+- [x] Añadir pruebas de altas, actualizaciones, repeticiones, retiradas, errores, aislamiento y aceptación atómica; pasar la regresión unitaria.
+- [ ] Aplicar la migración 013 y ejecutar las nuevas pruebas PostgreSQL y el recorrido manual documentado.
+
+## US-23 — Consultar y probar la API mediante documentación interactiva
+
+Decisión: [ADR-013](decisiones.md#adr-013-documentación-interactiva-de-la-api).
+Portal de los cinco servicios implementado junto a US-22. Queda comprobar el
+selector y las peticiones reales tras reconstruir los contenedores.
+
+Como integrador, quiero consultar los endpoints, sus contratos y ejemplos y
+probar peticiones autorizadas desde una interfaz para conectar una fuente sin
+tener que deducir el funcionamiento de la API a partir de su código.
+
+Criterios de aceptación:
+
+- Los servicios generan documentos OpenAPI y una interfaz tipo Swagger UI permite consultar rutas, parámetros, cuerpos, respuestas y ejemplos.
+- La entrada estandarizada de US-22 queda documentada con un ejemplo de integración completo, incluidos autenticación, identidad y repetición de solicitudes.
+- Se puede seleccionar la documentación del servicio correspondiente; se distingue Academic como API de origen de las API de Synkron.
+- Las peticiones de prueba respetan los permisos y la autenticación reales, incluida la sesión y el token CSRF donde corresponda.
+- Las rutas internas no se incluyen en el portal público ni se habilitan a través del gateway para permitir pruebas desde él.
+- Las especificaciones se pueden descargar y no incluyen credenciales ni datos personales reales en los ejemplos.
+
+Tareas:
+
+- [x] Publicar el documento OpenAPI de entrada y Swagger UI con `@nestjs/swagger` 11 en Sync, sin CDN.
+- [x] Generar documentos públicos de Cuentas, Sync, Automation, Monitoring y Academic desde sus rutas y contratos explícitos.
+- [x] Documentar la entrada estandarizada y las consultas públicas básicas de Sync.
+- [x] Añadir esquemas de entrada/salida, campos opcionales, errores y ejemplos ficticios de esta integración.
+- [x] Incorporar selector de servicio y encaminamiento de sus documentos por el gateway, con Academic identificado como origen externo.
+- [x] Integrar Bearer de fuente y sesión con CSRF en Swagger UI; añadir pruebas de permisos.
+- [x] Comprobar cobertura de todas las rutas públicas, generación real con Swagger y referencias de esquemas mediante pruebas con dependencias simuladas.
+- [ ] Comprobar el selector, TLS y peticiones reales de cada servicio en el entorno de contenedores.
+
+## US-24 — Incorporar el primer recorrido deportivo de gimnasio
+
+Contrato de producto acordado el 23/11/2026. Backend implementado y ciclo de
+vida validado manualmente. Interfaz implementada y aspecto visual aprobado;
+integración con Sync y presentación central implementadas. Recorrido manual
+Sport → Sync → calendario → Monitoring validado el 23/11/2026; escenario
+automatizado de aislamiento entre cuentas cubierto por CI, confirmado en verde
+por el usuario.
+[Plan de trabajo](deporte.md).
+
+Como usuario, quiero registrar sesiones de gimnasio y verlas en mi agenda de
+Synkron para organizar entrenamientos junto a mis compromisos académicos.
+
+Criterios de aceptación:
+
+- Se conservan fecha, hora, duración en minutos, modalidad y solo/acompañado.
+- Las modalidades son push, pull, leg, upper, lower y otros; el título es automático.
+- Los estados son programado, realizado y cancelado, admitiendo sesiones futuras y pasadas.
+- El origen mantiene los IDs al editar y diferencia cancelar de retirar.
+- `sport.gym` entra por la API común autenticada como intervalo de comienzo.
+- Calendario, detalle y seguimiento reutilizan la colección y eventos existentes.
+
+Tareas:
+
+- [x] Acordar los datos, estados, título y semántica temporal del primer recorrido.
+- [x] Implementar persistencia y API autorizada de la fuente deportiva, con Swagger, Compose y CI; ciclo de vida validado manualmente el 23/11/2026.
+- [x] Añadir interfaz deportiva para crear, editar, cancelar y retirar sesiones; aspecto visual aprobado el 23/11/2026.
+- [x] Habilitar el esquema de gimnasio y conectar la entrada estandarizada mediante un lector canónico reutilizable.
+- [x] Adaptar calendario, filtros, detalle y documentación Swagger; conectar fuentes desde Synkron y ofrecer «Sincronizar todo» por defecto.
+- [x] Validar manualmente alta, repetición sin duplicados, edición, cancelación, retirada y seguimiento en Monitoring; documentar el arranque (23/11/2026).
+- [x] Confirmar en CI la suite PostgreSQL, incluida la separación entre cuentas y la conexión concurrente; usuario confirma GitHub en verde.
+
+## US-25 — Incorporar el bloque Otros para compromisos personales
+
+Contrato acordado el 23/11/2026. Sustituye el alcance inicial de «Planes sociales»;
+backend, interfaz de origen e integración central implementados; presentación
+de Otros completada. El usuario da por válidas las comprobaciones finales
+el 23/11/2026; checkpoint y confirmación de CI pendientes.
+Incluye recados, citas y quedadas sin crear un tipo de
+actividad distinto para cada caso.
+
+Como usuario, quiero registrar compromisos personales sencillos y consultarlos
+en Synkron junto a mis actividades académicas y deportivas.
+
+Criterios de aceptación:
+
+- Asunto y día obligatorios; hora opcional.
+- Duración opcional en minutos enteros positivos cuando se conoce la hora.
+  Sin hora se conserva un día; con hora, un instante; con hora y duración, un intervalo.
+- Lista opcional de nombres de personas, sin cuentas ni invitaciones.
+- Estados pendiente, realizado y cancelado (`pending`, `completed`, `cancelled`).
+  El paso del tiempo no completa automáticamente un compromiso.
+- Nombre visible «Otros» y tipo central previsto `personal.event`, con rol `start`.
+  Tipo registrado en Sync y admitido por la migración 015; `social.plan` queda solo para lectura histórica.
+- Editar conserva la identidad; cancelar mantiene el compromiso visible;
+  retirar comunica una baja explícita.
+- Reutilizar exportación canónica, `standard.activities`, «Sincronizar todo»,
+  programaciones, calendario, eventos y seguimiento existentes.
+- Ubicación, descripción, recurrencias e invitaciones quedan fuera del primer recorrido.
+
+Subpuntos de trabajo:
+
+1. **Contrato — acordado.** Campos, estados, formas temporales e identidad común.
+2. **Fuente personal — implementada.** Persistencia, API por cuenta, CRUD,
+   exportación canónica, Swagger, Compose, CI y configuración de arranque.
+   Compilación y pruebas locales comprobadas; usuario confirma el recorrido
+   funcional desde Swagger el 23/11/2026. El usuario acepta las comprobaciones finales; confirmación de CI pendiente.
+3. **Interfaz de origen — implementada.** Formulario en dos columnas, listado
+   paginado, edición, cancelación y retirada, con estructura similar a las otras
+   fuentes e identidad rosa y ciruela propia. Compilación, lint y cuatro pruebas locales
+   comprobados; apariencia y alta sin hora confirmadas por el usuario. Edición,
+   cancelación y retirada desde la interfaz confirmadas en el recorrido conjunto.
+4. **Integración central — implementada.** Registrar `personal.event`, añadir
+   migración 015, mantener lectura histórica de `social.plan` y reutilizar el
+   lector común, worker, idempotencia y eventos. Preset de conexión Otros, origen
+   autorizado en Compose y soporte en «Sincronizar todo». Pruebas locales en verde;
+   escenarios PostgreSQL preparados para CI. Usuario valida el 23/11/2026 la
+   conexión, alta, repetición sin duplicados, edición de título/duración, vuelta
+   a día sin hora, cancelación y retirada con resultado en Monitoring.
+5. **Presentación y seguimiento — implementados.** Detalle de personas y duración,
+   rosa para Otros pendientes, filtros por los tres estados y nombres de campos
+   legibles en Monitoring. Seis plantillas de reglas por alta, retirada y cambios
+   de asunto, horario/duración, estado o personas. Compilación, lint y pruebas
+   locales en verde; presentación confirmada por el usuario, que da por válidas
+   las comprobaciones finales de Otros.
+   No se activan recordatorios implícitamente.
+6. **Validación aceptada; checkpoint pendiente.** Recorrido de alta, edición,
+   repetición, cancelación y retirada confirmado por el usuario. El usuario da
+   por válidos los chequeos finales de Otros; esta aceptación no implica que el
+   agente haya ejecutado cada prueba manual restante. Pruebas locales de
+   regresión mantenidas; guardar checkpoint y confirmar CI antes de cerrar.
 
 ## Ampliaciones posteriores
 

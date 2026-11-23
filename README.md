@@ -2,7 +2,14 @@
 
 Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
-Es un proyecto en desarrollo. Ya funcionan las entregas académicas desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La ampliación a las demás fuentes sigue pendiente.
+Es un proyecto en desarrollo. Ya funcionan las entregas y los exámenes académicos desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La ampliación a las demás fuentes sigue pendiente.
+
+Sync también admite [entrada estandarizada](docs/entrada-estandarizada.md) desde
+fuentes externas: credenciales por fuente, envío JSON idempotente y procesamiento
+mediante el mismo worker. [Swagger UI](docs/swagger.md) está en `/api/docs`, con selector para Cuentas, Sync,
+Automation, Monitoring, Academic y Sport; hay un
+[ejemplo con Node](examples/ingestions/README.md) independiente de Campus. Esta
+ampliación requiere la migración 013 y su comprobación real en el entorno local.
 
 ## Qué permitirá hacer
 
@@ -51,7 +58,7 @@ Synkron se divide en tres servicios:
 | **Automation** | Comprueba las reglas del usuario y pone en marcha las acciones que correspondan. |
 | **Monitoring** | Reúne los cambios, avisos y resultados para poder consultarlos. |
 
-Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Se sirve mediante Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md). Ofrece acceso y registro, agenda con filtros, calendario Mes/Semana/Día, detalle de actividad, sincronizaciones, centro de mandos, configuración de automatizaciones, historial y bandeja de avisos. Campus tiene una interfaz independiente para crear, editar y retirar entregas.
+Los servicios utilizan NestJS y TypeScript. El [frontend](apps/web/README.md) utiliza React y TypeScript, con Vite para el desarrollo y la compilación. Se sirve mediante Nginx y la [entrada HTTPS local con Caddy](infra/gateway/README.md). Ofrece acceso y registro, agenda con filtros, calendario Mes/Semana/Día, detalle de actividad, sincronizaciones, centro de mandos, configuración de automatizaciones, historial y bandeja de avisos. Campus tiene una interfaz independiente para crear, editar y retirar entregas y exámenes.
 
 Una API, la interfaz por la que se comunican las aplicaciones, recibe las peticiones del panel web y las dirige al servicio correspondiente. También se comprueba quién accede y qué información le pertenece.
 
@@ -178,7 +185,7 @@ Al crear una conexión se indican nombre, dirección y forma de acceso. Una sinc
 
 ## Estado y cierre de implementación
 
-Actualmente hay API de cuentas y sesiones, Sync con creación y listado paginado de conexiones sin autenticación o Bearer cifrado, prueba de conexión limitada a destinos autorizados, sus PostgreSQL independientes y una API ficticia estática de tareas. El [servicio académico](apps/academic/README.md) incorpora su propio PostgreSQL y una API autenticada de entregas con creación, consultas, edición completa, borrado lógico y exportación para Sync. Hay imágenes y comprobaciones de CI para estos backends. La migración de borrado y los escenarios de ciclo de vida de entregas también se han validado en el entorno local.
+Actualmente hay API de cuentas y sesiones, Sync con creación y listado paginado de conexiones sin autenticación o Bearer cifrado, prueba de conexión limitada a destinos autorizados, sus PostgreSQL independientes y las fuentes Academic, Sport y Personal. El [servicio académico](apps/academic/README.md) incorpora su propio PostgreSQL y una API autenticada de entregas con creación, consultas, edición completa, borrado lógico y exportación para Sync. Hay imágenes y comprobaciones de CI para estos backends. La migración de borrado y los escenarios de ciclo de vida de entregas también se han validado en el entorno local.
 
 Sync incorpora definiciones, aceptación idempotente y consulta de ejecuciones. El publicador automático envía los trabajos pendientes a Rabbit y el worker académico lee, transforma y guarda las actividades antes de persistir el resultado y confirmar el mensaje. Ambos funcionan como procesos separados en Compose. Se han comprobado solicitudes HTTP nuevas hasta `completed`, contadores coherentes, duplicados y parada ordenada. El [contrato y arranque del worker](docs/api.md#worker-de-ejecuciones) detalla este checkpoint; la recuperación utiliza reservas renovables y tokens por adquisición. Los mensajes inválidos se apartan con publicación confirmada y las reconexiones esperan entre intentos; se ha comprobado una caída deliberada tras adquirir una ejecución, su recuperación conservando ID e inicio y el traslado de un mensaje inválido a rechazados.
 
@@ -194,7 +201,9 @@ El 22/11/2026 quedó cerrado el flujo funcional de entregas académicas: una edi
 
 El workflow de CI incluye formato, lint, compilación, pruebas unitarias y migraciones e integración con PostgreSQL para Automation y Monitoring, además de construir sus imágenes. Las comprobaciones manuales con Rabbit real se mantienen diferenciadas de las pruebas automatizadas. La ejecución de los nuevos trabajos en GitHub queda por confirmar tras subir este checkpoint.
 
-Quedan por implementar exámenes, sesiones y eventos académicos generales y las fuentes de deporte y planes sociales. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. El cierre funcional de entregas académicas no equivale al cierre de todo el Hito 2.
+La incorporación de exámenes está implementada y dispone de una [guía de arranque y comprobación](docs/examenes.md). El 22/11/2026 se confirmó el paso de los dos escenarios de integración con PostgreSQL y se comprobó en los contenedores locales la creación, edición, cancelación y retirada, junto con un recordatorio y una regla de cambio de nota que generaron sus avisos en Synkron.
+
+Quedan por implementar sesiones y eventos académicos generales y las fuentes de deporte y planes sociales. También faltan operaciones de conexiones, almacenamiento de la última prueba, publicación de imágenes en GHCR y cierre del arranque y documentación completos. El cierre funcional de entregas académicas no equivale al cierre de todo el Hito 2.
 
 El objetivo de cierre del Hito 2 es la implementación funcional completa del alcance inicial acordado, con sus componentes integrados, pruebas, contenedores, CI y publicación de imágenes. Una primera sincronización o el mínimo de contenedores son checkpoints intermedios. Las funciones marcadas como posteriores u opcionales en [Requisitos](docs/requisitos.md) mantienen esa distinción. Infraestructura y despliegue corresponden al trabajo posterior; actualmente solo se configura CI.
 
@@ -212,3 +221,9 @@ Los [servicios de origen](docs/servicios-origen.md) describen las entradas acord
 
 El [modelo común de actividades](docs/modelo-actividades.md) define identidad,
 campos compartidos y reglas temporales para la próxima implementación.
+
+La [fuente deportiva](docs/deporte.md) dispone de backend de gimnasio con
+persistencia, credenciales propias y Swagger. Su interfaz independiente está en
+`apps/sport-web`, con un estilo similar a Campus y colores deportivos propios.
+La conexión a la entrada estandarizada es el siguiente paso del
+[plan de deporte](docs/deporte.md).

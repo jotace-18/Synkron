@@ -5,6 +5,39 @@ import type {
 } from './automation.types'
 
 export const NOTIFICATION_RULE_PRESETS = [
+  { value: 'personal_created', label: 'Se incorpora un compromiso de Otros' },
+  { value: 'personal_retired', label: 'Se retira un compromiso de Otros' },
+  {
+    value: 'personal_schedule_changed',
+    label: 'Cambia la fecha, hora o duración en Otros',
+  },
+  {
+    value: 'personal_status_changed',
+    label: 'Cambia el estado de un compromiso de Otros',
+  },
+  {
+    value: 'personal_people_changed',
+    label: 'Cambian las personas de un compromiso de Otros',
+  },
+  {
+    value: 'personal_title_changed',
+    label: 'Cambia el asunto de un compromiso de Otros',
+  },
+  { value: 'gym_created', label: 'Se incorpora un entrenamiento de gimnasio' },
+  { value: 'gym_retired', label: 'Se retira un entrenamiento de gimnasio' },
+  {
+    value: 'gym_schedule_changed',
+    label: 'Cambia el horario o duración de gimnasio',
+  },
+  {
+    value: 'gym_status_changed',
+    label: 'Cambia el estado de un entrenamiento de gimnasio',
+  },
+  { value: 'exam_created', label: 'Se incorpora un examen' },
+  { value: 'exam_retired', label: 'Se retira un examen' },
+  { value: 'exam_grade_changed', label: 'Cambia la nota de un examen' },
+  { value: 'exam_date_changed', label: 'Cambia la fecha de un examen' },
+  { value: 'exam_status_changed', label: 'Cambia el estado de un examen' },
   {
     value: 'sync_completed',
     label: 'Una sincronización termina correctamente',
@@ -44,6 +77,20 @@ export interface NotificationRuleFormValues {
   target_definition_id: string
 }
 
+const changedFields: Partial<Record<NotificationRulePreset, string>> = {
+  grade_changed: 'grade',
+  deadline_changed: 'schedule',
+  exam_grade_changed: 'grade',
+  exam_date_changed: 'schedule',
+  exam_status_changed: 'status',
+  gym_schedule_changed: 'schedule',
+  gym_status_changed: 'status',
+  personal_schedule_changed: 'schedule',
+  personal_status_changed: 'status',
+  personal_people_changed: 'people',
+  personal_title_changed: 'title',
+}
+
 export function notificationRuleInput(
   values: NotificationRuleFormValues,
 ): RuleInput {
@@ -64,23 +111,27 @@ export function notificationRuleInput(
     conditions.push({
       field: 'payload.activity_type',
       operator: '==',
-      value: 'academic.assignment',
+      value: values.preset.startsWith('personal_')
+        ? 'personal.event'
+        : values.preset.startsWith('gym_')
+          ? 'sport.gym'
+          : values.preset.startsWith('exam_')
+            ? 'academic.exam'
+            : 'academic.assignment',
     })
 
-    if (
-      values.preset === 'grade_changed' ||
-      values.preset === 'deadline_changed'
-    ) {
+    const changedField = changedFields[values.preset]
+    if (changedField) {
       conditions.push({
         field: 'payload.changed_fields',
         operator: 'contains',
-        value: values.preset === 'grade_changed' ? 'grade' : 'schedule',
+        value: changedField,
       })
     } else {
       conditions.push({
         field: 'payload.change_type',
         operator: '==',
-        value: values.preset === 'assignment_created' ? 'created' : 'retired',
+        value: values.preset.endsWith('_created') ? 'created' : 'retired',
       })
     }
   }

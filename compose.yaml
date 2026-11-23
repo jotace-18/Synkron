@@ -22,7 +22,7 @@ services:
       AUTH_API_INTERNAL_URL: http://api:3003
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
       SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
-      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS}
+      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS},http://sport:3000,http://personal:3000
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
@@ -106,25 +106,6 @@ services:
       retries: 10
       start_period: 10s
 
-  task-api:
-    build:
-      context: ./fixtures/task-api
-    init: true
-    ports:
-      - "127.0.0.1:3100:3000"
-    environment:
-      TASK_API_TOKEN: ${TASK_API_TOKEN:?Falta TASK_API_TOKEN}
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
-
   academic:
     build:
       context: ./apps/academic
@@ -168,6 +149,110 @@ services:
       - ./infra/postgres/academic/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
     networks:
       - academic-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  sport:
+    build:
+      context: ./apps/sport
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3104:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - default
+      - sport-data
+    environment:
+      PGHOST: sport-db
+      PGPORT: "5432"
+      PGDATABASE: ${SPORT_DB_NAME:?Falta SPORT_DB_NAME}
+      PGUSER: ${SPORT_DB_USER:?Falta SPORT_DB_USER}
+      PGPASSWORD: ${SPORT_DB_PASSWORD:?Falta SPORT_DB_PASSWORD}
+    depends_on:
+      sport-db:
+        condition: service_healthy
+
+  personal:
+    build:
+      context: ./apps/personal
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3106:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - default
+      - personal-data
+    environment:
+      PGHOST: personal-db
+      PGPORT: "5432"
+      PGDATABASE: ${PERSONAL_DB_NAME:?Falta PERSONAL_DB_NAME}
+      PGUSER: ${PERSONAL_DB_USER:?Falta PERSONAL_DB_USER}
+      PGPASSWORD: ${PERSONAL_DB_PASSWORD:?Falta PERSONAL_DB_PASSWORD}
+    depends_on:
+      personal-db:
+        condition: service_healthy
+
+  sport-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${SPORT_DB_NAME:?Falta SPORT_DB_NAME}
+      POSTGRES_USER: ${SPORT_DB_ADMIN_USER:?Falta SPORT_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${SPORT_DB_ADMIN_PASSWORD:?Falta SPORT_DB_ADMIN_PASSWORD}
+      SPORT_DB_USER: ${SPORT_DB_USER:?Falta SPORT_DB_USER}
+      SPORT_DB_PASSWORD: ${SPORT_DB_PASSWORD:?Falta SPORT_DB_PASSWORD}
+    volumes:
+      - sport-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/sport/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - sport-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  personal-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${PERSONAL_DB_NAME:?Falta PERSONAL_DB_NAME}
+      POSTGRES_USER: ${PERSONAL_DB_ADMIN_USER:?Falta PERSONAL_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${PERSONAL_DB_ADMIN_PASSWORD:?Falta PERSONAL_DB_ADMIN_PASSWORD}
+      PERSONAL_DB_USER: ${PERSONAL_DB_USER:?Falta PERSONAL_DB_USER}
+      PERSONAL_DB_PASSWORD: ${PERSONAL_DB_PASSWORD:?Falta PERSONAL_DB_PASSWORD}
+    volumes:
+      - personal-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/personal/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - personal-data
     healthcheck:
       test:
         - CMD-SHELL
@@ -274,7 +359,7 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
       SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
-      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS}
+      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS},http://sport:3000,http://personal:3000
     depends_on:
       sync-db:
         condition: service_healthy
@@ -589,6 +674,56 @@ services:
       retries: 5
       start_period: 5s
 
+  sport-web:
+    build:
+      context: ./apps/sport-web
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3105:8080"
+    environment:
+      SPORT_DEMO_TOKEN: ${SPORT_DEMO_TOKEN:?Falta SPORT_DEMO_TOKEN}
+    depends_on:
+      sport:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  personal-web:
+    build:
+      context: ./apps/personal-web
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3107:8080"
+    environment:
+      PERSONAL_DEMO_TOKEN: ${PERSONAL_DEMO_TOKEN:?Falta PERSONAL_DEMO_TOKEN}
+    depends_on:
+      personal:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   web:
     build:
       context: ./apps/web
@@ -645,6 +780,8 @@ volumes:
   sync-db-data:
   api-db-data:
   academic-db-data:
+  sport-db-data:
+  personal-db-data:
   rabbitmq-data:
   gateway-data:
   gateway-config:
@@ -658,6 +795,10 @@ networks:
   api-data:
     internal: true
   academic-data:
+    internal: true
+  sport-data:
+    internal: true
+  personal-data:
     internal: true
   monitoring-data:
     internal: true

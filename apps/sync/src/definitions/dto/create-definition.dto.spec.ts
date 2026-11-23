@@ -19,7 +19,10 @@ describe('CreateDefinitionDto', () => {
 
   function configuredPipe(): ValidationPipe {
     const useGlobalPipes = jest.fn<void, [ValidationPipe]>();
-    configureApp({ useGlobalPipes } as unknown as INestApplication);
+    configureApp({
+      useGlobalPipes,
+      use: jest.fn(),
+    } as unknown as INestApplication);
     const pipe: unknown = useGlobalPipes.mock.calls[0][0];
     if (!(pipe instanceof ValidationPipe))
       throw new Error('Expected the application validation pipe');

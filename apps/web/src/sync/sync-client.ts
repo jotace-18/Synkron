@@ -5,6 +5,9 @@ export interface SyncDefinition {
   id: string
   name: string
   enabled: boolean
+  connector: string
+  source_connection_id: string
+  group?: 'academic' | 'sport' | 'personal' | 'custom'
 }
 
 export interface RunReference {
@@ -32,21 +35,43 @@ function checkSession(response: Response): void {
   if (response.status === 401) throw new SessionExpiredError()
 }
 
-export async function listDefinitions(signal?: AbortSignal): Promise<SyncDefinition[]> {
+export async function listDefinitions(
+  signal?: AbortSignal,
+): Promise<SyncDefinition[]> {
   const definitions: SyncDefinition[] = []
   for (;;) {
-    const query = new URLSearchParams({ limit: '50', offset: String(definitions.length) })
+    const query = new URLSearchParams({
+      limit: '50',
+      offset: String(definitions.length),
+    })
     const response = await fetch(`/api/v1/sync-definitions?${query}`, {
-      credentials: 'same-origin', cache: 'no-store', signal: requestSignal(signal),
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: requestSignal(signal),
     })
     checkSession(response)
-    if (response.status !== 200) throw new Error('No se pudieron cargar las sincronizaciones.')
+    if (response.status !== 200)
+      throw new Error('No se pudieron cargar las sincronizaciones.')
     const page: unknown = await response.json()
-    if (!Array.isArray(page) || page.length > 50 || !page.every((item: unknown) =>
-      item !== null && typeof item === 'object' &&
-      'id' in item && typeof item.id === 'string' &&
-      'name' in item && typeof item.name === 'string' &&
-      'enabled' in item && typeof item.enabled === 'boolean')) {
+    if (
+      !Array.isArray(page) ||
+      page.length > 50 ||
+      !page.every(
+        (item: unknown) =>
+          item !== null &&
+          typeof item === 'object' &&
+          'id' in item &&
+          typeof item.id === 'string' &&
+          'name' in item &&
+          typeof item.name === 'string' &&
+          'enabled' in item &&
+          typeof item.enabled === 'boolean' &&
+          'connector' in item &&
+          typeof item.connector === 'string' &&
+          'source_connection_id' in item &&
+          typeof item.source_connection_id === 'string',
+      )
+    ) {
       throw new Error('El servicio ha devuelto una respuesta inesperada.')
     }
     definitions.push(...(page as SyncDefinition[]))
@@ -55,10 +80,15 @@ export async function listDefinitions(signal?: AbortSignal): Promise<SyncDefinit
 }
 
 function isRunReference(value: unknown): value is RunReference {
-  return value !== null && typeof value === 'object' &&
-    'id' in value && typeof value.id === 'string' &&
-    'status' in value && typeof value.status === 'string' &&
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'status' in value &&
+    typeof value.status === 'string' &&
     ['queued', 'running', 'completed', 'failed'].includes(value.status)
+  )
 }
 
 export async function requestRun(
@@ -67,34 +97,153 @@ export async function requestRun(
   signal?: AbortSignal,
 ): Promise<RunReference> {
   const csrf = await getCsrfToken(requestSignal(signal))
-  const response = await fetch(`/api/v1/sync-definitions/${encodeURIComponent(definitionId)}/runs`, {
-    method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: requestSignal(signal),
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'Idempotency-Key': requestKey },
-    body: '{}',
-  })
+  const response = await fetch(
+    `/api/v1/sync-definitions/${encodeURIComponent(definitionId)}/runs`,
+    {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: requestSignal(signal),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrf,
+        'Idempotency-Key': requestKey,
+      },
+      body: '{}',
+    },
+  )
   checkSession(response)
-  if (response.status === 404) throw new Error('La sincronización ya no está disponible.')
-  if (response.status === 409) throw new Error('La sincronización no está disponible. Revisa su configuración.')
-  if (response.status === 403) throw new Error('No se pudo autorizar la solicitud. Inténtalo de nuevo.')
-  if (response.status !== 202) throw new Error('No se pudo solicitar la sincronización. Puedes reintentar la misma solicitud.')
+  if (response.status === 404)
+    throw new Error('La sincronización ya no está disponible.')
+  if (response.status === 409)
+    throw new Error(
+      'La sincronización no está disponible. Revisa su configuración.',
+    )
+  if (response.status === 403)
+    throw new Error('No se pudo autorizar la solicitud. Inténtalo de nuevo.')
+  if (response.status !== 202)
+    throw new Error(
+      'No se pudo solicitar la sincronización. Puedes reintentar la misma solicitud.',
+    )
   const body: unknown = await response.json()
-  if (!isRunReference(body)) throw new Error('El servicio ha devuelto una respuesta inesperada.')
+  if (!isRunReference(body))
+    throw new Error('El servicio ha devuelto una respuesta inesperada.')
   return body
 }
 
-export async function getRun(id: string, signal?: AbortSignal): Promise<SyncRun> {
+export async function getRun(
+  id: string,
+  signal?: AbortSignal,
+): Promise<SyncRun> {
   const response = await fetch(`/api/v1/sync-runs/${encodeURIComponent(id)}`, {
-    credentials: 'same-origin', cache: 'no-store', signal: requestSignal(signal),
+    credentials: 'same-origin',
+    cache: 'no-store',
+    signal: requestSignal(signal),
   })
   checkSession(response)
-  if (response.status !== 200) throw new Error('No se pudo consultar el estado. La sincronización puede seguir en curso.')
+  if (response.status !== 200)
+    throw new Error(
+      'No se pudo consultar el estado. La sincronización puede seguir en curso.',
+    )
   const body: unknown = await response.json()
-  const countKeys = ['read_count', 'created_count', 'updated_count', 'unchanged_count', 'retired_count', 'ignored_count']
-  if (!isRunReference(body) || body.id !== id ||
-    !countKeys.every((key) => key in body && Number.isSafeInteger((body as unknown as Record<string, unknown>)[key]) &&
-      Number((body as unknown as Record<string, unknown>)[key]) >= 0) ||
-    !('error_message' in body) || (body.error_message !== null && typeof body.error_message !== 'string')) {
+  const countKeys = [
+    'read_count',
+    'created_count',
+    'updated_count',
+    'unchanged_count',
+    'retired_count',
+    'ignored_count',
+  ]
+  if (
+    !isRunReference(body) ||
+    body.id !== id ||
+    !countKeys.every(
+      (key) =>
+        key in body &&
+        Number.isSafeInteger(
+          (body as unknown as Record<string, unknown>)[key],
+        ) &&
+        Number((body as unknown as Record<string, unknown>)[key]) >= 0,
+    ) ||
+    !('error_message' in body) ||
+    (body.error_message !== null && typeof body.error_message !== 'string')
+  ) {
     throw new Error('El servicio ha devuelto una respuesta inesperada.')
   }
   return body as SyncRun
+}
+
+export async function connectSource(
+  input: { name: string; base_url: string; connector: string; token: string },
+  signal?: AbortSignal,
+): Promise<void> {
+  const csrf = await getCsrfToken(requestSignal(signal))
+  const response = await fetch('/api/v1/sync-sources', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    signal: requestSignal(signal),
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+    body: JSON.stringify({
+      name: input.name,
+      base_url: input.base_url,
+      connector: input.connector,
+      auth: { type: 'bearer', token: input.token },
+      enabled: true,
+    }),
+  })
+  checkSession(response)
+  if (response.status === 409)
+    throw new Error(
+      'Esta fuente ya existe con otra credencial o está deshabilitada. Revisa su configuración.',
+    )
+  if (response.status === 403)
+    throw new Error(
+      'Destino o solicitud no autorizado. Revisa los orígenes permitidos de Sync.',
+    )
+  if (response.status !== 201)
+    throw new Error(
+      'No se pudo guardar la fuente. Revisa los datos o reintenta sin duplicarla.',
+    )
+}
+
+export interface SyncConnection {
+  id: string
+  base_url: string
+}
+export async function listSyncConnections(
+  signal?: AbortSignal,
+): Promise<SyncConnection[]> {
+  const connections: SyncConnection[] = []
+  for (;;) {
+    const query = new URLSearchParams({
+      limit: '50',
+      offset: String(connections.length),
+    })
+    const response = await fetch(`/api/v1/connections?${query}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: requestSignal(signal),
+    })
+    checkSession(response)
+    if (response.status !== 200)
+      throw new Error('No se pudieron cargar las fuentes.')
+    const page: unknown = await response.json()
+    if (
+      !Array.isArray(page) ||
+      page.length > 50 ||
+      !page.every(
+        (item: unknown): item is SyncConnection =>
+          item !== null &&
+          typeof item === 'object' &&
+          'id' in item &&
+          typeof item.id === 'string' &&
+          'base_url' in item &&
+          typeof item.base_url === 'string',
+      )
+    )
+      throw new Error('El servicio ha devuelto una respuesta inesperada.')
+    connections.push(...page.map(({ id, base_url }) => ({ id, base_url })))
+    if (page.length < 50) return connections
+  }
 }

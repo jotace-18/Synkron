@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getRun, listDefinitions, requestRun } from '../src/sync/sync-client.ts'
+import { getRun, listDefinitions, listSyncConnections, requestRun } from '../src/sync/sync-client.ts'
 import { SessionExpiredError } from '../src/activities/activities-client.ts'
 
 const run = {
@@ -44,7 +44,7 @@ test('loads definition pages and stops an unauthorized read', async (t) => {
   t.mock.method(globalThis, 'fetch', async (url) => {
     offsets.push(new URL(url, 'https://localhost').searchParams.get('offset'))
     if (offsets.length === 1) {
-      return Response.json(Array.from({ length: 50 }, (_, id) => ({ id: String(id), name: 'Source', enabled: true })))
+      return Response.json(Array.from({ length: 50 }, (_, id) => ({ id: String(id), name: 'Source', enabled: true, connector: 'academic.assignments', source_connection_id: 'connection' })))
     }
     if (offsets.length === 2) return Response.json([])
     return new Response(null, { status: 401 })
@@ -52,4 +52,21 @@ test('loads definition pages and stops an unauthorized read', async (t) => {
   assert.equal((await listDefinitions()).length, 50)
   assert.deepEqual(offsets, ['0', '50'])
   await assert.rejects(listDefinitions(), SessionExpiredError)
+})
+
+
+test('loads owned connection metadata across pages and handles expired sessions', async (t) => {
+  const offsets = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    offsets.push(new URL(url, 'https://localhost').searchParams.get('offset'))
+    assert.equal(options.credentials, 'same-origin')
+    if (offsets.length === 1) return Response.json(Array.from({length: 50}, (_, id) => ({id: String(id), base_url: 'http://personal:3000/api/v1/activities/export', has_credentials: true})))
+    if (offsets.length === 2) return Response.json([])
+    return new Response(null, {status: 401})
+  })
+  const connections = await listSyncConnections()
+  assert.equal(connections.length, 50)
+  assert.deepEqual(Object.keys(connections[0]).sort(), ['base_url', 'id'])
+  assert.deepEqual(offsets, ['0', '50'])
+  await assert.rejects(listSyncConnections(), SessionExpiredError)
 })

@@ -1,3 +1,4 @@
+import { getConnector } from '../connectors/connector-catalog';
 import {
   BadRequestException,
   ConflictException,
@@ -21,7 +22,7 @@ export class DefinitionsService {
       `SELECT id, name, source_connection_id, connector, source_collection,
               enabled, created_at, updated_at
        FROM sync.definitions
-       WHERE tenant_id = $1
+       WHERE tenant_id = $1 AND source_mode = 'pull'
        ORDER BY created_at ASC, id ASC
        LIMIT $2 OFFSET $3`,
       [tenantId, query.limit, query.offset],
@@ -41,7 +42,7 @@ export class DefinitionsService {
          created_at,
          updated_at
        FROM sync.definitions
-       WHERE tenant_id = $1 AND id = $2`,
+       WHERE tenant_id = $1 AND id = $2 AND source_mode = 'pull'`,
       [tenantId, definitionId],
     );
 
@@ -58,6 +59,9 @@ export class DefinitionsService {
     tenantId: string,
     input: CreateDefinitionDto,
   ): Promise<SyncDefinition> {
+    const connector = getConnector(input.connector);
+    if (!connector) throw new BadRequestException('Conector no admitido');
+
     try {
       return await this.database.transaction<SyncDefinition>(async (client) => {
         const source = await client.query<{
@@ -69,7 +73,7 @@ export class DefinitionsService {
           `SELECT id, enabled, auth_type,
                   credentials_encrypted IS NOT NULL AS has_credentials
            FROM sync.connections
-           WHERE tenant_id = $1 AND id = $2
+           WHERE tenant_id = $1 AND id = $2 AND input_mode = 'pull'
            FOR SHARE`,
           [tenantId, input.source_connection_id],
         );
@@ -81,9 +85,12 @@ export class DefinitionsService {
         if (!connection.enabled) {
           throw new ConflictException('La conexión está deshabilitada');
         }
-        if (connection.auth_type !== 'bearer' || !connection.has_credentials) {
+        if (
+          connection.auth_type !== connector.auth_type ||
+          (connector.auth_type === 'bearer' && !connection.has_credentials)
+        ) {
           throw new BadRequestException(
-            'La conexión académica requiere una credencial Bearer',
+            'La conexión requiere una credencial Bearer',
           );
         }
 
@@ -91,10 +98,17 @@ export class DefinitionsService {
           `INSERT INTO sync.definitions (
              tenant_id, source_connection_id, name, connector,
              source_collection, enabled
-           ) VALUES ($1, $2, $3, $4, 'assignments', $5)
+           ) VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, name, source_connection_id, connector,
                      source_collection, enabled, created_at, updated_at`,
-          [tenantId, connection.id, input.name, input.connector, input.enabled],
+          [
+            tenantId,
+            connection.id,
+            input.name,
+            input.connector,
+            connector.source_collection,
+            input.enabled,
+          ],
         );
         return result.rows[0];
       });

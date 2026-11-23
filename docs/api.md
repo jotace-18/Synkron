@@ -4,24 +4,51 @@ El panel se comunicará con Synkron mediante esta API. Las rutas empiezan por `/
 
 Los identificadores y direcciones de este documento son ficticios.
 
+## Swagger y documentos OpenAPI
+
+El portal `https://localhost:8443/api/docs` reúne los contratos públicos de
+Cuentas, Sync, Automation, Monitoring, Academic y Sport mediante un selector. Incluye
+parámetros, cuerpos, respuestas, errores y ejemplos de las 56 operaciones
+implementadas, con sus permisos reales. La [guía de Swagger](swagger.md) detalla
+el arranque, la autenticación y la descarga de cada documento. Las rutas internas
+quedan fuera de estos contratos y bloqueadas en el gateway.
+
 ## Estado del contrato
 
 Están disponibles las rutas de autenticación de la API, la creación, listado
 paginado y prueba de conexiones en Sync, la creación de definiciones de
 sincronización, la solicitud y consulta de ejecuciones, el listado y detalle
-de actividades centralizadas y la API de entregas de académico. La
+de actividades centralizadas y la API de entregas de académico. También están
+disponibles programaciones, reglas, recordatorios, historial de Automation,
+consultas de Monitoring y avisos. La
 [entrada HTTPS local](../infra/gateway/README.md) sirve el frontend en
-`https://localhost:8443` y encamina `/api/v1/auth/...` a la API de cuentas y el
-resto de `/api/...` a Sync. Las rutas `/internal/...` quedan bloqueadas en esa
+`https://localhost:8443` y encamina `/api/v1/auth/...` a la API de cuentas,
+`/api/v1/automation/...` a Automation, `/api/v1/monitoring/...` y
+`/api/v1/notifications/...` a Monitoring y el resto de `/api/...` a Sync.
+Las rutas `/internal/...` quedan bloqueadas en esa
 entrada. En local se mantienen los puertos directos de API (3002), Sync (3001)
-y académico (3101) para comprobaciones. Las reglas, el historial y el calendario
-siguen pendientes. La ejecución en segundo plano de entregas académicas ya
-funciona. Las operaciones indicadas como previstas en este documento son diseño
+y académico (3101) para comprobaciones. El calendario y los recorridos de entregas y exámenes
+están implementados. La guía de puesta en marcha y validación de exámenes está en
+[Exámenes](examenes.md). Las operaciones indicadas como previstas en este documento son diseño
 y todavía no están implementadas.
 
 El destino inicial de una sincronización es la colección de actividades de Sync.
 Las tres fuentes se describen en [Servicios de origen](servicios-origen.md). Sus
 contratos de entrada son distintos de la representación común y de la vista.
+
+## Entrada estandarizada disponible
+
+Sync incorpora administración de fuentes en `/api/v1/ingestion-sources`, recepción
+Bearer en `POST /api/v1/ingestions` y resultados en `GET /api/v1/ingestions/{id}`.
+La administración requiere sesión y CSRF; cada fuente tiene una credencial de
+entrada propia, con pausa, rotación y revocación. El `202` confirma persistencia
+del trabajo, y `Idempotency-Key` permite reintentar sin crear otra ejecución.
+
+La [guía de entrada estandarizada](entrada-estandarizada.md) incluye contratos,
+límites, migración 013 y prueba completa. Swagger UI está disponible en
+`/api/docs` y el documento OpenAPI en `/api/docs/openapi.json`, a través del
+mismo gateway. El selector permite consultar también las API de los demás módulos; las rutas
+internas quedan excluidas.
 
 ## Servicio académico de origen
 
@@ -32,7 +59,98 @@ admite creación y listado, detalle y edición por ID y borrado lógico. La ruta
 eliminados con `deleted_at`, para que Sync pueda reconocer su retirada. El
 [contrato de entregas](../apps/academic/README.md) detalla campos, permisos,
 paginación, actualizaciones parciales y preparación local. Sync ya importa esos cambios en segundo plano a su colección central; la consulta
-autenticada de actividades ya está disponible; el calendario sigue pendiente.
+autenticada de actividades y el calendario ya están disponibles.
+
+### Contrato de exámenes
+
+El recurso de origen es `/api/v1/exams` en el servicio académico, con la misma
+autenticación Bearer y cuenta que las entregas. Estas rutas están implementadas en Academic; no se exponen como recursos de escritura de Sync.
+
+| Método | Ruta de Academic | Resultado acordado |
+|---|---|---|
+| POST | `/api/v1/exams` | `201`, examen creado. |
+| GET | `/api/v1/exams` | `200`, página de exámenes propios no retirados. |
+| GET | `/api/v1/exams/export` | `200`, página propia que incluye marcas de retirada. |
+| GET | `/api/v1/exams/{id}` | `200`, examen propio no retirado. |
+| PATCH | `/api/v1/exams/{id}` | `200`, edición parcial con validación del estado final. |
+| DELETE | `/api/v1/exams/{id}` | `204`, retirada lógica; repetir conserva la primera marca. |
+
+Campos de creación y edición:
+
+| Campo | Contrato |
+|---|---|
+| `title` | Texto obligatorio, de 1 a 200 caracteres. |
+| `course_name` | Texto obligatorio, de 1 a 150 caracteres. |
+| `course_abbreviation` | Texto opcional, de 1 a 20 caracteres, o `null`. Campus lo obtiene del selector de asignaturas. |
+| `topics` | Texto libre opcional, de 1 a 1000 caracteres, o `null`. |
+| `section` | Obligatorio: `theory` o `practice`. |
+| `exam_date` | Día `YYYY-MM-DD` sin hora, o `null` cuando se usa `exam_at`. |
+| `exam_at` | Instante ISO 8601 con `Z` o desplazamiento explícito, o `null` cuando se usa `exam_date`. |
+| `status` | `scheduled`, `completed` o `cancelled`. Por defecto, `scheduled`. |
+| `weight_percent` | Número finito entre 0 y 100, opcional. |
+| `weight_basis` | `course` o `section`, obligatorio cuando existe porcentaje; ambos campos nulos para omitir ponderación. |
+| `grade` | Número finito entre 0 y 10, con hasta dos decimales, o `null`. |
+
+Los textos se recortan y, cuando se proporcionan, no pueden quedar vacíos. Los
+textos opcionales y datos de evaluación omitidos en creación se guardan como
+`null`; el estado omitido toma el valor `scheduled`. Campos ajenos al
+contrato, `account_id`, IDs o fechas técnicas aportados en el cuerpo se rechazan
+con `422`. La cuenta procede exclusivamente de la credencial verificada.
+
+En Campus se elige siempre una fecha y, opcionalmente, una hora de Madrid. En la
+API se exige exactamente uno entre `exam_date` y `exam_at`; el segundo ya incluye
+el día. Se admiten fechas reales de los años 0001 a 9999, pasadas o futuras,
+sin fabricar una hora para los registros que no la tienen. Los instantes se
+normalizan a UTC y se devuelven con `Z`.
+
+Ejemplo de creación sin hora:
+
+```json
+{
+  "title": "Parcial de CC",
+  "course_name": "Cloud Computing",
+  "course_abbreviation": "CC",
+  "topics": "Temas 1 a 3",
+  "section": "theory",
+  "exam_date": "2026-12-02",
+  "exam_at": null,
+  "status": "scheduled",
+  "weight_percent": 25,
+  "weight_basis": "course",
+  "grade": null
+}
+```
+
+Las respuestas añaden `id`, `created_at`, `updated_at` y `deleted_at`, y devuelven
+los campos opcionales ausentes como `null`; no incluyen credenciales ni
+`account_id`. La exportación mantiene la misma forma y añade los registros con
+`deleted_at` informado. Los listados usan `limit` entre 1 y 50 (20 por defecto)
+y `offset` desde 0, con orden `created_at DESC, id DESC` y filtro por cuenta antes
+de paginar. No mantienen una instantánea entre páginas.
+
+En `PATCH`, omitir un campo conserva su valor y `null` vacía solo los campos
+opcionales. El cuerpo vacío o una combinación final inválida produce `422`.
+Cambiar de formato temporal requiere poner a `null` el campo anterior:
+
+```json
+{
+  "exam_date": null,
+  "exam_at": "2026-12-02T09:00:00+01:00"
+}
+```
+
+Eliminar una ponderación requiere enviar ambos campos a `null`. La validación
+final y la escritura son atómicas. Repetir los mismos valores conserva
+`updated_at`; modificar datos conserva `id` y `created_at`. Actualizar una nota
+no cambia automáticamente el estado del examen.
+
+Una credencial inválida devuelve `401`. Un ID ausente, ajeno o retirado devuelve
+el mismo `404` en detalle y edición. La retirada de un examen propio ya retirado
+vuelve a devolver `204`, conservando la primera fecha de borrado. `cancelled`
+conserva un registro visible y no equivale a `deleted_at`.
+
+El mapeo al calendario se define en el
+[contrato de exámenes del modelo común](modelo-actividades.md#contrato-de-exámenes).
 
 ## Operaciones
 
@@ -149,7 +267,7 @@ y no realiza todavía peticiones a la aplicación externa.
 
 Prueba de conexión: `POST /api/v1/connections/{id}/test`, con cuerpo `{}`, sesión,
 origen y CSRF válidos. Hace un `GET` a la URL guardada, incluida su ruta; para la
-API ficticia se utiliza `http://task-api:3000/tasks`. La conexión debe pertenecer
+fuente académica puede utilizarse `http://academic:3000/api/v1/assignments/export`. La conexión debe pertenecer
 a la cuenta; una conexión ajena o inexistente produce el mismo `404`, y un UUID
 inválido produce `422`. No se aceptan direcciones alternativas en el cuerpo:
 el destino procede siempre de la conexión guardada.
@@ -163,7 +281,8 @@ credenciales no se incluyen en el resultado.
 
 Solo se consultan los orígenes expresamente configurados en
 `SYNC_ALLOWED_CONNECTION_ORIGINS` (separados por comas, sin rutas, credenciales,
-query ni fragmentos). En el entorno local se autoriza `http://task-api:3000`;
+query ni fragmentos). En el entorno local se autorizan `http://academic:3000`,
+`http://sport:3000` y `http://personal:3000`;
 esta configuración está pensada para servicios controlados en la red de Docker.
 Los destinos no autorizados, o las URLs con credenciales, query o fragmentos,
 se rechazan con `403` antes de hacer la petición externa. Las redirecciones no
@@ -193,14 +312,13 @@ Creación de sincronización, `POST /api/v1/sync-definitions` (disponible):
 ```
 
 El nombre se recorta y debe contener entre 1 y 100 caracteres. La conexión se
-identifica mediante un UUID v4 y el único conector admitido por ahora es
-`academic.assignments`. `enabled` es un booleano y vale `true` si se omite.
+identifica mediante un UUID v4 y los conectores admitidos son
+`academic.assignments` y `academic.exams`. `enabled` es un booleano y vale `true` si se omite.
 No se convierten cadenas como `"false"` en booleanos. Se rechazan campos
 adicionales, incluidos propietario, credenciales, colección y fechas técnicas.
 
-Este primer conector utiliza la lectura y la correspondencia de entregas ya
-implementadas: colección `assignments`, destino central y tipo
-`academic.assignment`. La URL de exportación y la credencial proceden de la
+El conector de entregas utiliza la colección `assignments` y el tipo
+`academic.assignment`; el de exámenes utiliza `exams` y `academic.exam`. La URL de exportación y la credencial proceden de la
 conexión guardada. El modelo de destino se concreta en
 [Modelo de actividades](modelo-actividades.md). La configuración de
 correspondencias personalizadas y los demás conectores siguen pendientes.

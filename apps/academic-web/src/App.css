@@ -471,3 +471,10 @@
     padding: 22px;
   }
 }
+
+.campus-navigation button { display: block; width: 100%; padding: 14px 16px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.campus-navigation button[aria-current="page"] { background: #4034a3; color: #fff; font-weight: 600; }
+.campus-navigation button:focus-visible { outline: 2px solid #a7a6ff; outline-offset: 2px; }
+.campus-badge[data-status="scheduled"] { background: #e4e9ff; color: #3730a3; }
+.campus-badge[data-status="completed"] { background: #dcfce7; color: #166534; }
+.campus-badge[data-status="cancelled"] { background: #f1f5f9; color: #64748b; }

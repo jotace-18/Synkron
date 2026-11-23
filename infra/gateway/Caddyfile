@@ -7,6 +7,75 @@ https://localhost:8443 {
     tls internal
 
     route {
+        @accountsDocs path /api/docs/accounts/openapi.json
+        handle @accountsDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy api:3000
+        }
+
+        @automationDocs path /api/docs/automation/openapi.json
+        handle @automationDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy automation:3000
+        }
+
+        @monitoringDocs path /api/docs/monitoring/openapi.json
+        handle @monitoringDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy monitoring:3000
+        }
+
+        @personalDocs path /api/docs/personal/openapi.json
+        handle @personalDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy personal:3000
+        }
+
+        @personalApi path /personal/api/v1/events /personal/api/v1/events/* /personal/api/v1/activities/export
+        handle @personalApi {
+            uri strip_prefix /personal
+            reverse_proxy personal:3000
+        }
+
+        @personalPrivate path /personal /personal/*
+        handle @personalPrivate {
+            respond "Not found" 404
+        }
+
+        @sportDocs path /api/docs/sport/openapi.json
+        handle @sportDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy sport:3000
+        }
+
+        @sportApi path /sport/api/v1/activities/export /sport/api/v1/gym-sessions /sport/api/v1/gym-sessions/*
+        handle @sportApi {
+            uri strip_prefix /sport
+            reverse_proxy sport:3000
+        }
+
+        @sportPrivate path /sport /sport/*
+        handle @sportPrivate {
+            respond "Not found" 404
+        }
+
+        @academicDocs path /api/docs/academic/openapi.json
+        handle @academicDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy academic:3000
+        }
+
+        @academicApi path /academic/api/v1/assignments /academic/api/v1/assignments/* /academic/api/v1/exams /academic/api/v1/exams/*
+        handle @academicApi {
+            uri strip_prefix /academic
+            reverse_proxy academic:3000
+        }
+
+        @academicPrivate path /academic /academic/*
+        handle @academicPrivate {
+            respond "Not found" 404
+        }
+
         @auth path /api/v1/auth /api/v1/auth/*
         handle @auth {
             reverse_proxy api:3000

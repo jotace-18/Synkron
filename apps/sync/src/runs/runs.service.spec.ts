@@ -1,3 +1,4 @@
+import { CONNECTOR_SOURCES_JSON } from '../connectors/connector-catalog';
 import { createHash } from 'node:crypto';
 import {
   BadRequestException,
@@ -238,7 +239,11 @@ describe('RunsService.createQueued', () => {
     await expect(service.getDeliveryState(owner, run.id)).resolves.toEqual(
       state,
     );
-    expect(readQuery.mock.calls[0][1]).toEqual([owner, run.id]);
+    expect(readQuery.mock.calls[0][1]).toEqual([
+      owner,
+      run.id,
+      CONNECTOR_SOURCES_JSON,
+    ]);
     readQuery.mockResolvedValueOnce({ rows: [] });
     await expect(service.getDeliveryState(owner, run.id)).resolves.toBeNull();
     expect(transaction).not.toHaveBeenCalled();

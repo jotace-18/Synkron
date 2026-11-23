@@ -168,7 +168,7 @@ function App() {
                   <p className="eyebrow">Tu agenda personal</p>
                   <h1>{view === 'calendar' ? 'Tu calendario' : 'Tu agenda'}</h1>
                   <p className="workspace-description">
-                    Entregas, entrenamientos y planes en una misma vista.
+                    Entregas, exámenes, entrenamientos y compromisos personales en una misma vista.
                   </p>
                 </div>
                 <div className="view-switch" role="group" aria-label="Vista de actividades">

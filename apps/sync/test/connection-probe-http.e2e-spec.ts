@@ -11,12 +11,12 @@ import { DatabaseService } from '../src/database/database.service';
 describe('Connection probing (HTTP)', () => {
   const token = 'token-ficticio-de-pruebas';
   const cookie = `__Host-synkron_session=${'a'.repeat(64)}`;
-  const target = 'http://task-api:3000/tasks';
+  const target = 'http://source.test:3000/tasks';
   const settings = {
     AUTH_API_INTERNAL_URL: 'http://api:3003',
     SYNC_AUTH_SERVICE_TOKEN: 'b'.repeat(64),
     SESSION_COOKIE_NAME: '__Host-synkron_session',
-    SYNC_ALLOWED_CONNECTION_ORIGINS: 'http://task-api:3000',
+    SYNC_ALLOWED_CONNECTION_ORIGINS: 'http://source.test:3000',
   };
   let app: INestApplication<App>;
   let owner: string;

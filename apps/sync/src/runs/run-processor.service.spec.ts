@@ -1,3 +1,7 @@
+import type { CanonicalImportService } from '../imports/canonical-import.service';
+import type { StoredIngestionImporter } from '../ingestions/stored-ingestion.importer';
+import type { AcademicExamsImportService } from '../imports/academic-exams-import.service';
+import { ConnectorRegistryService } from '../connectors/connector-registry.service';
 import type { AcademicImportService } from '../imports/academic-import.service';
 import type { AcademicImportResult } from '../imports/academic-import.types';
 import type { ClaimedSyncRun } from './run.types';
@@ -87,7 +91,14 @@ describe('RunProcessorService', () => {
     });
     processor = new RunProcessorService(
       { complete, fail, renewLease } as unknown as RunsService,
-      { run: importRun } as unknown as AcademicImportService,
+      new ConnectorRegistryService(
+        {
+          run: importRun,
+        } as unknown as AcademicImportService,
+        { run: importRun } as unknown as AcademicExamsImportService,
+        { run: importRun } as unknown as StoredIngestionImporter,
+        { run: importRun } as unknown as CanonicalImportService,
+      ),
     );
   });
 

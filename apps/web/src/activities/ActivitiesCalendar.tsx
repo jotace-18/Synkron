@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   activityOccursOn,
+  compareCalendarActivities,
   addCalendarDays,
   getMadridDate,
   getDayLabel,
@@ -209,7 +210,7 @@ export default function ActivitiesCalendar({
           <p role="status">
             {activities.length === 0
               ? calendarView === 'day' ? 'No hay actividades para este día.' : 'No hay actividades en este periodo.'
-              : 'Horarios de Madrid · Verde: entregada · Ámbar: en curso · Rojo: pendiente'}
+              : 'Horarios de Madrid · Verde: entregada/realizado · Ámbar: en curso · Rojo: entrega pendiente · Violeta: examen programado · Naranja: gimnasio programado · Rosa: Otros pendientes · Gris: cancelado'}
           </p>
         )}
       </div>
@@ -251,8 +252,7 @@ export default function ActivitiesCalendar({
                     </button>
                     <ul className="calendar-events">
                       {activities.filter((activity) => activityOccursOn(activity, day.date))
-                        .sort((left, right) =>
-                          Number(left.schedule.kind !== 'date') - Number(right.schedule.kind !== 'date'))
+                        .sort(compareCalendarActivities)
                         .map((activity, index, items) => (
                           <Fragment key={activity.id}>
                           {calendarView !== 'month' && (
@@ -268,11 +268,12 @@ export default function ActivitiesCalendar({
                               type="button"
                               aria-haspopup="dialog"
                               className="calendar-event"
+                              data-type={activity.type}
                               data-status={activity.status ?? 'unknown'}
                               data-mandatory={activity.details.mandatory === true}
                               onClick={() => onSelect(activity.id)}
                               title={`${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
-                              aria-label={`Ver detalle: ${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
+                              aria-label={`Ver detalle: ${formatActivityType(activity.type)}. ${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
                             >
                             <span className="calendar-event-heading">
                               <span className="calendar-event-title">

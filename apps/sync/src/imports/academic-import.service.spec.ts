@@ -1,3 +1,5 @@
+import { ConnectorImportTransport } from './connector-import.transport';
+import { ActivityImportPipeline } from './activity-import.pipeline';
 import {
   BadGatewayException,
   BadRequestException,
@@ -73,10 +75,15 @@ describe('AcademicImportService', () => {
       .mockReset()
       .mockResolvedValue({ id: 'central-id', outcome: 'retired' });
     service = new AcademicImportService(
-      { query } as unknown as DatabaseService,
-      { decrypt } as unknown as CredentialsService,
+      new ConnectorImportTransport(
+        { query } as unknown as DatabaseService,
+        { decrypt } as unknown as CredentialsService,
+        new ActivityImportPipeline({
+          save,
+          retire,
+        } as unknown as ActivitiesService),
+      ),
       { readAll } as unknown as AcademicReaderService,
-      { save, retire } as unknown as ActivitiesService,
     );
   });
 

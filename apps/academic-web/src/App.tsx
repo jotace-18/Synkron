@@ -1,3 +1,4 @@
+import ExamsPage from './exams/ExamsPage'
 import { useEffect, useRef, useState } from 'react'
 import { listAssignments } from './assignments/assignments-client'
 import AssignmentsTable from './assignments/AssignmentsTable'
@@ -7,6 +8,7 @@ import type { Assignment } from './assignments/assignment.types'
 import './App.css'
 
 function App() {
+  const [view, setView] = useState<'assignments' | 'exams'>('assignments')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Assignment | null>(null)
   const [retiring, setRetiring] = useState<Assignment | null>(null)
@@ -77,9 +79,8 @@ function App() {
         </div>
 
         <nav className="campus-navigation" aria-label="Secciones">
-          <a href="#assignments" aria-current="page">
-            Entregas
-          </a>
+          <button type="button" disabled={creating || editing !== null || retiring !== null} aria-current={view === 'assignments' ? 'page' : undefined} onClick={() => setView('assignments')}>Entregas</button>
+          <button type="button" disabled={creating || editing !== null || retiring !== null} aria-current={view === 'exams' ? 'page' : undefined} onClick={() => setView('exams')}>Exámenes</button>
         </nav>
 
         <p className="campus-sidebar-note">
@@ -88,6 +89,7 @@ function App() {
       </aside>
 
       <main className="campus-main">
+        {view === 'exams' ? <ExamsPage /> : <>
         <header className="campus-heading">
           <div>
             <p className="campus-eyebrow">Agenda académica</p>
@@ -184,6 +186,7 @@ function App() {
             />
           )}
         </section>
+        </>}
       </main>
       {retiring && (
         <RetireAssignmentDialog

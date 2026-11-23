@@ -1,3 +1,18 @@
+import { SyncSourcesController } from './connections/sync-sources.controller';
+import { SyncSourcesService } from './connections/sync-sources.service';
+import { CanonicalImportService } from './imports/canonical-import.service';
+import { CanonicalReaderService } from './connectors/canonical/canonical-reader.service';
+import { IngestionSourcesService } from './ingestions/ingestion-sources.service';
+import { IngestionSourceGuard } from './ingestions/ingestion-source.guard';
+import { IngestionsService } from './ingestions/ingestions.service';
+import { StoredIngestionImporter } from './ingestions/stored-ingestion.importer';
+import { IngestionsController } from './ingestions/ingestions.controller';
+import { IngestionSourcesController } from './ingestions/ingestion-sources.controller';
+import { ConnectorImportTransport } from './imports/connector-import.transport';
+import { ActivityImportPipeline } from './imports/activity-import.pipeline';
+import { AcademicExamsReaderService } from './connectors/academic/academic-exams-reader.service';
+import { AcademicExamsImportService } from './imports/academic-exams-import.service';
+import { ConnectorRegistryService } from './connectors/connector-registry.service';
 import { Module } from '@nestjs/common';
 import { ConnectionTargetPolicyService } from './connections/connection-target-policy.service';
 import { AppController } from './app.controller';
@@ -27,7 +42,10 @@ import { AutomationActivitiesController } from './internals/automation-activitie
   imports: [],
   controllers: [
     AppController,
+    IngestionsController,
+    IngestionSourcesController,
     ConnectionsController,
+    SyncSourcesController,
     ActivitiesController,
     DefinitionsController,
     RunsController,
@@ -36,16 +54,28 @@ import { AutomationActivitiesController } from './internals/automation-activitie
     AutomationActivitiesController,
   ],
   providers: [
+    CanonicalReaderService,
+    CanonicalImportService,
     ConnectionTargetPolicyService,
+    IngestionSourcesService,
+    IngestionSourceGuard,
+    IngestionsService,
+    StoredIngestionImporter,
     AppService,
     DatabaseService,
     ConnectionsService,
+    SyncSourcesService,
     SessionClientService,
     CredentialsService,
     ConnectionProbeService,
     ActivitiesService,
     AcademicReaderService,
+    AcademicExamsReaderService,
+    AcademicExamsImportService,
     AcademicImportService,
+    ActivityImportPipeline,
+    ConnectorImportTransport,
+    ConnectorRegistryService,
     DefinitionsService,
     RunsService,
     RunJobsService,

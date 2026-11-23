@@ -71,10 +71,11 @@ describe('DefinitionsService.create', () => {
       connectionId,
       definition.name,
       'academic.assignments',
+      'assignments',
       true,
     ]);
     expect(query.mock.calls[1][0]).not.toContain(definition.name);
-    expect(query.mock.calls[1][0]).toContain("'assignments'");
+    expect(query.mock.calls[1][1]?.[4]).toBe('assignments');
   });
 
   it('lists a stable page scoped to the verified owner without selecting credentials', async () => {
@@ -103,7 +104,7 @@ describe('DefinitionsService.create', () => {
     await expect(
       service.create(owner, { ...input(), enabled: false }),
     ).resolves.toEqual({ ...definition, enabled: false });
-    expect(query.mock.calls[1][1]?.[4]).toBe(false);
+    expect(query.mock.calls[1][1]?.[5]).toBe(false);
   });
 
   it('rejects a missing or foreign connection without attempting an insert', async () => {

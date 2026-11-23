@@ -8,6 +8,7 @@ export type ActivityType =
   | 'sport.hiking'
   | 'sport.running'
   | 'sport.other'
+  | 'personal.event'
   | 'social.plan'
 
 export type ActivitySchedule =
