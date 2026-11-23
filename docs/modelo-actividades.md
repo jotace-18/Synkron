@@ -56,7 +56,13 @@ reconstruir su contenido a partir de esos eventos.
 | `sport.hiking` | Senderismo. |
 | `sport.running` | Carrera. |
 | `sport.other` | Otro deporte. |
-| `social.plan` | Quedada o plan social. |
+| `social.plan` | Nombre previsto inicialmente para planes; todavía presente en código y pendiente de sustitución. |
+
+El contrato de producto del 23/11/2026 amplía el tercer bloque a **Otros** y
+propone `personal.event` para recados, citas y quedadas: asunto y día obligatorios,
+hora y duración opcionales, personas opcionales y estados pendiente/realizado/cancelado.
+Esta decisión está documentada en US-25; el nuevo tipo aún no está habilitado y
+requiere actualizar el catálogo, las restricciones y las vistas durante su implementación.
 
 El tipo normalizado no sustituye a la colección del origen. Cambiar una
 correspondencia no debe producir una identidad distinta para el mismo recurso.

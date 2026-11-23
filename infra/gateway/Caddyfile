@@ -25,6 +25,23 @@ https://localhost:8443 {
             reverse_proxy monitoring:3000
         }
 
+        @personalDocs path /api/docs/personal/openapi.json
+        handle @personalDocs {
+            rewrite * /api/docs/openapi.json
+            reverse_proxy personal:3000
+        }
+
+        @personalApi path /personal/api/v1/events /personal/api/v1/events/* /personal/api/v1/activities/export
+        handle @personalApi {
+            uri strip_prefix /personal
+            reverse_proxy personal:3000
+        }
+
+        @personalPrivate path /personal /personal/*
+        handle @personalPrivate {
+            respond "Not found" 404
+        }
+
         @sportDocs path /api/docs/sport/openapi.json
         handle @sportDocs {
             rewrite * /api/docs/openapi.json

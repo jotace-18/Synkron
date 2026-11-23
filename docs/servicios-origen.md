@@ -10,7 +10,7 @@ implementado. Las decisiones abiertas se enumeran al final.
 |---|---|
 | Académico | Agenda personal de entregas, exámenes, sesiones de trabajo y eventos académicos. |
 | Deporte | Registro de gimnasio, fútbol, senderismo, carrera y otras actividades sencillas. |
-| Planes sociales | Quedadas y planes personales con información opcional de lugar y participantes. |
+| Otros | Recados, citas y quedadas con asunto y día, hora y duración opcionales, personas opcionales y estado. |
 
 Son servicios externos al motor de Synkron. En un proyecto personal pueden ser
 módulos propios. No son los componentes internos Sync, Automation y Monitoring.
@@ -20,10 +20,10 @@ registros y ofrece una API de acceso autorizado. Synkron no lee sus bases de dat
 La API estática `fixtures/task-api` permite comprobar conexiones. El backend
 `apps/academic` implementa las colecciones editables de entregas y exámenes, con PostgreSQL,
 autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
-describen las rutas disponibles. Los demás recursos académicos y la fuente de
-planes sociales siguen pendientes. `apps/sport` incorpora la API de gimnasio con
+describen las rutas disponibles. Los demás recursos académicos siguen pendientes. La fuente Otros dispone ya
+de backend; su interfaz e integración central siguen pendientes. `apps/sport` incorpora la API de gimnasio con
 PostgreSQL y credenciales propias. `apps/sport-web` permite mantener sesiones
-desde una interfaz independiente; la publicación en Sync sigue pendiente. Campus permite introducir y editar entregas y exámenes.
+desde una interfaz independiente; la integración con Sync y Monitoring está validada. Campus permite introducir y editar entregas y exámenes.
 
 ## Fuente académica
 
@@ -181,20 +181,142 @@ un conector actual. Registrar actividades frecuentes no supone todavía patrones
 de repetición automática. Para gimnasio ya se admite planificar sesiones futuras;
 el alcance concreto de las demás disciplinas se cerrará al incorporarlas.
 
-## Fuente de planes sociales
+## Fuente personal: Otros
+
+Contrato acordado el 23/11/2026; sustituye la propuesta de planes sociales.
+El backend está implementado en `apps/personal`; su interfaz y la habilitación
+central en Sync corresponden a los siguientes subpuntos. Puede representar ir a comprar,
+una cita con el peluquero o quedar con amigos mediante el mismo recurso.
 
 | Dato | Alcance |
 |---|---|
-| Título | Nombre de la quedada o plan. |
-| Fecha | Día del plan. |
-| Hora | Hora del plan. |
-| Ubicación | Opcional. |
-| Participantes | Lista opcional de nombres. |
+| Asunto | Obligatorio. |
+| Día | Obligatorio. |
+| Hora | Opcional; se introduce en horario de Madrid. |
+| Duración | Opcional, en minutos enteros positivos; requiere hora de comienzo. |
+| Personas | Lista opcional de nombres, sin cuentas ni invitaciones. |
+| Estado | Pendiente, realizado o cancelado. |
 
-La descripción opcional y un estado de cancelación son propuestas pendientes
-de confirmar. La ubicación puede empezar como texto libre y los participantes
-como nombres; no se ha solicitado un sistema de invitaciones, cuentas de
-participantes o integración de mapas.
+Sin hora se exporta un día; con hora y sin duración, un instante; con duración,
+un intervalo. El tipo central previsto es `personal.event` con rol `start` y
+estados `pending`, `completed`, `cancelled`. La duración central se obtiene del
+intervalo. Cancelar mantiene el registro; retirar comunica una baja explícita.
+
+La exportación ofrece el contrato canónico común para el lector
+`standard.activities`. Ubicación, descripción, recurrencias, mapas e invitaciones
+no forman parte del primer recorrido. El plan está en [US-25](backlog.md#us-25--incorporar-el-bloque-otros-para-compromisos-personales).
+
+### API de compromisos personales
+
+El backend escucha en `127.0.0.1:3106`, dispone de `/healthz` con comprobación de
+PostgreSQL y usa una cuenta propia con token Bearer de 64 caracteres hexadecimales.
+Solo se guarda la huella SHA-256 del token. No se usan cookies para esta fuente.
+
+| Método | Ruta en Personal | Comportamiento |
+|---|---|---|
+| POST | `/api/v1/events` | Crear un compromiso propio. |
+| GET | `/api/v1/events` | Listar activos; `limit` 1–50, `offset` no negativo. |
+| GET | `/api/v1/events/export` | Listar propios incluidas retiradas. |
+| GET | `/api/v1/events/:id` | Obtener un activo propio. |
+| PATCH | `/api/v1/events/:id` | Editar parcialmente, completar o cancelar. |
+| DELETE | `/api/v1/events/:id` | Retirada lógica idempotente. |
+| GET | `/api/v1/activities/export` | Operaciones canónicas v1, incluidas retiradas. |
+
+El día sin hora se conserva en `on_date`. Si se conoce la hora, se comunica
+`started_at` con zona explícita y `on_date:null`; el instante ya contiene el día.
+`duration_minutes` es null o un entero positivo hasta 2147483647, solo con hora.
+El final calculado debe permanecer entre los años 1 y 9999. No se guarda un
+`end_at` independiente. Todas las fechas se devuelven sin hora inventada o en UTC.
+
+`title` se recorta y admite 1–200 caracteres. `people` es una lista opcional
+(por defecto vacía) de hasta 50 nombres recortados, no vacíos y de hasta 100
+caracteres. No representa invitaciones ni cuentas. `status` usa `pending` por
+defecto y admite `completed` o `cancelled`; no cambia por el paso del tiempo.
+
+PATCH conserva los campos omitidos y comprueba el estado final en una única
+sentencia SQL. Cambiar de día sin hora a instante requiere borrar `on_date` con
+null. Volver a un día sin hora exige borrar `started_at` y cualquier duración.
+Solo los tres campos temporales admiten null; `people:[]` elimina los nombres.
+Una edición sin cambios conserva `updated_at`; editar siempre conserva el ID.
+Cancelar mantiene el compromiso visible. DELETE lo retira; repetir DELETE
+conserva la fecha de retirada. Un ID ajeno y uno inexistente devuelven el mismo
+404. No se aceptan `account_id`, `tenant_id`, `end_at` ni fechas técnicas del cliente.
+
+La exportación canónica usa `personal.event`, `external_id=events:<id>` y
+colección lógica `activities`. Los detalles contienen exclusivamente `people`.
+Los registros activos son sobres `upsert` completos y los retirados sobres
+`retire` con identidad y fecha. Se pagina en orden `created_at DESC, id DESC`,
+incluyendo retiradas; la ausencia no se interpreta como baja. Las lecturas
+concurrentes con altas pueden necesitar una segunda sincronización para converger.
+
+### Arranque de la fuente personal
+
+El bloque `PERSONAL_*` está en `.env.example`. El usuario ya preparó tres valores
+distintos: contraseña administradora, contraseña de aplicación y token de la
+cuenta de demostración. No se deben copiar credenciales a documentación o al chat.
+
+Desde la raíz del repositorio:
+
+```bash
+docker compose up -d --wait personal-db
+docker compose build personal sync
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/personal:/app" personal npm run migrate:up
+docker compose up -d --wait personal
+```
+
+Prepara la cuenta sin imprimir el token ni pasarlo como argumento:
+
+```bash
+set -o pipefail
+node --env-file=.env -e 'process.stdout.write(process.env.PERSONAL_DEMO_TOKEN ?? "")' \
+  | docker compose exec -T personal npm run account:demo
+```
+
+Repetir conserva la cuenta y no reactiva una cuenta deshabilitada. Se muestran
+solo ID, nombre y enabled. Después actualiza el portal y el gateway:
+
+```bash
+docker compose up -d sync gateway
+docker compose exec gateway caddy reload --config /etc/caddy/Caddyfile
+```
+
+En `https://localhost:8443/api/docs`, selecciona **Otros · fuente externa** y
+autoriza `PersonalBearer` con tu token personal (sin el prefijo Bearer).
+El gateway publica solo las rutas de negocio indicadas bajo `/personal` y el
+OpenAPI en `/api/docs/personal/openapi.json`; no expone sus rutas internas.
+
+### Comprobación del backend personal
+
+1. GET events debe devolver 200 con un array vacío si la cuenta es nueva.
+2. Crea un día sin hora con el ejemplo de Swagger: 201 y campos temporales null
+   excepto `on_date`. Consulta después el listado para comprobar persistencia.
+3. Edita el mismo ID con `{ "on_date": null, "started_at": "2026-11-25T10:00:00+01:00" }`:
+   debe conservar ID y devolver el instante UTC, sin final.
+4. Añade `{ "duration_minutes": 30, "people": ["Ana"] }`: comprueba el final
+   calculado. Repetir la misma edición conserva `updated_at`.
+5. Prueba volver a día sin hora dejando una duración: 422. Vuelve correctamente
+   enviando día y borrando inicio y duración con null en la misma petición.
+6. Marca `completed` o `cancelled`; sigue visible. Retira: 204, listado normal
+   vacío y exportación con el mismo ID y su retirada. Repite DELETE: 204.
+7. Comprueba el sobre v1 en GET activities/export, sin datos de cuenta ni token.
+
+La validación local incluye compilación, lint, formato, contrato temporal y
+esquemas Swagger sin escuchar en un puerto ni acceder a bases reales. La suite
+PostgreSQL contiene tres escenarios para ciclo de vida, aislamiento/autenticación
+y restricciones. Se incluye en CI; no se da por ejecutada localmente. El agente
+no ha utilizado Docker ni leído `.env`.
+
+El 23/11/2026 el usuario aplicó las migraciones, arrancó Personal, preparó la
+cuenta y confirmó GET 200 con un array vacío en Swagger. Después confirmó que
+el recorrido funcional propuesto funciona, indicando que no realizó las últimas
+comprobaciones. Se registra validación manual funcional del backend; las pruebas
+finales de autenticación y paginación y el aislamiento entre dos cuentas no se
+dan por comprobados manualmente. La ejecución de la suite PostgreSQL en CI
+sigue pendiente de confirmar para este checkpoint.
+
+Todavía no se habilita este tipo en Sync, ni se implementa su interfaz o su
+política de recordatorios.
 
 ## Identidad y actualizaciones
 
@@ -241,7 +363,7 @@ mediante la API de Synkron, sin necesitar contactar con cada fuente al abrirlo.
   historial de correcciones.
 - Unidades de distancia, duración y planificación de las disciplinas deportivas
   restantes; gimnasio ya utiliza minutos y admite sesiones futuras y realizadas.
-- Descripción y cancelación en planes sociales.
+- Ampliaciones posteriores del bloque Otros; su contrato inicial ya está acordado.
 - Identidades entre colecciones, relaciones y mapeos al modelo central; política
   si varias configuraciones importan el mismo recurso.
 - Fechas sin hora, instantes con zona y duración sin valores redundantes.

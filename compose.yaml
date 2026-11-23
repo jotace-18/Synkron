@@ -207,6 +207,36 @@ services:
       sport-db:
         condition: service_healthy
 
+  personal:
+    build:
+      context: ./apps/personal
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3106:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - default
+      - personal-data
+    environment:
+      PGHOST: personal-db
+      PGPORT: "5432"
+      PGDATABASE: ${PERSONAL_DB_NAME:?Falta PERSONAL_DB_NAME}
+      PGUSER: ${PERSONAL_DB_USER:?Falta PERSONAL_DB_USER}
+      PGPASSWORD: ${PERSONAL_DB_PASSWORD:?Falta PERSONAL_DB_PASSWORD}
+    depends_on:
+      personal-db:
+        condition: service_healthy
+
   sport-db:
     image: postgres:17-bookworm
     environment:
@@ -220,6 +250,28 @@ services:
       - ./infra/postgres/sport/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
     networks:
       - sport-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  personal-db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${PERSONAL_DB_NAME:?Falta PERSONAL_DB_NAME}
+      POSTGRES_USER: ${PERSONAL_DB_ADMIN_USER:?Falta PERSONAL_DB_ADMIN_USER}
+      POSTGRES_PASSWORD: ${PERSONAL_DB_ADMIN_PASSWORD:?Falta PERSONAL_DB_ADMIN_PASSWORD}
+      PERSONAL_DB_USER: ${PERSONAL_DB_USER:?Falta PERSONAL_DB_USER}
+      PERSONAL_DB_PASSWORD: ${PERSONAL_DB_PASSWORD:?Falta PERSONAL_DB_PASSWORD}
+    volumes:
+      - personal-db-data:/var/lib/postgresql/data
+      - ./infra/postgres/personal/01-create-app.sql:/docker-entrypoint-initdb.d/01-create-app.sql:ro
+    networks:
+      - personal-data
     healthcheck:
       test:
         - CMD-SHELL
@@ -723,6 +775,7 @@ volumes:
   api-db-data:
   academic-db-data:
   sport-db-data:
+  personal-db-data:
   rabbitmq-data:
   gateway-data:
   gateway-config:
@@ -738,6 +791,8 @@ networks:
   academic-data:
     internal: true
   sport-data:
+    internal: true
+  personal-data:
     internal: true
   monitoring-data:
     internal: true

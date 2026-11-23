@@ -24,7 +24,7 @@ export async function swaggerRequestInterceptor(
   }
   request.redirect = 'error';
   request.credentials =
-    /^(?:\/api\/v1\/ingestions(?:\/|$)|\/(?:academic|sport)\/api\/v1\/)/.test(
+    /^(?:\/api\/v1\/ingestions(?:\/|$)|\/(?:academic|sport|personal)\/api\/v1\/)/.test(
       target.pathname,
     )
       ? 'omit'
@@ -94,6 +94,10 @@ export function configureApiDocs(app: INestApplication): void {
           },
           { name: 'Automation', url: '/api/docs/automation/openapi.json' },
           { name: 'Monitoring', url: '/api/docs/monitoring/openapi.json' },
+          {
+            name: 'Otros · fuente externa',
+            url: '/api/docs/personal/openapi.json',
+          },
           {
             name: 'Deporte · fuente externa',
             url: '/api/docs/sport/openapi.json',

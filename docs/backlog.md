@@ -29,10 +29,10 @@ el recorrido académico ya implementado y comprobado.
 2. Abordar el bloque de deporte con gimnasio como primera actividad, conforme
    a [US-24](#us-24--incorporar-el-primer-recorrido-deportivo-de-gimnasio) y su
    [plan](deporte.md): fuente editable, entrada común, calendario y seguimiento.
-3. Aplicar el mismo criterio a planes sociales para disponer de un recorrido
-   funcional en cada bloque.
+3. Incorporar el bloque **Otros** (US-25): recados, citas y quedadas bajo un
+   contrato personal común, antes de ampliar las actividades de cada bloque.
 4. Retomar las sesiones de estudio/trabajo y los eventos académicos generales,
-   ampliar las actividades de deporte y planes y completar sus detalles.
+   ampliar las actividades de deporte y Otros y completar sus detalles.
 
 La documentación interactiva de la API queda registrada en US-23. Su primera
 versión acompaña al contrato estandarizado; el refinamiento del portal no
@@ -363,13 +363,13 @@ Tareas:
 Requisitos: RF-23, RF-24; RI-16; CU-15, CU-17.
 
 Como usuario, quiero introducir y actualizar datos académicos, deportivos y
-sociales en sus servicios para alimentar Synkron con actividades propias.
+personales en sus servicios para alimentar Synkron con actividades propias.
 
 Criterios de aceptación:
 
 - Académico permite entregas, exámenes, sesiones de estudio/trabajo y eventos generales con los campos descritos en el contrato de origen.
 - Deporte conserva los datos comunes y los específicos de gimnasio, fútbol, senderismo y carrera; otros deportes admiten un registro sencillo.
-- Planes sociales admite título, fecha/hora, ubicación y participantes opcionales; las propuestas adicionales se cierran antes de implementarse.
+- Otros admite asunto y día obligatorios, hora y duración opcionales, lista opcional de personas y estado pendiente/realizado/cancelado; contrato acordado en US-25.
 - Los datos persisten al reiniciar. Solo se exponen los registros autorizados por cuenta o credencial.
 - Cada registro mantiene su ID al modificarse. Las notas opcionales pueden añadirse después con máximo dos decimales.
 - Las sesiones de estudio pueden relacionarse con entregas o exámenes, sin compartir su estado de finalización.
@@ -553,7 +553,8 @@ Contrato de producto acordado el 23/11/2026. Backend implementado y ciclo de
 vida validado manualmente. Interfaz implementada y aspecto visual aprobado;
 integración con Sync y presentación central implementadas. Recorrido manual
 Sport → Sync → calendario → Monitoring validado el 23/11/2026; escenario
-automatizado de aislamiento entre cuentas pendiente de CI.
+automatizado de aislamiento entre cuentas cubierto por CI, confirmado en verde
+por el usuario.
 [Plan de trabajo](deporte.md).
 
 Como usuario, quiero registrar sesiones de gimnasio y verlas en mi agenda de
@@ -576,7 +577,51 @@ Tareas:
 - [x] Habilitar el esquema de gimnasio y conectar la entrada estandarizada mediante un lector canónico reutilizable.
 - [x] Adaptar calendario, filtros, detalle y documentación Swagger; conectar fuentes desde Synkron y ofrecer «Sincronizar todo» por defecto.
 - [x] Validar manualmente alta, repetición sin duplicados, edición, cancelación, retirada y seguimiento en Monitoring; documentar el arranque (23/11/2026).
-- [ ] Confirmar en CI la suite PostgreSQL, incluida la separación entre cuentas y la conexión concurrente.
+- [x] Confirmar en CI la suite PostgreSQL, incluida la separación entre cuentas y la conexión concurrente; usuario confirma GitHub en verde.
+
+## US-25 — Incorporar el bloque Otros para compromisos personales
+
+Contrato acordado el 23/11/2026. Sustituye el alcance inicial de «Planes sociales»;
+backend de origen implementado; interfaz e integración central pendientes.
+Incluye recados, citas y quedadas sin crear un tipo de
+actividad distinto para cada caso.
+
+Como usuario, quiero registrar compromisos personales sencillos y consultarlos
+en Synkron junto a mis actividades académicas y deportivas.
+
+Criterios de aceptación:
+
+- Asunto y día obligatorios; hora opcional.
+- Duración opcional en minutos enteros positivos cuando se conoce la hora.
+  Sin hora se conserva un día; con hora, un instante; con hora y duración, un intervalo.
+- Lista opcional de nombres de personas, sin cuentas ni invitaciones.
+- Estados pendiente, realizado y cancelado (`pending`, `completed`, `cancelled`).
+  El paso del tiempo no completa automáticamente un compromiso.
+- Nombre visible «Otros» y tipo central previsto `personal.event`, con rol `start`.
+  El tipo aún no está habilitado en el catálogo ni en las restricciones de Sync.
+- Editar conserva la identidad; cancelar mantiene el compromiso visible;
+  retirar comunica una baja explícita.
+- Reutilizar exportación canónica, `standard.activities`, «Sincronizar todo»,
+  programaciones, calendario, eventos y seguimiento existentes.
+- Ubicación, descripción, recurrencias e invitaciones quedan fuera del primer recorrido.
+
+Subpuntos de trabajo:
+
+1. **Contrato — acordado.** Campos, estados, formas temporales e identidad común.
+2. **Fuente personal — implementada.** Persistencia, API por cuenta, CRUD,
+   exportación canónica, Swagger, Compose, CI y configuración de arranque.
+   Compilación y pruebas locales comprobadas; usuario confirma el recorrido
+   funcional desde Swagger el 23/11/2026. Últimas comprobaciones manuales de
+   autenticación/paginación y confirmación de CI pendientes.
+3. **Interfaz de origen.** Formulario y listado para mantener compromisos, con
+   estructura similar a las otras fuentes y una identidad visual propia.
+4. **Integración central.** Registrar `personal.event`, adaptar el catálogo y
+   restricciones que aún contemplan `social.plan`, y reutilizar el lector común.
+5. **Presentación y seguimiento.** Mostrar «Otros», personas y duración;
+   adaptar filtros y reglas por eventos. No activar recordatorios implícitamente.
+6. **Validación y checkpoint.** Comprobar día sin hora, instante e intervalo;
+   repetición, edición, cancelación, retirada y aislamiento entre cuentas.
+   Añadir solo pruebas necesarias para las reglas nuevas y reutilizar regresión.
 
 ## Ampliaciones posteriores
 

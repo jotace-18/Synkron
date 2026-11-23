@@ -135,9 +135,9 @@ describe('Swagger browser authentication', () => {
       ).toBe('current-csrf');
     }
     expect(fetchCsrf).toHaveBeenCalledTimes(7);
-    for (const source of ['academic', 'sport']) {
+    for (const source of ['academic', 'sport', 'personal']) {
       const external = await intercept({
-        url: `/${source}/api/v1/${source === 'sport' ? 'gym-sessions' : 'exams'}`,
+        url: `/${source}/api/v1/${source === 'sport' ? 'gym-sessions' : source === 'personal' ? 'events' : 'exams'}`,
         method: 'POST',
         headers: { Authorization: 'Bearer source-test-only' },
       });

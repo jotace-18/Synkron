@@ -288,6 +288,74 @@ jobs:
           PGUSER: sport_test
           PGPASSWORD: ci-only-password
 
+  personal:
+    name: Comprobar Otros
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: personal_test
+          POSTGRES_USER: personal_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - "127.0.0.1:5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U personal_test -d personal_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: apps/personal
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/personal/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar formato
+        run: npx --no-install prettier --check "src/**/*.ts" "test/**/*.ts"
+
+      - name: Comprobar lint
+        run: npx --no-install eslint "{src,apps,libs,test}/**/*.ts" --max-warnings=0
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Ejecutar pruebas unitarias
+        run: npm test -- --runInBand
+
+      - name: Aplicar migraciones de Otros
+        run: npm run migrate:up -- --create-schema
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGDATABASE: personal_test
+          PGUSER: personal_test
+          PGPASSWORD: ci-only-password
+
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e -- --runInBand
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGDATABASE: personal_test
+          PGUSER: personal_test
+          PGPASSWORD: ci-only-password
+
   supporting-services:
     name: Comprobar ${{ matrix.app }}
     runs-on: ubuntu-latest
@@ -498,6 +566,7 @@ jobs:
         api,
         academic,
         sport,
+        personal,
         academic-web,
         sport-web,
         task-api,
@@ -520,6 +589,8 @@ jobs:
             context: apps/academic
           - service: sport
             context: apps/sport
+          - service: personal
+            context: apps/personal
           - service: task-api
             context: fixtures/task-api
           - service: web

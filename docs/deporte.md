@@ -67,8 +67,9 @@ por POST con IngestionToken, sin un endpoint diferente para gimnasio.
    pruebas necesarias para las nuevas reglas y realizar la comprobación real
    del recorrido. Actualizar la guía de arranque y dejar un checkpoint.
 
-Después de este recorrido se priorizan planes sociales, antes de ampliar todas
-las disciplinas deportivas o las actividades académicas pendientes.
+Después de este recorrido se prioriza el bloque **Otros** para recados, citas y
+quedadas (US-25), antes de ampliar todas las disciplinas deportivas o las
+actividades académicas pendientes.
 
 ## Comprobación del backend
 
