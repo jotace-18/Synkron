@@ -550,7 +550,8 @@ Tareas:
 ## US-24 — Incorporar el primer recorrido deportivo de gimnasio
 
 Contrato de producto acordado el 23/11/2026. Backend implementado y ciclo de
-vida validado manualmente; interfaz e integración pendientes.
+vida validado manualmente. Interfaz implementada y aspecto visual aprobado;
+recorrido manual de sus acciones e integración con Sync pendientes.
 [Plan de trabajo](deporte.md).
 
 Como usuario, quiero registrar sesiones de gimnasio y verlas en mi agenda de
@@ -569,7 +570,7 @@ Tareas:
 
 - [x] Acordar los datos, estados, título y semántica temporal del primer recorrido.
 - [x] Implementar persistencia y API autorizada de la fuente deportiva, con Swagger, Compose y CI; ciclo de vida validado manualmente el 23/11/2026.
-- [ ] Añadir una interfaz básica para introducir y mantener sesiones.
+- [x] Añadir interfaz deportiva para crear, editar, cancelar y retirar sesiones; aspecto visual aprobado el 23/11/2026.
 - [ ] Habilitar el esquema de gimnasio y conectar la recepción estandarizada.
 - [ ] Adaptar calendario, filtros, detalle y documentación Swagger.
 - [ ] Comprobar el ciclo de vida, deduplicación y separación entre cuentas, y documentar el arranque.

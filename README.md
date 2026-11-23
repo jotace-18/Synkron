@@ -223,5 +223,7 @@ El [modelo común de actividades](docs/modelo-actividades.md) define identidad,
 campos compartidos y reglas temporales para la próxima implementación.
 
 La [fuente deportiva](docs/deporte.md) dispone de backend de gimnasio con
-persistencia, credenciales propias y Swagger. Su interfaz y conexión a la entrada
-estandarizada son los siguientes pasos del [plan de deporte](docs/deporte.md).
+persistencia, credenciales propias y Swagger. Su interfaz independiente está en
+`apps/sport-web`, con un estilo similar a Campus y colores deportivos propios.
+La conexión a la entrada estandarizada es el siguiente paso del
+[plan de deporte](docs/deporte.md).

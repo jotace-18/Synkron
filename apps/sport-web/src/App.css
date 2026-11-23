@@ -1,0 +1,525 @@
+.sport-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100dvh;
+}
+.sport-skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  transform: translateY(-180%);
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: white;
+  color: var(--accent-dark);
+}
+.sport-skip-link:focus {
+  transform: translateY(0);
+}
+.sport-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 42px;
+  padding: 34px 24px 26px;
+  color: #fff7ef;
+  background: #302b2a;
+}
+.sport-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sport-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  color: #302b2a;
+  background: #eda174;
+}
+.sport-mark svg {
+  width: 34px;
+  height: 34px;
+}
+.sport-brand strong {
+  display: block;
+  font-size: 25px;
+  letter-spacing: -0.04em;
+}
+.sport-brand div > span {
+  display: block;
+  margin-top: 3px;
+  color: #d9c7bb;
+  font-size: 13px;
+}
+.sport-navigation a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #a34428;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.sport-navigation a:hover {
+  background: #b24e2e;
+}
+.sport-sidebar-note {
+  margin-top: auto;
+  color: #d9c7bb;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.sport-sidebar-line {
+  display: block;
+  width: 32px;
+  height: 3px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  background: #d4865e;
+}
+.sport-main {
+  min-width: 0;
+  padding: 48px clamp(24px, 4vw, 64px);
+}
+.sport-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 34px;
+}
+.sport-eyebrow {
+  margin-bottom: 10px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sport-heading h1 {
+  font-size: clamp(29px, 3vw, 37px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+.sport-description {
+  max-width: 680px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+.sport-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 11px 17px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.sport-button:hover:not(:disabled) {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+.sport-button-secondary {
+  background: white;
+  color: var(--accent);
+  border-color: #d9b6a4;
+}
+.sport-button-secondary:hover:not(:disabled) {
+  background: var(--accent-light);
+  border-color: #c78f70;
+}
+.sport-button:disabled,
+.sport-row-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sport-panel {
+  min-width: 0;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+}
+.sport-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.sport-panel h2 {
+  font-size: 20px;
+  letter-spacing: -0.025em;
+}
+.sport-muted {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.sport-notice {
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  border: 1px solid #e8ccba;
+  border-radius: 9px;
+  background: #fff3e8;
+  color: #83401f;
+  line-height: 1.7;
+}
+.sport-editor {
+  max-width: 1050px;
+  margin-bottom: 24px;
+  border-top: 3px solid #ce7750;
+}
+.sport-editor .sport-panel-heading {
+  margin-bottom: 26px;
+}
+.sport-editor .sport-eyebrow {
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.sport-editor-tag {
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sport-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sport-field {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+.sport-field > span {
+  font-size: 14px;
+  font-weight: 600;
+}
+.sport-field input,
+.sport-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 45px;
+  padding: 10px 12px;
+  border: 1px solid #d4d2ce;
+  border-radius: 8px;
+  color: #292d35;
+  background-color: white;
+}
+.sport-field select {
+  padding-right: 36px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23b34623' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.sport-session-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  margin-top: 24px;
+  border-radius: 9px;
+  border: 1px solid #ecddcf;
+  background: #fcf8f3;
+}
+.sport-preview-mark {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  color: var(--accent);
+  background: #f4e2d4;
+  font-size: 24px;
+}
+.sport-session-preview strong {
+  font-size: 15px;
+}
+.sport-session-preview p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.sport-form-hint {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.sport-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.sport-error {
+  color: #ab2525;
+  line-height: 1.7;
+}
+.sport-editor .sport-error {
+  margin-top: 16px;
+}
+.sport-table-wrap {
+  overflow-x: auto;
+}
+.sport-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.sport-table th {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  color: #6e6057;
+  background: #f8f5f0;
+  font-size: 12px;
+  font-weight: 650;
+}
+.sport-table td {
+  padding: 22px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.sport-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.sport-table tbody tr:hover {
+  background: #fdfbf8;
+}
+.sport-table td:first-child {
+  min-width: 175px;
+}
+.sport-table td:nth-child(2) {
+  min-width: 155px;
+}
+.sport-table td:nth-child(3),
+.sport-table td:nth-child(4) {
+  white-space: nowrap;
+}
+.sport-cell-detail {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.sport-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.sport-badge[data-status="scheduled"] {
+  background: #fce9d5;
+  color: #894217;
+}
+.sport-badge[data-status="completed"] {
+  background: #e6f3e9;
+  color: #2b6b3c;
+}
+.sport-badge[data-status="cancelled"] {
+  background: #eeeef0;
+  color: #62666e;
+}
+.sport-table tr[data-cancelled] td:first-child strong {
+  color: #717174;
+}
+.sport-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 185px;
+}
+.sport-row-action {
+  min-height: 38px;
+  padding: 7px 11px;
+  border: 1px solid #ded8d1;
+  border-radius: 7px;
+  background: white;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sport-row-action:hover:not(:disabled) {
+  background: var(--accent-light);
+  border-color: #d3ac96;
+}
+.sport-row-action-danger {
+  color: #ab2525;
+}
+.sport-row-action-danger:hover:not(:disabled) {
+  background: #fff1ee;
+  border-color: #e4b3a9;
+}
+.sport-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 22px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.sport-pagination > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.sport-empty {
+  padding: 34px 16px 40px;
+  text-align: center;
+}
+.sport-empty h3 {
+  margin-top: 14px;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+.sport-empty p {
+  max-width: 480px;
+  margin: 10px auto 20px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.sport-empty .sport-error {
+  color: #ab2525;
+}
+.sport-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto;
+  border: 1px solid #edddce;
+  border-radius: 14px;
+  background: #fcf3e8;
+  color: var(--accent);
+  font-size: 30px;
+}
+.sport-dialog {
+  width: min(520px, calc(100% - 32px));
+  max-height: 85dvh;
+  margin: auto;
+  padding: 30px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: white;
+  color: #292d35;
+  box-shadow: 0 24px 80px #302b2a33;
+}
+.sport-dialog::backdrop {
+  background: #302b2a85;
+}
+.sport-dialog h2 {
+  margin-bottom: 16px;
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+.sport-dialog > p:not(.sport-eyebrow) {
+  line-height: 1.8;
+}
+.sport-dialog .sport-error {
+  margin-top: 16px;
+}
+.sport-button-danger {
+  background: #ab2525;
+  border-color: #ab2525;
+}
+.sport-button-danger:hover:not(:disabled) {
+  background: #8e2020;
+  border-color: #8e2020;
+}
+@media (max-width: 900px) {
+  .sport-shell {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+  .sport-sidebar {
+    padding: 28px 20px;
+  }
+  .sport-main {
+    padding: 34px 24px;
+  }
+}
+@media (max-width: 700px) {
+  .sport-shell {
+    grid-template-columns: 1fr;
+  }
+  .sport-sidebar {
+    gap: 20px;
+    padding: 20px;
+  }
+  .sport-brand strong {
+    font-size: 23px;
+  }
+  .sport-navigation a {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+  .sport-sidebar-note {
+    display: none;
+  }
+  .sport-main {
+    padding: 28px 16px;
+  }
+  .sport-heading {
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .sport-heading > .sport-button {
+    width: 100%;
+  }
+  .sport-panel {
+    padding: 22px 18px;
+  }
+  .sport-form-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .sport-session-preview {
+    align-items: flex-start;
+    padding: 14px;
+  }
+  .sport-actions > .sport-button {
+    flex: 1 1 auto;
+  }
+  .sport-pagination {
+    gap: 8px;
+  }
+  .sport-dialog {
+    padding: 24px;
+  }
+}

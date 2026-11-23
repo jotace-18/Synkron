@@ -1,7 +1,8 @@
 # Primer recorrido deportivo: gimnasio
 
 Contrato de producto acordado el 23/11/2026. El backend de la fuente deportiva
-está implementado en `apps/sport`; quedan la interfaz y la integración con Sync.
+está implementado en `apps/sport` y su interfaz en `apps/sport-web`; queda la
+integración con Sync.
 El esquema `sport.gym` todavía no está habilitado en la entrada común.
 
 ## Datos y comportamiento acordados
@@ -46,7 +47,8 @@ mantendrán en el backend de la fuente, fuera del navegador.
    Persistencia y API autorizada para crear,
    consultar, editar y retirar sesiones. Calcular el final y mantener los IDs.
    Documentar sus operaciones en Swagger.
-3. **Interfaz de la fuente.** Formulario sencillo con los campos acordados,
+3. **Interfaz de la fuente — implementada y aspecto visual aprobado.**
+   Formulario sencillo con los campos acordados,
    listado y acciones de edición/retirada, con identidad visual propia de una
    aplicación externa.
 4. **Integración con la entrada estandarizada.** Registrar el esquema de
@@ -118,3 +120,58 @@ operaciones de gimnasio y sus ejemplos están documentados allí. La fecha y hor
 se envían en `started_at` con zona explícita; `duration_minutes` es un entero
 positivo, `training_mode` utiliza `other` para Otros y `accompanied` es booleano.
 Título y final se calculan automáticamente.
+
+## Interfaz deportiva
+
+La aplicación `apps/sport-web` utiliza la estructura de Campus con una paleta
+terracota/naranja y una identidad deportiva propia. Ofrece formulario en dos
+columnas, título y final calculados en la vista previa, listado paginado, edición
+y confirmaciones separadas para cancelar y retirar. Todos los horarios se
+introducen y muestran en Madrid. La edición conserva un instante original con
+segundos o milisegundos cuando no se cambia la fecha/hora.
+
+Las respuestas inciertas de escritura piden comprobar la lista antes de repetir
+la operación; no se reenvían creaciones automáticamente. Hay estados de carga,
+lista vacía, error y reintento, y el diseño se adapta a pantallas estrechas.
+
+### Arranque de la interfaz
+
+Reutiliza `SPORT_DEMO_TOKEN` del `.env` de la raíz; no requiere otra credencial.
+Con la base migrada y la cuenta deportiva preparada:
+
+```bash
+npm --prefix apps/sport-web ci
+docker compose up -d --build --wait sport-web
+```
+
+Abre `http://127.0.0.1:3105` o `http://localhost:3105`. Compose levanta Sport y su
+base si están parados. Nginx añade el Bearer al reenviar las peticiones; el token
+no se incorpora al JavaScript ni se introduce en la interfaz. La configuración
+local restringe las escrituras al origen de esta aplicación.
+
+Para desarrollo con Vite, mantén `sport` arrancado y ejecuta:
+
+```bash
+npm --prefix apps/sport-web run dev
+```
+
+La dirección de desarrollo es `http://127.0.0.1:5175`. Solo el servidor Vite de
+desarrollo lee la credencial; la compilación no carga el `.env` de la raíz.
+
+### Comprobación manual de la interfaz
+
+1. Crea un entrenamiento e identifica el título, horario y duración calculados.
+2. Recarga y comprueba que la sesión persiste en el listado.
+3. Edita la duración, modalidad o compañía y comprueba que se conserva la sesión.
+4. Cancela desde la fila y confirma: la sesión debe seguir visible como Cancelado.
+5. Retira desde la fila y confirma: la sesión debe desaparecer del listado.
+6. Prueba una hora inexistente por cambio de horario y una duración inválida.
+7. Comprueba formulario y listado en una pantalla estrecha. Si tienes más de
+   veinte sesiones, comprueba también la paginación.
+
+Este frontend mantiene sesiones en la fuente deportiva. Su publicación en Sync
+y su aparición en el calendario pertenecen a los siguientes subpuntos. El usuario confirmó el 23/11/2026 que la interfaz se abre en el entorno local y
+aprobó su aspecto visual. Las pruebas de creación, recarga, edición, cancelación
+y retirada desde esta interfaz aún no se han confirmado; la validación previa
+del backend desde Swagger y las cuatro pruebas automatizadas del frontend no
+se registran como sustituto de ese recorrido.

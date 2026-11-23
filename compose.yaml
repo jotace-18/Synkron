@@ -641,6 +641,31 @@ services:
       retries: 5
       start_period: 5s
 
+  sport-web:
+    build:
+      context: ./apps/sport-web
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3105:8080"
+    environment:
+      SPORT_DEMO_TOKEN: ${SPORT_DEMO_TOKEN:?Falta SPORT_DEMO_TOKEN}
+    depends_on:
+      sport:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   web:
     build:
       context: ./apps/web

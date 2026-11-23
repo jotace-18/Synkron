@@ -22,8 +22,8 @@ La API estática `fixtures/task-api` permite comprobar conexiones. El backend
 autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
 describen las rutas disponibles. Los demás recursos académicos y la fuente de
 planes sociales siguen pendientes. `apps/sport` incorpora la API de gimnasio con
-PostgreSQL y credenciales propias; su interfaz y publicación en Sync están
-pendientes. Campus permite introducir y editar entregas y exámenes.
+PostgreSQL y credenciales propias. `apps/sport-web` permite mantener sesiones
+desde una interfaz independiente; la publicación en Sync sigue pendiente. Campus permite introducir y editar entregas y exámenes.
 
 ## Fuente académica
 
@@ -165,8 +165,8 @@ parte de este primer recorrido. La propuesta anterior de nombres y sensaciones
 queda aplazada respecto al alcance simplificado acordado.
 
 El [plan de gimnasio](deporte.md) recoge los subpuntos de implementación. El
-backend de la fuente está implementado; la interfaz y la habilitación de su
-esquema en Sync siguen pendientes.
+backend y la interfaz de la fuente están implementados; la habilitación de su
+esquema y su publicación en Sync siguen pendientes.
 
 El desnivel de senderismo es el positivo acumulado, medido en metros ascendidos,
 no la diferencia de altura entre inicio y final ni el descenso acumulado.
