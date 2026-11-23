@@ -22,7 +22,7 @@ services:
       AUTH_API_INTERNAL_URL: http://api:3003
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-__Host-synkron_session}
       SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
-      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS},http://sport:3000
+      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS},http://sport:3000,http://personal:3000
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: "5672"
       RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER}
@@ -378,7 +378,7 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:?Falta RABBITMQ_VHOST}
       SYNC_CREDENTIALS_KEY: ${SYNC_CREDENTIALS_KEY:?Falta SYNC_CREDENTIALS_KEY}
-      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS},http://sport:3000
+      SYNC_ALLOWED_CONNECTION_ORIGINS: ${SYNC_ALLOWED_CONNECTION_ORIGINS:?Falta SYNC_ALLOWED_CONNECTION_ORIGINS},http://sport:3000,http://personal:3000
     depends_on:
       sync-db:
         condition: service_healthy
@@ -704,6 +704,31 @@ services:
       SPORT_DEMO_TOKEN: ${SPORT_DEMO_TOKEN:?Falta SPORT_DEMO_TOKEN}
     depends_on:
       sport:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  personal-web:
+    build:
+      context: ./apps/personal-web
+      target: runtime
+    init: true
+    ports:
+      - "127.0.0.1:3107:8080"
+    environment:
+      PERSONAL_DEMO_TOKEN: ${PERSONAL_DEMO_TOKEN:?Falta PERSONAL_DEMO_TOKEN}
+    depends_on:
+      personal:
         condition: service_healthy
     healthcheck:
       test:

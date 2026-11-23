@@ -8,6 +8,8 @@ export const ACTIVITY_TYPES = [
   'sport.hiking',
   'sport.running',
   'sport.other',
+  'personal.event',
+  // Retained for historical reads, not registered for new imports.
   'social.plan',
 ] as const;
 

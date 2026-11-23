@@ -6,25 +6,19 @@ export interface CalendarDay {
   inCurrentMonth: boolean
 }
 
-export function getMonthDays(
-  year: number,
-  month: number,
-): CalendarDay[] {
+export function getMonthDays(year: number, month: number): CalendarDay[] {
   const first = new Date(Date.UTC(year, month, 1))
 
   const precedingDays = (first.getUTCDay() + 6) % 7
 
   return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(
-      Date.UTC(year, month, 1 - precedingDays + index),
-    )
+    const date = new Date(Date.UTC(year, month, 1 - precedingDays + index))
 
     return {
       date: date.toISOString().slice(0, 10),
       day: date.getUTCDate(),
       inCurrentMonth:
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() === month,
+        date.getUTCFullYear() === year && date.getUTCMonth() === month,
     }
   })
 }
@@ -110,4 +104,22 @@ export function getDayLabel(referenceDate: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${referenceDate}T00:00:00Z`))
+}
+
+export function compareCalendarActivities(
+  left: Activity,
+  right: Activity,
+): number {
+  const leftUntimed = left.schedule.kind === 'date'
+  const rightUntimed = right.schedule.kind === 'date'
+  if (leftUntimed !== rightUntimed) return leftUntimed ? 1 : -1
+  if (left.schedule.kind !== 'date' && right.schedule.kind !== 'date') {
+    const difference =
+      Date.parse(left.schedule.at) - Date.parse(right.schedule.at)
+    if (difference !== 0) return difference
+  }
+  return (
+    left.title.localeCompare(right.title, 'es') ||
+    left.id.localeCompare(right.id)
+  )
 }

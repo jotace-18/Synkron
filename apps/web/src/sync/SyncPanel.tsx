@@ -3,11 +3,19 @@ import { SessionExpiredError } from '../activities/activities-client'
 import {
   getRun,
   listDefinitions,
+  listSyncConnections,
   type SyncDefinition,
   type SyncRun,
 } from './sync-client'
 import { createBatch, submitBatch, type BatchEntry } from './sync-batch'
 import ConnectSourceForm from './ConnectSourceForm'
+import {
+  assignSyncGroups,
+  definitionsForGroup,
+  batchGroups,
+  groupResult,
+  SYNC_GROUPS,
+} from './sync-groups'
 
 interface SyncPanelProps {
   onSessionExpired: () => void
@@ -40,6 +48,13 @@ export default function SyncPanel({
   const notified = useRef(new Set<string>())
   const requestController = useRef<AbortController | null>(null)
   const enabled = (definitions ?? []).filter((definition) => definition.enabled)
+  const availableGroups = SYNC_GROUPS.filter(({ id }) =>
+    enabled.some((definition) => definition.group === id),
+  )
+  const selection =
+    selected === 'all' || availableGroups.some(({ id }) => id === selected)
+      ? selected
+      : 'all'
   const busy =
     requesting ||
     entries.some(({ receipt }) => receipt && !isTerminal(runs[receipt.id]))
@@ -50,10 +65,13 @@ export default function SyncPanel({
 
   useEffect(() => {
     const controller = new AbortController()
-    listDefinitions(controller.signal)
-      .then((items) => {
+    Promise.all([
+      listDefinitions(controller.signal),
+      listSyncConnections(controller.signal),
+    ])
+      .then(([items, connections]) => {
         if (!controller.signal.aborted) {
-          setDefinitions(items)
+          setDefinitions(assignSyncGroups(items, connections))
           setDefinitionError(false)
         }
       })
@@ -117,11 +135,7 @@ export default function SyncPanel({
     event.preventDefault()
     if (busy || requestController.current) return
     if (!unresolved) {
-      attempt.current = createBatch(
-        selected === 'all'
-          ? enabled
-          : enabled.filter(({ id }) => id === selected),
-      )
+      attempt.current = createBatch(definitionsForGroup(enabled, selection))
       cache.current = {}
       notified.current.clear()
       setRuns({})
@@ -178,7 +192,7 @@ export default function SyncPanel({
           <label className="agenda-filter">
             <span>Qué sincronizar</span>
             <select
-              value={selected}
+              value={selection}
               disabled={busy}
               onChange={(e) => {
                 setSelected(e.target.value)
@@ -188,10 +202,10 @@ export default function SyncPanel({
                 setPollErrors({})
               }}
             >
-              <option value="all">Todas las fuentes</option>
-              {enabled.map((definition) => (
-                <option key={definition.id} value={definition.id}>
-                  {definition.name}
+              <option value="all">Todos los bloques</option>
+              {availableGroups.map(({ id, label }) => (
+                <option key={id} value={id}>
+                  {label}
                 </option>
               ))}
             </select>
@@ -201,9 +215,9 @@ export default function SyncPanel({
               ? 'Sincronizando…'
               : unresolved
                 ? 'Reintentar pendientes'
-                : selected === 'all'
+                : selection === 'all'
                   ? 'Sincronizar todo'
-                  : 'Sincronizar ahora'}
+                  : `Sincronizar ${availableGroups.find(({ id }) => id === selection)?.label ?? 'bloque'}`}
           </button>
         </form>
       )}
@@ -217,35 +231,66 @@ export default function SyncPanel({
               : 'Seguimiento de las fuentes seleccionadas'}
           </p>
           <ul className="sync-source-results">
-            {entries.map(({ definition, receipt, error }) => {
-              const run = receipt ? runs[receipt.id] : undefined
+            {batchGroups(entries).map((group) => {
+              const summary = groupResult(group.entries, runs)
               return (
-                <li key={definition.id}>
-                  <strong>{definition.name}</strong>
-                  <span>
-                    {receipt
-                      ? labels[run?.status ?? receipt.status]
-                      : error
-                        ? 'Solicitud sin confirmar'
-                        : 'Preparando solicitud…'}
-                  </span>
-                  {error && <p className="form-error">{error}</p>}
-                  {run?.status === 'failed' && (
-                    <p className="form-error">
-                      {run.error_message ?? 'No se pudo completar esta fuente.'}
-                    </p>
-                  )}
-                  {run?.status === 'completed' && (
+                <li key={group.id}>
+                  <strong>{group.label}</strong>
+                  <span>{summary.status}</span>
+                  {summary.terminalCount > 0 && (
                     <p className="sync-counts">
-                      {run.read_count} leídas · {run.created_count} nuevas ·{' '}
-                      {run.updated_count} actualizadas · {run.unchanged_count}{' '}
-                      sin cambios · {run.retired_count} retiradas ·{' '}
-                      {run.ignored_count} ignoradas
+                      {summary.counts.read_count} leídas ·{' '}
+                      {summary.counts.created_count} nuevas ·{' '}
+                      {summary.counts.updated_count} actualizadas ·{' '}
+                      {summary.counts.unchanged_count} sin cambios ·{' '}
+                      {summary.counts.retired_count} retiradas ·{' '}
+                      {summary.counts.ignored_count} ignoradas
+                      {summary.terminalCount < group.entries.length
+                        ? ' · Resultados parciales'
+                        : ''}
                     </p>
                   )}
-                  {receipt && pollErrors[receipt.id] && (
-                    <p className="form-error">{pollErrors[receipt.id]}</p>
-                  )}
+                  <details className="sync-execution-details">
+                    <summary>Ver detalle de las ejecuciones</summary>
+                    <ul>
+                      {group.entries.map(({ definition, receipt, error }) => {
+                        const run = receipt ? runs[receipt.id] : undefined
+                        return (
+                          <li key={definition.id}>
+                            <strong>{definition.name}</strong>
+                            <span>
+                              {receipt
+                                ? labels[run?.status ?? receipt.status]
+                                : error
+                                  ? 'Solicitud sin confirmar'
+                                  : 'Preparando solicitud…'}
+                            </span>
+                            {error && <p className="form-error">{error}</p>}
+                            {run?.status === 'failed' && (
+                              <p className="form-error">
+                                {run.error_message ??
+                                  'No se pudo completar esta fuente.'}
+                              </p>
+                            )}
+                            {run?.status === 'completed' && (
+                              <p className="sync-counts">
+                                {run.read_count} leídas · {run.created_count}{' '}
+                                nuevas · {run.updated_count} actualizadas ·{' '}
+                                {run.unchanged_count} sin cambios ·{' '}
+                                {run.retired_count} retiradas ·{' '}
+                                {run.ignored_count} ignoradas
+                              </p>
+                            )}
+                            {receipt && pollErrors[receipt.id] && (
+                              <p className="form-error">
+                                {pollErrors[receipt.id]}
+                              </p>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </details>
                 </li>
               )
             })}

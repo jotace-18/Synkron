@@ -76,7 +76,7 @@ export function buildPersonalOpenApi(): OpenAPIObject {
       title: 'Otros · Personal (fuente externa)',
       version: '1.0.0',
       description:
-        'Recados, citas y quedadas. Cada cuenta utiliza su PersonalBearer, independiente de SportBearer, AcademicBearer, la sesión Synkron y los tokens de ingesta. La fuente ofrece el contrato canónico; personal.event aún requiere habilitación en Sync en el subpunto 4. Conocer el día es obligatorio: on_date para día sin hora o started_at para un instante con zona. No se guarda un día redundante junto al instante.',
+        'Recados, citas y quedadas. Cada cuenta utiliza su PersonalBearer, independiente de SportBearer, AcademicBearer, la sesión Synkron y los tokens de ingesta. La fuente ofrece el contrato canónico personal.event, admitido por el lector estándar de Sync tras aplicar la migración 015. Conocer el día es obligatorio: on_date para día sin hora o started_at para un instante con zona. No se guarda un día redundante junto al instante.',
     },
     servers: [
       { url: '/personal', description: 'Fuente personal por el gateway HTTPS' },
@@ -262,7 +262,7 @@ export function buildPersonalOpenApi(): OpenAPIObject {
           {
             parameters: pagination,
             description:
-              'Array paginado limit/offset, orden estable created_at DESC e id DESC; incluye retiradas explícitas. external_id=events:<id>; colección lógica activities. El día se exporta sin hora inventada; el intervalo tiene final calculado. La habilitación de personal.event en Sync corresponde al subpunto 4.',
+              'Array paginado limit/offset, orden estable created_at DESC e id DESC; incluye retiradas explícitas. external_id=events:<id>; colección lógica activities. El día se exporta sin hora inventada; el intervalo tiene final calculado. Sync admite este contrato mediante standard.activities con la migración 015 aplicada.',
           },
         ),
       },

@@ -520,6 +520,38 @@ jobs:
       - name: Ejecutar pruebas de Sport
         run: npm test
 
+  personal-web:
+    name: Comprobar interfaz de Otros
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: apps/personal-web
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/personal-web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Comprobar lint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Compilar
+        run: npm run build
+
+      - name: Ejecutar pruebas de Otros
+        run: npm test
+
   task-api:
     name: Comprobar API de tareas simulada
     runs-on: ubuntu-latest
@@ -569,6 +601,7 @@ jobs:
         personal,
         academic-web,
         sport-web,
+        personal-web,
         task-api,
         web,
         gateway,
@@ -599,6 +632,8 @@ jobs:
             context: apps/academic-web
           - service: sport-web
             context: apps/sport-web
+          - service: personal-web
+            context: apps/personal-web
           - service: automation
             context: apps/automation
           - service: monitoring
@@ -629,3 +664,10 @@ jobs:
           docker run --rm
           -e SPORT_DEMO_TOKEN=0000000000000000000000000000000000000000000000000000000000000000
           synkron-sport-web:ci nginx -t
+
+      - name: Validar configuración de la interfaz de Otros
+        if: matrix.service == 'personal-web'
+        run: >-
+          docker run --rm
+          -e PERSONAL_DEMO_TOKEN=0000000000000000000000000000000000000000000000000000000000000000
+          synkron-personal-web:ci nginx -t

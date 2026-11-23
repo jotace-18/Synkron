@@ -4,9 +4,7 @@ import {
   formatActivityType,
   formatSchedule,
   formatStatus,
-  getAssignmentFields,
-  getExamFields,
-  getGymFields,
+  getActivityFields,
 } from './activity-format'
 import type { Activity } from './activity.types'
 
@@ -35,8 +33,10 @@ export default function ActivityDetails({
 
   useEffect(() => {
     const dialog = dialogRef.current
-    const returnFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement : null
+    const returnFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
     dialog?.showModal()
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -67,13 +67,13 @@ export default function ActivityDetails({
     return () => controller.abort()
   }, [activityId, retry, onSessionExpired])
 
-  const fields = activity?.type === 'academic.assignment'
-    ? getAssignmentFields(activity) : activity?.type === 'academic.exam' ? getExamFields(activity) : activity?.type === 'sport.gym' ? getGymFields(activity) : []
+  const fields = activity ? getActivityFields(activity) : []
 
   return (
     <dialog
       ref={dialogRef}
       className="activity-dialog"
+      data-type={activity?.type}
       aria-labelledby="activity-detail-title"
       onCancel={(event) => {
         event.preventDefault()
@@ -92,7 +92,9 @@ export default function ActivityDetails({
         <p role="status">Cargando detalle…</p>
       ) : error ? (
         <>
-          <p className="form-error" role="alert">{error}</p>
+          <p className="form-error" role="alert">
+            {error}
+          </p>
           <button
             className="secondary-button"
             type="button"
@@ -111,11 +113,17 @@ export default function ActivityDetails({
         <>
           <div className="activity-detail-summary">
             <span>{formatActivityType(activity.type)}</span>
-            <span>{formatStatus(activity.status)}</span>
+            <span data-status={activity.status ?? undefined}>
+              {formatStatus(activity.status)}
+            </span>
           </div>
-          <p className="activity-detail-schedule">{formatSchedule(activity.schedule)}</p>
+          <p className="activity-detail-schedule">
+            {formatSchedule(activity.schedule)}
+          </p>
           <p className="activity-detail-timezone">
-            {activity.schedule.kind === 'date' ? 'Sin hora indicada.' : 'Horario de Madrid.'}
+            {activity.schedule.kind === 'date'
+              ? 'Sin hora indicada.'
+              : 'Horario de Madrid.'}
           </p>
           <dl className="activity-detail-fields">
             {fields.map(({ label, value }) => (
@@ -131,12 +139,18 @@ export default function ActivityDetails({
               {activity.source_updated_at && (
                 <div>
                   <dt>Último cambio en origen</dt>
-                  <dd>{timestampFormatter.format(new Date(activity.source_updated_at))}</dd>
+                  <dd>
+                    {timestampFormatter.format(
+                      new Date(activity.source_updated_at),
+                    )}
+                  </dd>
                 </div>
               )}
               <div>
                 <dt>Última sincronización</dt>
-                <dd>{timestampFormatter.format(new Date(activity.last_synced_at))}</dd>
+                <dd>
+                  {timestampFormatter.format(new Date(activity.last_synced_at))}
+                </dd>
               </div>
             </dl>
           </details>

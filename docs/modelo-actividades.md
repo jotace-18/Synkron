@@ -56,13 +56,16 @@ reconstruir su contenido a partir de esos eventos.
 | `sport.hiking` | Senderismo. |
 | `sport.running` | Carrera. |
 | `sport.other` | Otro deporte. |
-| `social.plan` | Nombre previsto inicialmente para planes; todavía presente en código y pendiente de sustitución. |
+| `personal.event` | Compromiso personal de Otros: recados, citas y quedadas. |
+| `social.plan` | Nombre histórico conservado para lectura; no habilitado para nuevas importaciones. |
 
 El contrato de producto del 23/11/2026 amplía el tercer bloque a **Otros** y
-propone `personal.event` para recados, citas y quedadas: asunto y día obligatorios,
+utiliza `personal.event` para recados, citas y quedadas: asunto y día obligatorios,
 hora y duración opcionales, personas opcionales y estados pendiente/realizado/cancelado.
-Esta decisión está documentada en US-25; el nuevo tipo aún no está habilitado y
-requiere actualizar el catálogo, las restricciones y las vistas durante su implementación.
+El esquema está registrado en Sync y la migración 015 añade el tipo al catálogo
+de PostgreSQL. Admite día, instante o intervalo de minutos enteros con rol start,
+y detalles exactos `{people: string[]}`. `social.plan` permanece legible para no
+reescribir identidades, huellas ni eventos históricos; no se admite como entrada nueva.
 
 El tipo normalizado no sustituye a la colección del origen. Cambiar una
 correspondencia no debe producir una identidad distinta para el mismo recurso.

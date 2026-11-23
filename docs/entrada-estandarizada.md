@@ -67,7 +67,7 @@ contrato de intercambio y no se añade a `details` ni a la huella de actividad.
 | Campo | Regla v1 |
 |---|---|
 | `external_id` | Texto estable de 1 a 256 caracteres; no exige UUID. Se rechazan valores vacíos y espacios exteriores, sin cambiar mayúsculas ni normalizar el identificador. |
-| `type` | Tipo registrado y permitido para esa fuente. El prefijo `academic`, `sport` o `social` determina su bloque; no se recibe otra categoría que pueda contradecirlo. |
+| `type` | Tipo registrado y permitido para esa fuente. El prefijo `academic`, `sport` o `personal` determina su bloque; no se recibe otra categoría que pueda contradecirlo. |
 | `title` | Texto recortado de 1 a 200 caracteres. |
 | `schedule` | Objeto completo de una de las tres variantes temporales siguientes. |
 | `status` | Campo obligatorio, con un estado del tipo o `null` si su esquema lo admite. Nunca se infiere a partir de la fecha o de una nota. |
@@ -477,3 +477,45 @@ lectura en una transacción y conserva la procedencia ante reintentos. La guía 
 [Deporte](deporte.md#conectar-gimnasio-con-synkron) documenta la configuración,
 límites, paginación y el botón «Sincronizar todo». No se incorpora un conector
 específico de gimnasio ni un endpoint de recepción nuevo por disciplina.
+
+
+## Integración de Otros: personal.event (23/11/2026)
+
+La migración 015 añade `personal.event` al catálogo central. No crea otro
+conector ni otro endpoint de ingesta: `standard.activities` consulta la
+exportación canónica de Personal y la entrada directa utiliza la misma validación.
+El worker, la identidad, la idempotencia y los eventos existentes se conservan.
+
+El esquema exige rol `start`, estado `pending/completed/cancelled` y exactamente
+`details.people`: un array de hasta 50 nombres no vacíos, sin espacios exteriores,
+y de hasta 100 caracteres Unicode cada uno. Una lista vacía representa personas
+no indicadas. Admite día sin hora, instante o intervalo de duración positiva en
+minutos enteros hasta 2147483647; no permite almacenar otra duración en details.
+
+Cada operación conserva su identidad `events:<id>` en colección `activities`.
+No se inventa una hora para un día ni se infiere una retirada por ausencia. Un
+registro inválido en cualquier página impide comenzar a aplicar esa exportación;
+una baja requiere `retire`. Los eventos de cambio identifican el tipo, la actividad
+y los campos modificados, incluidos `people` y `schedule`, sin copiar la lista de
+personas en el evento.
+
+`social.plan` conserva su valor de base de datos y su lectura histórica. No se
+reescriben sus IDs, huellas ni eventos y no se habilita como tipo de entrada.
+La agenda identifica `personal.event` como «Otros» y agrupa allí el tipo histórico.
+
+Compose autoriza `http://personal:3000` tanto en Sync como en su worker. El
+preset Otros utiliza la misma administración atómica de conexiones y credenciales
+cifradas; cambiar el preset limpia la credencial introducida. «Sincronizar todo»
+incluye su definición habilitada junto a las académicas y deportivas, sin cambiar
+las fuentes ya conectadas. Véase la
+[guía de conexión](servicios-origen.md#conectar-otros-con-synkron).
+
+
+### Selección manual por bloques
+
+En la agenda, seleccionar Académico solicita juntas sus definiciones habilitadas
+de entregas y exámenes; Deporte y Otros hacen lo mismo con sus fuentes del bloque.
+Sincronizar todo reúne todos los bloques y las otras fuentes conectadas. Las
+solicitudes, claves de idempotencia y ejecuciones siguen siendo independientes
+por definición; la interfaz agrega el resultado y deja desplegar sus detalles.
+Las programaciones y reglas existentes mantienen su destino explícito.

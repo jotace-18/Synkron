@@ -1,3 +1,4 @@
+import { PERSONAL_STATUSES } from '../activities/personal/personal-details.validator';
 import { getEnabledActivityTypes } from '../activities/activity-schema';
 import {
   GYM_STATUSES,
@@ -141,6 +142,39 @@ export function buildIngestionOpenApi(): OpenAPIObject {
       }),
     });
   const schemas: Record<string, SchemaObject | ReferenceObject> = {
+    PersonalUpsert: request(
+      'personal.event',
+      'start',
+      PERSONAL_STATUSES,
+      object({
+        people: {
+          type: 'array',
+          maxItems: 50,
+          items: {
+            ...text(100),
+            description:
+              'Nombre no vacío, sin espacios exteriores. Lista vacía si no se indican personas.',
+          },
+        },
+      }),
+      {
+        oneOf: [
+          date('start'),
+          instant('start'),
+          {
+            ...object({
+              kind: { type: 'string', enum: ['interval'] },
+              role: { type: 'string', enum: ['start'] },
+              date: none,
+              at: timestamp,
+              end_at: timestamp,
+            }),
+            description:
+              'Duración positiva en minutos enteros, máximo 2147483647. No se envía otra duración en details.',
+          },
+        ],
+      },
+    ),
     GymUpsert: request(
       'sport.gym',
       'start',
@@ -198,6 +232,7 @@ export function buildIngestionOpenApi(): OpenAPIObject {
         ref('ExamUpsert'),
         ref('AssignmentUpsert'),
         ref('GymUpsert'),
+        ref('PersonalUpsert'),
         ref('Retirement'),
       ],
       description:

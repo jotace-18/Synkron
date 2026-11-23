@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   activityOccursOn,
+  compareCalendarActivities,
   addCalendarDays,
   getMadridDate,
   getMonthDays,
@@ -91,4 +92,17 @@ test('rejects an expired session on a later page instead of showing an incomplet
     SessionExpiredError,
   )
   assert.equal(calls, 2)
+})
+
+
+test('orders timed activities chronologically before dates with stable ties', () => {
+  const activity = (id, title, schedule) => ({id, title, schedule})
+  const items = [
+    activity('date', 'Sin hora', {kind: 'date', date: '2026-11-24'}),
+    activity('late', 'Tarde', {kind: 'instant', at: '2026-11-24T17:00:00+01:00'}),
+    activity('middle', 'Mediodía', {kind: 'interval', at: '2026-11-24T10:00:00+01:00', end_at: '2026-11-24T11:00:00+01:00'}),
+    activity('early-b', 'Mañana', {kind: 'instant', at: '2026-11-24T07:00:00Z'}),
+    activity('early-a', 'Mañana', {kind: 'instant', at: '2026-11-24T08:00:00+01:00'}),
+  ]
+  assert.deepEqual(items.sort(compareCalendarActivities).map(({id}) => id), ['early-a', 'early-b', 'middle', 'late', 'date'])
 })

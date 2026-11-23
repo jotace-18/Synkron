@@ -1,4 +1,9 @@
 import {
+  PERSONAL_STATUSES,
+  isPersonalDetails,
+  isPersonalSchedule,
+} from './personal/personal-details.validator';
+import {
   GYM_STATUSES,
   isGymDetails,
   isGymInterval,
@@ -27,6 +32,13 @@ export interface ActivitySchema {
 
 // A planned ActivityType does not enable ingestion until its schema is registered.
 const schemas: Partial<Record<ActivityType, ActivitySchema>> = {
+  'personal.event': {
+    role: 'start',
+    kinds: ['date', 'instant', 'interval'],
+    statuses: PERSONAL_STATUSES,
+    isDetails: isPersonalDetails,
+    isSchedule: isPersonalSchedule,
+  },
   'sport.gym': {
     role: 'start',
     kinds: ['interval'],

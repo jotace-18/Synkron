@@ -127,11 +127,13 @@ export function buildSyncOpenApi(): OpenAPIObject {
     AssignmentActivity: activity('AssignmentUpsert'),
     ExamActivity: activity('ExamUpsert'),
     GymActivity: activity('GymUpsert'),
+    PersonalActivity: activity('PersonalUpsert'),
     Activity: {
       oneOf: [
         ref('AssignmentActivity'),
         ref('ExamActivity'),
         ref('GymActivity'),
+        ref('PersonalActivity'),
       ],
     },
   });

@@ -71,7 +71,7 @@ export function formatSection(section: JsonValue | undefined): string {
   }
 }
 
-export function formatActivityType(type: ActivityType): string {
+export function formatActivityType(type: string): string {
   const labels: Record<ActivityType, string> = {
     'academic.assignment': 'Entrega',
     'academic.exam': 'Examen',
@@ -82,9 +82,12 @@ export function formatActivityType(type: ActivityType): string {
     'sport.hiking': 'Senderismo',
     'sport.running': 'Carrera',
     'sport.other': 'Deporte',
-    'social.plan': 'Plan',
+    'personal.event': 'Otros',
+    'social.plan': 'Otros',
   }
-  return labels[type]
+  return Object.hasOwn(labels, type)
+    ? labels[type as ActivityType]
+    : 'Actividad'
 }
 
 export function formatCalendarTitle(activity: Activity): string {
@@ -228,4 +231,55 @@ export function getGymFields(
             : 'Sin especificar',
     },
   ]
+}
+
+export function getPersonalFields(
+  activity: Activity,
+): { label: string; value: string }[] {
+  const people = Array.isArray(activity.details.people)
+    ? activity.details.people.filter(
+        (name): name is string =>
+          typeof name === 'string' && name.trim().length > 0,
+      )
+    : []
+  const duration =
+    activity.schedule.kind === 'interval'
+      ? (Date.parse(activity.schedule.end_at) -
+          Date.parse(activity.schedule.at)) /
+        60_000
+      : null
+  return [
+    {
+      label: 'Duración',
+      value:
+        duration === null
+          ? 'Sin duración indicada'
+          : `${new Intl.NumberFormat('es-ES').format(duration)} minutos`,
+    },
+    {
+      label: 'Personas',
+      value: people.length ? people.join(', ') : 'Sin personas indicadas',
+    },
+  ]
+}
+
+const detailFormatters: Partial<
+  Record<
+    ActivityType,
+    (activity: Activity) => { label: string; value: string }[]
+  >
+> = {
+  'academic.assignment': getAssignmentFields,
+  'academic.exam': getExamFields,
+  'sport.gym': getGymFields,
+  'personal.event': getPersonalFields,
+  'social.plan': getPersonalFields,
+}
+export function getActivityFields(
+  activity: Activity,
+): { label: string; value: string }[] {
+  const formatter = Object.hasOwn(detailFormatters, activity.type)
+    ? detailFormatters[activity.type]
+    : undefined
+  return formatter?.(activity) ?? []
 }

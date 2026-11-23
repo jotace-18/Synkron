@@ -291,8 +291,8 @@ export default function NotificationRuleForm({
       </label>
 
       <p className="automation-description">
-        Las reglas sobre notas, vencimientos y entregas se evalúan cuando
-        sincronizas los cambios de la fuente.
+        Las reglas sobre cambios de actividades se evalúan cuando sincronizas
+        la fuente. Una regla de aviso no programa recordatorios previos.
       </p>
 
       {error && (

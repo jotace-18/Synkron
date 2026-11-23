@@ -1,12 +1,13 @@
 import type { Activity } from './activity.types'
 
 export interface ActivityFilters {
-  category: 'all' | 'academic' | 'sport' | 'social'
+  category: 'all' | 'academic' | 'sport' | 'personal'
   delivery:
     | 'all'
     | 'submitted'
     | 'unsubmitted'
     | 'scheduled'
+    | 'pending'
     | 'completed'
     | 'cancelled'
   course: string
@@ -25,33 +26,29 @@ export function filterActivities(
   return activities.filter((activity) => {
     if (
       filters.category !== 'all' &&
-      !activity.type.startsWith(`${filters.category}.`)
+      !(
+        activity.type.startsWith(`${filters.category}.`) ||
+        (filters.category === 'personal' && activity.type === 'social.plan')
+      )
     ) {
       return false
     }
 
     if (filters.delivery !== 'all') {
-      const examState = ['scheduled', 'completed', 'cancelled'].includes(
-        filters.delivery,
-      )
-      if (examState)
-        return (
-          (activity.type === 'academic.exam' ||
-            activity.type === 'sport.gym') &&
-          activity.status === filters.delivery &&
-          (filters.category !== 'academic' ||
-            !filters.course ||
-            activity.details.course_name === filters.course)
-        )
-      if (activity.type !== 'academic.assignment') return false
-      if (filters.delivery === 'submitted' && activity.status !== 'submitted')
-        return false
       if (
-        filters.delivery === 'unsubmitted' &&
-        activity.status !== 'pending' &&
-        activity.status !== 'in_progress'
-      )
-        return false
+        filters.delivery === 'submitted' ||
+        filters.delivery === 'unsubmitted'
+      ) {
+        if (activity.type !== 'academic.assignment') return false
+        if (filters.delivery === 'submitted' && activity.status !== 'submitted')
+          return false
+        if (
+          filters.delivery === 'unsubmitted' &&
+          activity.status !== 'pending' &&
+          activity.status !== 'in_progress'
+        )
+          return false
+      } else if (activity.status !== filters.delivery) return false
     }
 
     return (
@@ -85,4 +82,26 @@ export function getCourseOptions(
   return Array.from(courses, ([value, label]) => ({ value, label })).sort(
     (left, right) => left.label.localeCompare(right.label, 'es'),
   )
+}
+
+export function getStatusFilterOptions(
+  category: ActivityFilters['category'],
+): { value: ActivityFilters['delivery']; label: string }[] {
+  const options: { value: ActivityFilters['delivery']; label: string }[] = [
+    { value: 'all', label: 'Cualquier estado' },
+  ]
+  if (category === 'all' || category === 'academic')
+    options.push(
+      { value: 'submitted', label: 'Entregadas' },
+      { value: 'unsubmitted', label: 'No entregadas' },
+    )
+  if (category === 'all' || category === 'personal')
+    options.push({ value: 'pending', label: 'Pendientes' })
+  if (category !== 'personal')
+    options.push({ value: 'scheduled', label: 'Programados' })
+  options.push(
+    { value: 'completed', label: 'Realizados' },
+    { value: 'cancelled', label: 'Cancelados' },
+  )
+  return options
 }

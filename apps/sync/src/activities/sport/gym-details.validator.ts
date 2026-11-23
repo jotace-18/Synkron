@@ -1,3 +1,4 @@
+import { isWholeMinuteInterval } from '../activity-schedule.validator';
 import type { ActivitySchedule, JsonValue } from '../activity.types';
 import {
   hasExactFields,
@@ -24,7 +25,5 @@ export function isGymDetails(
   );
 }
 export function isGymInterval(value: ActivitySchedule): boolean {
-  if (value.kind !== 'interval') return false;
-  const minutes = (Date.parse(value.end_at) - Date.parse(value.at)) / 60_000;
-  return Number.isInteger(minutes) && minutes > 0 && minutes <= 2_147_483_647;
+  return isWholeMinuteInterval(value);
 }

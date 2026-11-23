@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type SubmitEvent } from 'react'
 import { SessionExpiredError } from '../activities/activities-client'
 import { connectSource } from './sync-client'
+import { SOURCE_PRESETS, type SourcePreset } from './source-presets'
 
 export default function ConnectSourceForm({
   onConnected,
@@ -9,8 +10,9 @@ export default function ConnectSourceForm({
   onConnected: () => void
   onSessionExpired: () => void
 }) {
-  const [name, setName] = useState('Sincronizar gimnasio')
-  const [url, setUrl] = useState('http://sport:3000/api/v1/activities/export')
+  const [preset, setPreset] = useState<SourcePreset>('personal')
+  const [name, setName] = useState<string>(SOURCE_PRESETS.personal.name)
+  const [url, setUrl] = useState<string>(SOURCE_PRESETS.personal.url)
   const [connector, setConnector] = useState('standard.activities')
   const [token, setToken] = useState('')
   const [saving, setSaving] = useState(false)
@@ -52,10 +54,33 @@ export default function ConnectSourceForm({
     <details className="source-connection">
       <summary>Conectar una fuente externa</summary>
       <p>
-        Para gimnasio, utiliza tu SPORT_DEMO_TOKEN. La credencial se guarda
-        cifrada y vinculada a tu cuenta de Synkron.
+        {SOURCE_PRESETS[preset].hint} La credencial se guarda cifrada y
+        vinculada a tu cuenta de Synkron.
       </p>
       <form className="source-form" onSubmit={save}>
+        <label>
+          Fuente
+          <select
+            value={preset}
+            disabled={saving}
+            onChange={(event) => {
+              const value = event.target.value as SourcePreset
+              const source = SOURCE_PRESETS[value]
+              setPreset(value)
+              setName(source.name)
+              setUrl(source.url)
+              setConnector(source.connector)
+              setToken('')
+              setMessage(null)
+            }}
+          >
+            {Object.entries(SOURCE_PRESETS).map(([value, source]) => (
+              <option key={value} value={value}>
+                {source.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           Nombre
           <input
@@ -74,7 +99,7 @@ export default function ConnectSourceForm({
             onChange={(e) => setConnector(e.target.value)}
           >
             <option value="standard.activities">
-              Actividades estándar (gimnasio y otras fuentes)
+              Actividades estándar (Otros, gimnasio y otras fuentes)
             </option>
             <option value="academic.assignments">Entregas académicas</option>
             <option value="academic.exams">Exámenes académicos</option>
@@ -88,7 +113,12 @@ export default function ConnectSourceForm({
             maxLength={2048}
             value={url}
             disabled={saving}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value)
+              setPreset('custom')
+              setToken('')
+              setMessage(null)
+            }}
           />
         </label>
         <label>

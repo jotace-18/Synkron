@@ -128,6 +128,60 @@ describe('Standardized ingestion (HTTP, PostgreSQL and worker)', () => {
     return response.body as IngestionResult;
   }
 
+  it('accepts Personal through a scoped push credential using the same worker and canonical validation', async () => {
+    const created = await admin('post', '/api/v1/ingestion-sources')
+      .send({
+        name: 'Personal push',
+        source_collection: 'personal-push',
+        allowed_types: ['personal.event'],
+      })
+      .expect(201);
+    const credential = created.body as Credential;
+    const body = {
+      schema_version: 1,
+      action: 'upsert',
+      external_id: 'events:push-test',
+      source_updated_at: null,
+      activity: {
+        type: 'personal.event',
+        title: 'Cita',
+        status: 'pending',
+        schedule: {
+          kind: 'date',
+          role: 'start',
+          date: '2026-11-25',
+          at: null,
+          end_at: null,
+        },
+        details: { people: ['Ana'] },
+      },
+    };
+    const accepted = (
+      await send(credential.token, 'personal-push-key', body).expect(202)
+    ).body as IngestionReceipt;
+    await execute(accepted.id);
+    const result = await db.query<{
+      type: string;
+      details: { people: string[] };
+    }>(
+      'SELECT type,details FROM sync.activities WHERE tenant_id=$1 AND external_id=$2',
+      [owner, 'events:push-test'],
+    );
+    expect(result.rows).toEqual([
+      { type: 'personal.event', details: { people: ['Ana'] } },
+    ]);
+    expect(
+      (
+        (await send(credential.token, 'personal-push-key', body).expect(202))
+          .body as IngestionReceipt
+      ).id,
+    ).toBe(accepted.id);
+    await send(credential.token, 'wrong-profile', {
+      ...ingestionExample,
+      external_id: 'not-personal',
+    }).expect(422);
+  });
+
   it('persists before accepting, survives retries, processes from the stored body and emits normal changes and results', async () => {
     const credential = await createSource();
     expect(credential.token).toMatch(/^si_[a-f0-9]{64}$/);

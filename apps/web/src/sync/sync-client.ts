@@ -5,6 +5,9 @@ export interface SyncDefinition {
   id: string
   name: string
   enabled: boolean
+  connector: string
+  source_connection_id: string
+  group?: 'academic' | 'sport' | 'personal' | 'custom'
 }
 
 export interface RunReference {
@@ -62,7 +65,11 @@ export async function listDefinitions(
           'name' in item &&
           typeof item.name === 'string' &&
           'enabled' in item &&
-          typeof item.enabled === 'boolean',
+          typeof item.enabled === 'boolean' &&
+          'connector' in item &&
+          typeof item.connector === 'string' &&
+          'source_connection_id' in item &&
+          typeof item.source_connection_id === 'string',
       )
     ) {
       throw new Error('El servicio ha devuelto una respuesta inesperada.')
@@ -198,4 +205,45 @@ export async function connectSource(
     throw new Error(
       'No se pudo guardar la fuente. Revisa los datos o reintenta sin duplicarla.',
     )
+}
+
+export interface SyncConnection {
+  id: string
+  base_url: string
+}
+export async function listSyncConnections(
+  signal?: AbortSignal,
+): Promise<SyncConnection[]> {
+  const connections: SyncConnection[] = []
+  for (;;) {
+    const query = new URLSearchParams({
+      limit: '50',
+      offset: String(connections.length),
+    })
+    const response = await fetch(`/api/v1/connections?${query}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: requestSignal(signal),
+    })
+    checkSession(response)
+    if (response.status !== 200)
+      throw new Error('No se pudieron cargar las fuentes.')
+    const page: unknown = await response.json()
+    if (
+      !Array.isArray(page) ||
+      page.length > 50 ||
+      !page.every(
+        (item: unknown): item is SyncConnection =>
+          item !== null &&
+          typeof item === 'object' &&
+          'id' in item &&
+          typeof item.id === 'string' &&
+          'base_url' in item &&
+          typeof item.base_url === 'string',
+      )
+    )
+      throw new Error('El servicio ha devuelto una respuesta inesperada.')
+    connections.push(...page.map(({ id, base_url }) => ({ id, base_url })))
+    if (page.length < 50) return connections
+  }
 }

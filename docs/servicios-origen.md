@@ -21,7 +21,7 @@ La API estática `fixtures/task-api` permite comprobar conexiones. El backend
 `apps/academic` implementa las colecciones editables de entregas y exámenes, con PostgreSQL,
 autorización Bearer y borrado lógico. Su [contrato y arranque](../apps/academic/README.md)
 describen las rutas disponibles. Los demás recursos académicos siguen pendientes. La fuente Otros dispone ya
-de backend; su interfaz e integración central siguen pendientes. `apps/sport` incorpora la API de gimnasio con
+de backend, interfaz e integración central; el recorrido conjunto queda pendiente. `apps/sport` incorpora la API de gimnasio con
 PostgreSQL y credenciales propias. `apps/sport-web` permite mantener sesiones
 desde una interfaz independiente; la integración con Sync y Monitoring está validada. Campus permite introducir y editar entregas y exámenes.
 
@@ -184,8 +184,8 @@ el alcance concreto de las demás disciplinas se cerrará al incorporarlas.
 ## Fuente personal: Otros
 
 Contrato acordado el 23/11/2026; sustituye la propuesta de planes sociales.
-El backend está implementado en `apps/personal`; su interfaz y la habilitación
-central en Sync corresponden a los siguientes subpuntos. Puede representar ir a comprar,
+El backend está implementado en `apps/personal` y su interfaz en `apps/personal-web`;
+el esquema central está habilitado en Sync con la migración 015. Puede representar ir a comprar,
 una cita con el peluquero o quedar con amigos mediante el mismo recurso.
 
 | Dato | Alcance |
@@ -198,7 +198,7 @@ una cita con el peluquero o quedar con amigos mediante el mismo recurso.
 | Estado | Pendiente, realizado o cancelado. |
 
 Sin hora se exporta un día; con hora y sin duración, un instante; con duración,
-un intervalo. El tipo central previsto es `personal.event` con rol `start` y
+un intervalo. El tipo central es `personal.event` con rol `start` y
 estados `pending`, `completed`, `cancelled`. La duración central se obtiene del
 intervalo. Cancelar mantiene el registro; retirar comunica una baja explícita.
 
@@ -315,8 +315,201 @@ finales de autenticación y paginación y el aislamiento entre dos cuentas no se
 dan por comprobados manualmente. La ejecución de la suite PostgreSQL en CI
 sigue pendiente de confirmar para este checkpoint.
 
-Todavía no se habilita este tipo en Sync, ni se implementa su interfaz o su
-política de recordatorios.
+El esquema de este tipo está habilitado en Sync con la migración 015. No se
+implementa una política de recordatorios para Otros. La interfaz de origen se
+describe a continuación.
+
+### Interfaz de Otros
+
+`apps/personal-web` mantiene la estructura de Campus y Sport con identidad rosa y ciruela,
+barra lateral propia y formulario en dos columnas en escritorio. Se adapta a una
+columna en pantallas estrechas y conserva la tabla dentro de un área desplazable.
+
+El formulario permite asunto, día obligatorio, hora opcional, duración opcional,
+estado y personas (un nombre por línea, hasta 50). Muestra una vista previa del
+día, horario y final. La duración solo se habilita cuando hay hora; al quitarla,
+se elimina también la duración. La edición envía los cambios y las anulaciones
+temporales necesarias en el mismo PATCH. No inventa horas para días sin hora ni
+cambia los segundos o milisegundos de un instante original si no se edita su hora.
+
+El listado ofrece páginas de 20 compromisos, con consulta adicional para saber
+si existe página siguiente. Permite editar, marcar realizado mediante el editor,
+cancelar y retirar con confirmación. Hay estados de carga, lista vacía, error y
+reintento, bloqueo de acciones durante escrituras y recuperación del foco.
+
+Una respuesta incierta de escritura obliga a comprobar la lista antes de volver
+a intentarlo; no se reenvían creaciones automáticamente. El usuario distingue
+cancelación, que conserva el compromiso visible, de retirada, que lo oculta.
+
+Con Personal migrado y la cuenta ya preparada, desde la raíz:
+
+```bash
+npm --prefix apps/personal-web ci
+docker compose up -d --build --wait personal-web
+```
+
+Abre `http://127.0.0.1:3107` o `http://localhost:3107`. Se reutiliza
+`PERSONAL_DEMO_TOKEN` de la raíz, sin otra credencial. Nginx añade el Bearer en el
+servidor, elimina cookies y restringe las escrituras al origen de esta interfaz.
+Solo se reenvía `/api/v1/events`; los demás caminos `/api/` devuelven 404. El token
+no se incorpora al JavaScript del navegador.
+
+Para desarrollo con Vite y el backend Personal arrancado:
+
+```bash
+npm --prefix apps/personal-web run dev
+```
+
+Vite escucha en `http://127.0.0.1:5176` y reenvía a `127.0.0.1:3106`. La credencial
+se lee solo para el servidor de desarrollo; la compilación no carga el `.env`
+de la raíz. El preview de Vite no configura este proxy autenticado.
+
+El usuario aprobó la apariencia rosa/ciruela y confirmó el alta de un compromiso
+sin hora. La edición y las siguientes acciones se comprobarán junto a Synkron:
+
+
+1. Crear un compromiso con asunto y día sin hora; recargar y comprobar persistencia.
+2. Editar para añadir hora y comprobar la vista previa y el listado en Madrid.
+3. Añadir duración y dos personas; comprobar el final y conservar el mismo ID.
+4. Quitar la hora: debe limpiarse la duración y volver a mostrar «Sin hora».
+5. Marcar realizado o cancelar: el compromiso sigue visible con su estado.
+6. Retirar y confirmar: desaparece del listado. Comprobar también Volver y Escape
+   en el diálogo para no ejecutar la retirada.
+7. Probar una hora inexistente por cambio de horario y un nombre demasiado largo.
+8. Revisar formulario en pantalla estrecha y paginación si hay más de 20 registros.
+
+La compilación, lint y cuatro pruebas de formulario, reloj, paginación y cliente
+HTTP se verifican localmente sin arrancar servicios. La imagen y `nginx -t` están
+incluidos en CI. El usuario confirmó el arranque y la apariencia en su navegador;
+la validación local del agente no acredita el recorrido manual completo. El punto 4 implementa su integración con Synkron;
+el punto 5 implementa el detalle de personas/duración y las reglas guiadas.
+El usuario confirma la presentación y da por válidos los chequeos finales de Otros.
+
+### Conectar Otros con Synkron
+
+La integración utiliza `standard.activities`, sin un conector específico de
+Personal ni nuevas dependencias. Reutiliza `PERSONAL_DEMO_TOKEN` para la lectura
+por cuenta; no se configura otro token si se utiliza este recorrido. La recepción
+directa por POST sigue disponible con su propio IngestionToken y la misma
+validación, pero no hay que configurar ambos recorridos para los mismos datos.
+
+Con las bases migradas de las fuentes y sus cuentas ya preparadas:
+
+```bash
+docker compose up -d --wait sync-db personal-db
+docker compose build personal sync sync-worker sync-publisher sync-event-publisher web
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/sync:/app" sync npm run migrate:up
+docker compose up -d personal personal-web api rabbitmq academic sport \
+  sync sync-worker sync-publisher sync-event-publisher \
+  monitoring monitoring-consumer automation web gateway
+docker compose exec gateway caddy reload --config /etc/caddy/Caddyfile
+```
+
+La migración nueva es **015_add_personal_event** de Sync. No hay otra migración
+de Personal para este paso. Compose añade el origen interno Personal a la lista
+autorizada en Sync y el worker, conservando los orígenes configurados; no es
+necesario editar el `.env` existente para añadir este origen.
+
+1. Entra en `https://localhost:8443`, Mi agenda → Conectar una fuente externa.
+2. Selecciona **Otros (Personal)**. Se preparan nombre, conector
+   `standard.activities` y URL `http://personal:3000/api/v1/activities/export`.
+3. Introduce tu credencial personal, sin compartirla ni publicarla en el chat,
+   y conecta. Se guarda cifrada; un reintento de la misma configuración devuelve
+   la misma conexión y definición. No se reactiva ni sobrescribe una conexión
+   existente con otra credencial.
+4. Crea un compromiso desde `http://localhost:3107` y pulsa **Sincronizar todo**
+   en Synkron. Puedes seleccionar solo Otros para aislar su resultado durante
+   una comprobación. Los demás orígenes conservan ejecuciones independientes.
+5. Comprueba el título y la fecha en calendario y la ejecución en Monitoring.
+   Sin cambios, repetir debe conservar ID y no duplicar actividades. Editar,
+   cancelar y retirar se reflejan en la misma identidad central.
+
+La conexión de una fuente no la consulta hasta solicitar la sincronización.
+Si Personal está apagado o rechaza su Bearer, la ejecución falla de manera
+visible y las otras fuentes del lote siguen su recorrido.
+
+Se han añadido pruebas locales del contrato de los tres horarios, límites de
+personas, restricción por fuente y rechazo del alias histórico. La suite CI
+`personal-import.e2e-spec.ts` prepara conexión por cuenta y verifica el ciclo con
+worker y persistencia reales y un lector simulado, incluyendo cancelación,
+retirada, validación completa antes de escribir, aislamiento y eventos normales.
+La suite de ingesta HTTP añade recepción directa con credencial de tipo limitado
+a Personal y repetición idempotente. Esas suites PostgreSQL no se han ejecutado
+localmente desde el agente. El usuario validó el recorrido conjunto el 23/11/2026: conexión de Otros,
+aparición en calendario de un intervalo de 10:00 a 10:30, repetición sin duplicados,
+edición a «Compra semanal» con final a las 10:45, vuelta a día sin hora y
+cancelación visible en gris y tachada. Confirmó después una retirada en el
+resultado de Monitoring. Esto no acredita la ejecución local de las suites
+PostgreSQL ni la comprobación manual de aislamiento entre dos cuentas.
+
+El punto 4 incluye la identificación básica «Otros» y el filtro del bloque. El
+punto 5 añade la presentación completa y las plantillas por eventos descritas
+a continuación. No se generan recordatorios para compromisos personales.
+
+### Presentación y avisos de Otros en Synkron
+
+El detalle central presenta **Duración** calculada del intervalo (sin otro campo
+redundante) y **Personas**, con los nombres sincronizados. Un día o instante sin
+intervalo muestra «Sin duración indicada»; una lista vacía muestra «Sin personas
+indicadas», sin asumir que el compromiso es individual.
+
+Otros pendiente utiliza rosa en el calendario, acorde a su interfaz de origen.
+Realizado conserva el verde y cancelado el gris/tachado. El tipo y el estado se
+indican también como texto en detalle y listado. La agenda conserva título,
+sigla académica cuando existe y hora en las filas compactas del mes.
+
+En la vista **Agenda**, el filtro **Otros** ofrece Cualquier estado, Pendientes,
+Realizados y Cancelados.
+Al cambiar de categoría se conserva el filtro de estado solo si es válido para
+la nueva selección. En Todos los tipos, Pendientes reúne los estados pending;
+No entregadas sigue limitado a entregas pendientes o en curso. Las opciones de
+asignatura permanecen específicas del bloque académico.
+
+En Automation hay seis nuevas plantillas, filtradas por `personal.event`:
+
+- Alta o retirada de un compromiso de Otros.
+- Cambio de asunto.
+- Cambio de fecha, hora o duración (campo canónico `schedule`).
+- Cambio de estado.
+- Cambio de personas.
+
+Las reglas se evalúan al sincronizar cambios; no constituyen una política de
+recordatorios previos ni se activan automáticamente. Monitoring presenta los
+campos Personas, Asunto, Fecha/hora/duración y Retirada con nombres legibles.
+Los avisos reutilizan la bandeja y el enlace a la actividad existente.
+
+Este punto modifica solo la web central; no requiere otra migración, token ni
+reconstrucción de los backends. Con el recorrido de sincronización ya arrancado:
+
+```bash
+docker compose up -d --build --wait web
+```
+
+Recarga `https://localhost:8443` con Ctrl+Shift+R. Comprueba un compromiso activo
+con 45 minutos y personas para ver ambos campos; un registro retirado ya no está
+en el calendario. Verifica también un día sin hora, los tres estados y los
+filtros. El usuario confirma la presentación y acepta las comprobaciones finales
+el 23/11/2026; los siguientes pasos quedan como guía de reproducción.
+
+Para probar un aviso, mantén los consumidores y el despachador activos:
+
+```bash
+docker compose up -d automation-consumer automation-notifications \
+  monitoring monitoring-consumer
+```
+
+Primero crea y sincroniza un compromiso. Después crea una regla **Cambian las
+personas de un compromiso de Otros**, con acción Avisar y un mensaje de prueba.
+Actívala explícitamente, cambia las personas de ese compromiso en la fuente y
+pulsa Sincronizar todo. Actualiza Avisos después de unos segundos: debe aparecer
+el mensaje con enlace al compromiso. Repetir sin cambios no debe producir otro
+aviso. Pausa la regla al terminar la prueba si no quieres conservarla activa.
+
+La suite local de web cubre el detalle, la convivencia de filtros y la conversión
+de las seis plantillas a condiciones y su posterior edición, junto a la regresión
+académica/deportiva. No se ha arrancado Docker ni se han creado reglas reales
+desde el agente para acreditar la comprobación manual.
 
 ## Identidad y actualizaciones
 
@@ -370,3 +563,27 @@ mediante la API de Synkron, sin necesitar contactar con cada fuente al abrirlo.
 - Contratos y permisos concretos de creación, modificación y lectura de fuentes.
 
 Estas decisiones no implican que las fuentes o el calendario estén implementados.
+
+
+## Ajustes comunes y aceptación de Otros (23/11/2026)
+
+El usuario confirma la presentación y da por válidos los chequeos finales de
+Otros. Se registra su aceptación; no se atribuye al agente la ejecución de las
+pruebas manuales restantes. Quedan el checkpoint y su confirmación en CI.
+
+La sincronización manual selecciona bloques: **Académico**, **Deporte** y
+**Otros**, además de **Sincronizar todo**. Académico incluye todas sus
+definiciones habilitadas, tanto entregas como exámenes. Cada bloque muestra un
+resultado agregado y permite desplegar las ejecuciones individuales para revisar
+fallos. Los reintentos conservan las claves y solicitudes ya aceptadas.
+
+La clasificación utiliza los conectores académicos y las URL canónicas de las
+fuentes Sport y Personal registradas, sin depender de sus nombres. Otras fuentes
+canónicas permanecen en **Otras fuentes** y en Sincronizar todo. Las programaciones
+y acciones de reglas mantienen su definición explícita guardada.
+
+Las tarjetas de la agenda y el detalle distinguen Académico en violeta, Deporte
+en naranja y Otros en rosa. Se conservan los colores semánticos de los estados,
+incluidos completado en verde y cancelado en gris. El calendario mensual,
+semanal y diario ordena primero por hora de inicio y deja al final las actividades
+sin hora, con desempate estable por título e identidad.

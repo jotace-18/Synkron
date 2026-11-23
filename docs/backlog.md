@@ -582,7 +582,9 @@ Tareas:
 ## US-25 — Incorporar el bloque Otros para compromisos personales
 
 Contrato acordado el 23/11/2026. Sustituye el alcance inicial de «Planes sociales»;
-backend de origen implementado; interfaz e integración central pendientes.
+backend, interfaz de origen e integración central implementados; presentación
+de Otros completada. El usuario da por válidas las comprobaciones finales
+el 23/11/2026; checkpoint y confirmación de CI pendientes.
 Incluye recados, citas y quedadas sin crear un tipo de
 actividad distinto para cada caso.
 
@@ -598,7 +600,7 @@ Criterios de aceptación:
 - Estados pendiente, realizado y cancelado (`pending`, `completed`, `cancelled`).
   El paso del tiempo no completa automáticamente un compromiso.
 - Nombre visible «Otros» y tipo central previsto `personal.event`, con rol `start`.
-  El tipo aún no está habilitado en el catálogo ni en las restricciones de Sync.
+  Tipo registrado en Sync y admitido por la migración 015; `social.plan` queda solo para lectura histórica.
 - Editar conserva la identidad; cancelar mantiene el compromiso visible;
   retirar comunica una baja explícita.
 - Reutilizar exportación canónica, `standard.activities`, «Sincronizar todo»,
@@ -611,17 +613,31 @@ Subpuntos de trabajo:
 2. **Fuente personal — implementada.** Persistencia, API por cuenta, CRUD,
    exportación canónica, Swagger, Compose, CI y configuración de arranque.
    Compilación y pruebas locales comprobadas; usuario confirma el recorrido
-   funcional desde Swagger el 23/11/2026. Últimas comprobaciones manuales de
-   autenticación/paginación y confirmación de CI pendientes.
-3. **Interfaz de origen.** Formulario y listado para mantener compromisos, con
-   estructura similar a las otras fuentes y una identidad visual propia.
-4. **Integración central.** Registrar `personal.event`, adaptar el catálogo y
-   restricciones que aún contemplan `social.plan`, y reutilizar el lector común.
-5. **Presentación y seguimiento.** Mostrar «Otros», personas y duración;
-   adaptar filtros y reglas por eventos. No activar recordatorios implícitamente.
-6. **Validación y checkpoint.** Comprobar día sin hora, instante e intervalo;
-   repetición, edición, cancelación, retirada y aislamiento entre cuentas.
-   Añadir solo pruebas necesarias para las reglas nuevas y reutilizar regresión.
+   funcional desde Swagger el 23/11/2026. El usuario acepta las comprobaciones finales; confirmación de CI pendiente.
+3. **Interfaz de origen — implementada.** Formulario en dos columnas, listado
+   paginado, edición, cancelación y retirada, con estructura similar a las otras
+   fuentes e identidad rosa y ciruela propia. Compilación, lint y cuatro pruebas locales
+   comprobados; apariencia y alta sin hora confirmadas por el usuario. Edición,
+   cancelación y retirada desde la interfaz confirmadas en el recorrido conjunto.
+4. **Integración central — implementada.** Registrar `personal.event`, añadir
+   migración 015, mantener lectura histórica de `social.plan` y reutilizar el
+   lector común, worker, idempotencia y eventos. Preset de conexión Otros, origen
+   autorizado en Compose y soporte en «Sincronizar todo». Pruebas locales en verde;
+   escenarios PostgreSQL preparados para CI. Usuario valida el 23/11/2026 la
+   conexión, alta, repetición sin duplicados, edición de título/duración, vuelta
+   a día sin hora, cancelación y retirada con resultado en Monitoring.
+5. **Presentación y seguimiento — implementados.** Detalle de personas y duración,
+   rosa para Otros pendientes, filtros por los tres estados y nombres de campos
+   legibles en Monitoring. Seis plantillas de reglas por alta, retirada y cambios
+   de asunto, horario/duración, estado o personas. Compilación, lint y pruebas
+   locales en verde; presentación confirmada por el usuario, que da por válidas
+   las comprobaciones finales de Otros.
+   No se activan recordatorios implícitamente.
+6. **Validación aceptada; checkpoint pendiente.** Recorrido de alta, edición,
+   repetición, cancelación y retirada confirmado por el usuario. El usuario da
+   por válidos los chequeos finales de Otros; esta aceptación no implica que el
+   agente haya ejecutado cada prueba manual restante. Pruebas locales de
+   regresión mantenidas; guardar checkpoint y confirmar CI antes de cerrar.
 
 ## Ampliaciones posteriores
 

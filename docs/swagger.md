@@ -120,5 +120,7 @@ atómica `/api/v1/sync-sources` están documentadas en sus servicios respectivos
 El backend de Otros usa `/personal/api/v1/events` y exporta operaciones canónicas
 en `/personal/api/v1/activities/export`. Consulta el
 [arranque de la fuente personal](servicios-origen.md#arranque-de-la-fuente-personal).
-La fuente está implementada; la habilitación de `personal.event` dentro de Sync
-se realiza en el punto 4 de US-25 y no se da por completada con estas rutas.
+El esquema `personal.event` está habilitado en Sync tras la migración 015, tanto
+para recepción directa como para lectura con `standard.activities`. La conexión
+desde la agenda ofrece un preset «Otros (Personal)» con su URL canónica; utiliza
+la credencial personal y no el token deportivo.

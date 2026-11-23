@@ -1,4 +1,4 @@
-
+import { formatActivityType } from '../activities/activity-format'
 import type { MonitoringRunDetail } from './monitoring.types'
 
 const dateFormatter = new Intl.DateTimeFormat('es-ES', {
@@ -17,7 +17,9 @@ const fieldLabels: Record<string, string> = {
   title: 'Título',
   status: 'Estado',
   grade: 'Nota',
-  schedule: 'Fecha u horario',
+  schedule: 'Fecha, hora o duración',
+  people: 'Personas',
+  deleted_at: 'Retirada',
   course_name: 'Asignatura',
   course_abbreviation: 'Sigla',
   section: 'Parte',
@@ -88,11 +90,20 @@ export default function MonitoringRunDetailContent({
         <ul className="monitoring-changes">
           {changes.map((change) => (
             <li key={change.event_id}>
-              <strong>{changeLabels[change.change_type]}</strong>
+              <strong>
+                {changeLabels[change.change_type]} ·{' '}
+                {formatActivityType(change.activity_type)}
+              </strong>
               {change.changed_fields.length > 0 && (
                 <p>
-                  Campos: {change.changed_fields
-                    .map((field) => fieldLabels[field] ?? field)
+                  Campos:{' '}
+                  {change.changed_fields
+                    .map((field) =>
+                      field === 'title' &&
+                      change.activity_type === 'personal.event'
+                        ? 'Asunto'
+                        : (fieldLabels[field] ?? field),
+                    )
                     .join(', ')}
                 </p>
               )}
@@ -116,9 +127,7 @@ export default function MonitoringRunDetailContent({
           <dt>Definición</dt>
           <dd>{run.definition_id}</dd>
           <dt>Recibido en Monitoring</dt>
-          <dd>
-            {dateFormatter.format(new Date(run.received_at))}
-          </dd>
+          <dd>{dateFormatter.format(new Date(run.received_at))}</dd>
         </dl>
       </details>
     </>

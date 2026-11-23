@@ -5,6 +5,24 @@ import type {
 } from './automation.types'
 
 export const NOTIFICATION_RULE_PRESETS = [
+  { value: 'personal_created', label: 'Se incorpora un compromiso de Otros' },
+  { value: 'personal_retired', label: 'Se retira un compromiso de Otros' },
+  {
+    value: 'personal_schedule_changed',
+    label: 'Cambia la fecha, hora o duración en Otros',
+  },
+  {
+    value: 'personal_status_changed',
+    label: 'Cambia el estado de un compromiso de Otros',
+  },
+  {
+    value: 'personal_people_changed',
+    label: 'Cambian las personas de un compromiso de Otros',
+  },
+  {
+    value: 'personal_title_changed',
+    label: 'Cambia el asunto de un compromiso de Otros',
+  },
   { value: 'gym_created', label: 'Se incorpora un entrenamiento de gimnasio' },
   { value: 'gym_retired', label: 'Se retira un entrenamiento de gimnasio' },
   {
@@ -59,6 +77,20 @@ export interface NotificationRuleFormValues {
   target_definition_id: string
 }
 
+const changedFields: Partial<Record<NotificationRulePreset, string>> = {
+  grade_changed: 'grade',
+  deadline_changed: 'schedule',
+  exam_grade_changed: 'grade',
+  exam_date_changed: 'schedule',
+  exam_status_changed: 'status',
+  gym_schedule_changed: 'schedule',
+  gym_status_changed: 'status',
+  personal_schedule_changed: 'schedule',
+  personal_status_changed: 'status',
+  personal_people_changed: 'people',
+  personal_title_changed: 'title',
+}
+
 export function notificationRuleInput(
   values: NotificationRuleFormValues,
 ): RuleInput {
@@ -79,30 +111,21 @@ export function notificationRuleInput(
     conditions.push({
       field: 'payload.activity_type',
       operator: '==',
-      value: values.preset.startsWith('gym_')
-        ? 'sport.gym'
-        : values.preset.startsWith('exam_')
-          ? 'academic.exam'
-          : 'academic.assignment',
+      value: values.preset.startsWith('personal_')
+        ? 'personal.event'
+        : values.preset.startsWith('gym_')
+          ? 'sport.gym'
+          : values.preset.startsWith('exam_')
+            ? 'academic.exam'
+            : 'academic.assignment',
     })
 
-    if (
-      values.preset === 'grade_changed' ||
-      values.preset === 'deadline_changed' ||
-      values.preset === 'exam_grade_changed' ||
-      values.preset === 'exam_date_changed' ||
-      values.preset === 'exam_status_changed' ||
-      values.preset === 'gym_schedule_changed' ||
-      values.preset === 'gym_status_changed'
-    ) {
+    const changedField = changedFields[values.preset]
+    if (changedField) {
       conditions.push({
         field: 'payload.changed_fields',
         operator: 'contains',
-        value: values.preset.endsWith('grade_changed')
-          ? 'grade'
-          : values.preset.endsWith('status_changed')
-            ? 'status'
-            : 'schedule',
+        value: changedField,
       })
     } else {
       conditions.push({
