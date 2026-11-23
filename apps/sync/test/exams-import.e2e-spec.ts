@@ -1,3 +1,4 @@
+import type { CanonicalImportService } from '../src/imports/canonical-import.service';
 import type { StoredIngestionImporter } from '../src/ingestions/stored-ingestion.importer';
 import { ConnectorImportTransport } from '../src/imports/connector-import.transport';
 import { ActivityImportPipeline } from '../src/imports/activity-import.pipeline';
@@ -80,6 +81,7 @@ describe('Exam execution integration', () => {
         {} as AcademicImportService,
         importer,
         {} as StoredIngestionImporter,
+        {} as CanonicalImportService,
       ),
       processor = new RunProcessorService(runs, registry);
     const execute = async () => {

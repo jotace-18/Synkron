@@ -551,7 +551,9 @@ Tareas:
 
 Contrato de producto acordado el 23/11/2026. Backend implementado y ciclo de
 vida validado manualmente. Interfaz implementada y aspecto visual aprobado;
-recorrido manual de sus acciones e integración con Sync pendientes.
+integración con Sync y presentación central implementadas. Recorrido manual
+Sport → Sync → calendario → Monitoring validado el 23/11/2026; escenario
+automatizado de aislamiento entre cuentas pendiente de CI.
 [Plan de trabajo](deporte.md).
 
 Como usuario, quiero registrar sesiones de gimnasio y verlas en mi agenda de
@@ -571,9 +573,10 @@ Tareas:
 - [x] Acordar los datos, estados, título y semántica temporal del primer recorrido.
 - [x] Implementar persistencia y API autorizada de la fuente deportiva, con Swagger, Compose y CI; ciclo de vida validado manualmente el 23/11/2026.
 - [x] Añadir interfaz deportiva para crear, editar, cancelar y retirar sesiones; aspecto visual aprobado el 23/11/2026.
-- [ ] Habilitar el esquema de gimnasio y conectar la recepción estandarizada.
-- [ ] Adaptar calendario, filtros, detalle y documentación Swagger.
-- [ ] Comprobar el ciclo de vida, deduplicación y separación entre cuentas, y documentar el arranque.
+- [x] Habilitar el esquema de gimnasio y conectar la entrada estandarizada mediante un lector canónico reutilizable.
+- [x] Adaptar calendario, filtros, detalle y documentación Swagger; conectar fuentes desde Synkron y ofrecer «Sincronizar todo» por defecto.
+- [x] Validar manualmente alta, repetición sin duplicados, edición, cancelación, retirada y seguimiento en Monitoring; documentar el arranque (23/11/2026).
+- [ ] Confirmar en CI la suite PostgreSQL, incluida la separación entre cuentas y la conexión concurrente.
 
 ## Ampliaciones posteriores
 

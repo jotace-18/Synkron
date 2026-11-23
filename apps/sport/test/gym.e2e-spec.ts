@@ -8,6 +8,7 @@ import { configureApp } from '../src/configure-app';
 import { configureApiDocs } from '../src/docs/configure-api-docs';
 import { DatabaseService } from '../src/database/database.service';
 import type { GymSessionView } from '../src/gym/gym.types';
+import { canonicalGymSession } from '../src/gym/canonical-activities.controller';
 
 const body = {
   started_at: '2026-11-24T18:00:00+01:00',
@@ -79,6 +80,8 @@ describe('Sport gym API (PostgreSQL)', () => {
       status: 'scheduled',
     });
     expect(session).not.toHaveProperty('account_id');
+    const canonical = await api('get', '/api/v1/activities/export').expect(200);
+    expect(canonical.body as unknown).toEqual([canonicalGymSession(session)]);
     const same = await api('patch', `/api/v1/gym-sessions/${session.id}`)
       .send(body)
       .expect(200);
@@ -108,6 +111,13 @@ describe('Sport gym API (PostgreSQL)', () => {
     );
     const retired = (exported.body as GymSessionView[])[0];
     expect(retired.deleted_at).not.toBeNull();
+    const canonicalRetired = await api(
+      'get',
+      '/api/v1/activities/export',
+    ).expect(200);
+    expect(canonicalRetired.body as unknown).toEqual([
+      canonicalGymSession(retired),
+    ]);
     await api('delete', `/api/v1/gym-sessions/${session.id}`).expect(204);
     const again = await api('get', '/api/v1/gym-sessions/export').expect(200);
     expect((again.body as GymSessionView[])[0].deleted_at).toBe(
@@ -123,6 +133,15 @@ describe('Sport gym API (PostgreSQL)', () => {
   it('does not disclose or modify another account and rejects missing or disabled credentials', async () => {
     const session = await create();
     await request(app.getHttpServer()).get('/api/v1/gym-sessions').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/activities/export')
+      .expect(401);
+    const foreignExport = await api(
+      'get',
+      '/api/v1/activities/export',
+      otherToken,
+    ).expect(200);
+    expect(foreignExport.body as unknown).toEqual([]);
     expect(
       (await api('get', '/api/v1/gym-sessions', otherToken).expect(200))
         .body as GymSessionView[],
@@ -146,6 +165,7 @@ describe('Sport gym API (PostgreSQL)', () => {
       owner,
     ]);
     await api('get', '/api/v1/gym-sessions').expect(401);
+    await api('get', '/api/v1/activities/export').expect(401);
   });
 
   it('enforces body validation and the database interval boundary and serves the public contract', async () => {

@@ -1,9 +1,10 @@
 # Primer recorrido deportivo: gimnasio
 
 Contrato de producto acordado el 23/11/2026. El backend de la fuente deportiva
-está implementado en `apps/sport` y su interfaz en `apps/sport-web`; queda la
-integración con Sync.
-El esquema `sport.gym` todavía no está habilitado en la entrada común.
+está implementado en `apps/sport` y su interfaz en `apps/sport-web`. La integración
+con Sync y el esquema común `sport.gym` están implementados. El usuario validó
+el recorrido real Sport → Sync → calendario → Monitoring el 23/11/2026, tras
+reconstruir los servicios y aplicar la migración 014.
 
 ## Datos y comportamiento acordados
 
@@ -23,21 +24,23 @@ cronómetro, planificación automática ni integraciones con Hevy o Strava.
 
 ## Representación en la entrada común
 
-Se habilitará `sport.gym` con `schedule.kind=interval` y `schedule.role=start`.
+Se habilita `sport.gym` con `schedule.kind=interval` y `schedule.role=start`.
 El comienzo y el final se comunican como instantes con zona y se normalizan a
 UTC; `schedule.date` es null. La duración visible se obtiene de ese intervalo,
 sin mantener otro valor central independiente que pueda contradecirlo.
 
-Los estados serán `scheduled`, `completed` y `cancelled`. Los detalles conservarán
+Los estados son `scheduled`, `completed` y `cancelled`. Los detalles conservarán
 la modalidad y la selección solo/acompañado. El origen utiliza `started_at`, `duration_minutes`, `training_mode`, `accompanied`
-y `status`. Los detalles centrales previstos son `training_mode` y `accompanied`;
+y `status`. Los detalles centrales son `training_mode` y `accompanied`;
 la duración se obtiene del intervalo. La API de origen está documentada en
 [Swagger](swagger.md), seleccionando «Deporte · fuente externa».
 
 La identidad sigue siendo cuenta, conexión, colección e identificador externo.
-La fuente utilizará la recepción autenticada de actividades: la cuenta y la
-procedencia vendrán de su credencial y no del cuerpo JSON. Las credenciales se
-mantendrán en el backend de la fuente, fuera del navegador.
+Sport expone operaciones canónicas por HTTP y Sync las consulta con el conector
+genérico `standard.activities`. La cuenta deportiva procede de SportBearer;
+la cuenta Synkron y la conexión proceden de la sesión y la configuración de Sync,
+nunca del JSON de la actividad. El mismo esquema también admite recepción directa
+por POST con IngestionToken, sin un endpoint diferente para gimnasio.
 
 ## Subpuntos de trabajo
 
@@ -51,15 +54,15 @@ mantendrán en el backend de la fuente, fuera del navegador.
    Formulario sencillo con los campos acordados,
    listado y acciones de edición/retirada, con identidad visual propia de una
    aplicación externa.
-4. **Integración con la entrada estandarizada.** Registrar el esquema de
-   `sport.gym`, permitirlo en las fuentes de entrada, conectar el envío de la
+4. **Integración con la entrada estandarizada — implementada.** Registrar el esquema de
+   `sport.gym`, permitirlo en las fuentes de entrada, conectar la exportación canónica de la
    fuente deportiva y actualizar ejemplos y Swagger. Reutilizar worker,
    idempotencia, persistencia y eventos existentes.
-5. **Presentación y seguimiento en Synkron.** Calendario, filtros y detalle con
+5. **Presentación y seguimiento en Synkron — implementados.** Calendario, filtros y detalle con
    modalidad, duración y compañía. Reutilizar Monitoring y las reglas por
    eventos. Los recordatorios actuales son académicos: los avisos previos para
    gimnasio requieren acordar su política y no se añaden implícitamente.
-6. **Comprobación y cierre.** Recorrido de alta, edición, repetición sin duplicado,
+6. **Comprobación y cierre — recorrido real validado; aislamiento automatizado pendiente de CI.** Recorrido de alta, edición, repetición sin duplicado,
    cancelación y retirada; comprobar aislamiento entre cuentas. Añadir solo las
    pruebas necesarias para las nuevas reglas y realizar la comprobación real
    del recorrido. Actualizar la guía de arranque y dejar un checkpoint.
@@ -70,8 +73,8 @@ las disciplinas deportivas o las actividades académicas pendientes.
 ## Comprobación del backend
 
 El [arranque del backend](#arranque-del-backend) utiliza las variables `SPORT_*`,
-sus migraciones y una cuenta deportiva propia. Esta fase no conecta todavía
-sesiones con el calendario de Synkron.
+sus migraciones y una cuenta deportiva propia. La integración central requiere
+además la configuración de la fuente descrita más adelante.
 
 Validación manual confirmada el 23/11/2026 desde Swagger por HTTPS: migraciones
 aplicadas, cuenta deportiva habilitada, listado inicial vacío (`200`), creación
@@ -169,9 +172,115 @@ desarrollo lee la credencial; la compilación no carga el `.env` de la raíz.
 7. Comprueba formulario y listado en una pantalla estrecha. Si tienes más de
    veinte sesiones, comprueba también la paginación.
 
-Este frontend mantiene sesiones en la fuente deportiva. Su publicación en Sync
-y su aparición en el calendario pertenecen a los siguientes subpuntos. El usuario confirmó el 23/11/2026 que la interfaz se abre en el entorno local y
-aprobó su aspecto visual. Las pruebas de creación, recarga, edición, cancelación
-y retirada desde esta interfaz aún no se han confirmado; la validación previa
-del backend desde Swagger y las cuatro pruebas automatizadas del frontend no
-se registran como sustituto de ese recorrido.
+Este frontend mantiene sesiones en la fuente deportiva. Los cambios se incorporan
+a Synkron cuando se consulta su exportación canónica con «Sincronizar todo» o una
+sincronización individual/programada. El usuario confirmó el 23/11/2026 que la interfaz se abre en el entorno local y
+aprobó su aspecto visual. Posteriormente confirmó creación, edición, cancelación
+y retirada desde Sport y su reflejo en Synkron. La recarga, validación temporal,
+pantalla estrecha y paginación no se registran como comprobaciones manuales
+completadas con esa confirmación.
+
+
+## Conectar gimnasio con Synkron
+
+No requiere nuevas dependencias, contraseñas ni otro token: reutiliza tu
+`SPORT_DEMO_TOKEN`. No publiques ese valor en el repositorio ni en una conversación.
+La aplicación deportiva conserva su cuenta independiente de la cuenta Synkron.
+
+Desde la raíz, con las variables existentes configuradas:
+
+```bash
+docker compose up -d --wait sync-db sport-db
+docker compose build sync sync-worker sync-publisher sync-event-publisher sport web
+docker compose run --rm --no-deps \
+  --volume "$PWD/apps/sync:/app" sync npm run migrate:up
+docker compose up -d api rabbitmq academic sport sync sync-publisher sync-worker sync-event-publisher web gateway
+docker compose exec gateway caddy reload --config /etc/caddy/Caddyfile
+```
+
+Si quieres ver también Monitoring y ejecutar reglas, mantén sus servicios ya
+configurados (`monitoring`, `monitoring-consumer`, `automation` y los procesos
+Automation que utilices). No es necesario activar recordatorios académicos para
+sincronizar gimnasio. La nueva integración no necesita otra preparación RabbitMQ.
+
+1. Inicia sesión en `https://localhost:8443` y abre **Mi agenda**.
+2. Despliega **Conectar una fuente externa**. Los valores iniciales son
+   `standard.activities` y `http://sport:3000/api/v1/activities/export`.
+3. Introduce tu credencial deportiva en el campo de contraseña y pulsa
+   **Conectar fuente**. Se crean conexión y definición en una transacción; la
+   credencial se guarda cifrada y no se devuelve. El campo de credencial se vacía al guardar.
+   Conectar no consulta todavía el origen: los errores de lectura/autorización
+   se presentan al sincronizar. Una credencial distinta para una fuente ya creada
+   devuelve conflicto para evitar cambiar de cuenta de origen silenciosamente;
+   la gestión de rotación de credenciales queda fuera de este formulario.
+4. Crea una sesión en Sport si no tienes sesiones activas. Pulsa **Sincronizar
+   todo**, seleccionado por defecto. También puedes elegir solo gimnasio.
+5. Comprueba su intervalo, modalidad, duración y compañía en el detalle central.
+   Un gimnasio programado se distingue en naranja; realizado en verde y cancelado
+   en gris. El filtro Deporte permite seleccionar esos tres estados.
+6. Repite sin cambios: debe conservar ID y no duplicar la sesión. Edita duración,
+   modalidad o compañía en Sport y sincroniza: cambia la misma actividad.
+7. Cancela y sincroniza: permanece visible cancelada. Retira y sincroniza:
+   desaparece del calendario. En Monitoring aparecen los resultados y los eventos
+   normales de esa definición.
+
+### Contrato de lectura reutilizable
+
+`GET /api/v1/activities/export` requiere SportBearer y devuelve un array paginado
+con `limit` y `offset`. Cada elemento tiene el mismo sobre v1 de la entrada
+estandarizada: `upsert` completo o `retire` explícito. El identificador es
+`gym_sessions:<id>`; la colección central es `activities`. El prefijo evita
+colisiones al incorporar otras disciplinas al mismo endpoint.
+
+El conector `standard.activities` sirve para cualquier fuente que ofrezca ese
+contrato. No contiene reglas de gimnasio ni mapea tablas de Sport. Lee páginas
+con 20 registros, máximo 100 páginas y 64 KiB por página, timeout de tres segundos
+por petición, sin seguir redirecciones y solo hacia orígenes autorizados. Valida
+la exportación completa antes de comenzar a guardar; un ID repetido invalida la
+lectura. Una ausencia en la exportación no implica retirada. El listado usa el
+orden estable de Sport; los cambios concurrentes durante la paginación pueden
+requerir una segunda sincronización para converger, sin inferir bajas.
+
+Compose autoriza explícitamente `http://sport:3000` tanto en Sync como en su
+worker, junto a los orígenes configurados. Otros orígenes necesitan autorización
+explícita. La entrada directa por POST sigue disponible; no mezcles mecanismos
+con procedencias distintas para una misma cuenta externa si quieres evitar
+representaciones duplicadas.
+
+### Alcance de «Sincronizar todo»
+
+Consulta todas las definiciones de lectura habilitadas de la cuenta. Cada fuente
+conserva su ejecución, resultado y clave de idempotencia; un fallo no bloquea las
+demás. Si no se confirma una solicitud, **Reintentar pendientes** conserva su
+clave y no vuelve a solicitar las fuentes ya aceptadas. Los fallos de consulta
+de estado se recuperan con **Volver a consultar**. No descubre servicios ni
+credenciales por sí solo. Las fuentes de recepción directa ya reciben operaciones
+por POST y no representan un origen consultable por este botón.
+
+Monitoring, eventos y programaciones reutilizan el recorrido existente. La interfaz de reglas
+ofrece plantillas de alta, retirada, cambio de horario/duración y cambio de estado
+de gimnasio, filtradas por `payload.activity_type == sport.gym`, junto a las
+plantillas académicas existentes. Los avisos previos
+de gimnasio necesitan acordar su política y no se activan implícitamente.
+
+### Validación de esta integración
+
+Las comprobaciones locales cubren compilación, lint, pruebas con dependencias
+simuladas, contrato canónico, límites del lector, aislamiento del lote ante
+fallos y reintentos idempotentes. `test/gym-import.e2e-spec.ts` añade la comprobación
+PostgreSQL de conexión concurrente, cifrado, separación de cuentas y ciclo de vida
+con el worker/pipeline reales y un lector simulado; se ejecuta con la suite CI.
+El agente no ejecutó PostgreSQL/HTTP real durante la implementación. El usuario
+reconstruyó después los servicios, aplicó las migraciones y confirmó en su entorno:
+
+- Conexión de Sport desde Synkron y ejecución de «Sincronizar todo».
+- Alta de un entrenamiento programado para el miércoles y aparición en calendario.
+- Repetición sin duplicados; edición a 75 minutos y acompañado sobre la misma actividad.
+- Cancelación visible en gris y retirada que desaparece del calendario.
+- Seguimiento en Monitoring: ejecución completada con dos registros leídos,
+  uno sin cambios y uno retirado, y el evento de retirada relacionado.
+
+Esta validación manual corresponde al 23/11/2026. No acredita la ejecución local
+de la suite PostgreSQL, el escenario de dos cuentas, las reglas de aviso nuevas
+ni los fallos simulados del lote; esos escenarios conservan sus pruebas y su
+validación automatizada pendiente de CI.

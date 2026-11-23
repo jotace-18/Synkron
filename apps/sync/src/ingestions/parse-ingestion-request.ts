@@ -8,14 +8,10 @@ import type { ActivityImportContext } from '../imports/activity-import.validatio
 import { hasExactFields, isRecord } from '../validation/value-validators';
 
 function invalid(path: string, message: string): never {
-  throw new UnprocessableEntityException({
-    statusCode: 422,
-    message: 'La entrada no cumple el contrato',
-    errors: [{ path, message }],
-  });
+  throw new ActivityValidationError(path, message);
 }
 
-export function parseIngestionRequest(
+export function normalizeIngestionEnvelope(
   value: unknown,
   context: ActivityImportContext,
 ): ActivityImport {
@@ -90,17 +86,26 @@ export function parseIngestionRequest(
     invalid('action', 'La acción debe ser upsert o retire');
   }
 
+  return normalizeActivityImport(operation, context);
+}
+
+export function parseIngestionRequest(
+  value: unknown,
+  context: ActivityImportContext,
+): ActivityImport {
   try {
-    return normalizeActivityImport(operation, context);
+    return normalizeIngestionEnvelope(value, context);
   } catch (error) {
     if (error instanceof ActivityValidationError) {
       const path = error.path
         .replace(/^operation\./, '')
         .replace(/^activity\.(external_id|source_updated_at)$/, '$1');
-
-      invalid(path, error.message);
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        message: 'La entrada no cumple el contrato',
+        errors: [{ path, message: error.message }],
+      });
     }
-
     throw error;
   }
 }

@@ -90,7 +90,7 @@ export class DefinitionsService {
           (connector.auth_type === 'bearer' && !connection.has_credentials)
         ) {
           throw new BadRequestException(
-            'La conexión académica requiere una credencial Bearer',
+            'La conexión requiere una credencial Bearer',
           );
         }
 

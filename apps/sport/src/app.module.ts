@@ -1,3 +1,4 @@
+import { CanonicalActivitiesController } from './gym/canonical-activities.controller';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -8,7 +9,7 @@ import { GymController } from './gym/gym.controller';
 import { GymService } from './gym/gym.service';
 
 @Module({
-  controllers: [AppController, GymController],
+  controllers: [AppController, GymController, CanonicalActivitiesController],
   providers: [
     AppService,
     DatabaseService,

@@ -5,6 +5,16 @@ import type {
 } from './automation.types'
 
 export const NOTIFICATION_RULE_PRESETS = [
+  { value: 'gym_created', label: 'Se incorpora un entrenamiento de gimnasio' },
+  { value: 'gym_retired', label: 'Se retira un entrenamiento de gimnasio' },
+  {
+    value: 'gym_schedule_changed',
+    label: 'Cambia el horario o duración de gimnasio',
+  },
+  {
+    value: 'gym_status_changed',
+    label: 'Cambia el estado de un entrenamiento de gimnasio',
+  },
   { value: 'exam_created', label: 'Se incorpora un examen' },
   { value: 'exam_retired', label: 'Se retira un examen' },
   { value: 'exam_grade_changed', label: 'Cambia la nota de un examen' },
@@ -69,17 +79,30 @@ export function notificationRuleInput(
     conditions.push({
       field: 'payload.activity_type',
       operator: '==',
-      value: values.preset.startsWith('exam_') ? 'academic.exam' : 'academic.assignment',
+      value: values.preset.startsWith('gym_')
+        ? 'sport.gym'
+        : values.preset.startsWith('exam_')
+          ? 'academic.exam'
+          : 'academic.assignment',
     })
 
     if (
       values.preset === 'grade_changed' ||
-      values.preset === 'deadline_changed' || values.preset === 'exam_grade_changed' || values.preset === 'exam_date_changed' || values.preset === 'exam_status_changed'
+      values.preset === 'deadline_changed' ||
+      values.preset === 'exam_grade_changed' ||
+      values.preset === 'exam_date_changed' ||
+      values.preset === 'exam_status_changed' ||
+      values.preset === 'gym_schedule_changed' ||
+      values.preset === 'gym_status_changed'
     ) {
       conditions.push({
         field: 'payload.changed_fields',
         operator: 'contains',
-        value: values.preset.endsWith('grade_changed') ? 'grade' : values.preset === 'exam_status_changed' ? 'status' : 'schedule',
+        value: values.preset.endsWith('grade_changed')
+          ? 'grade'
+          : values.preset.endsWith('status_changed')
+            ? 'status'
+            : 'schedule',
       })
     } else {
       conditions.push({

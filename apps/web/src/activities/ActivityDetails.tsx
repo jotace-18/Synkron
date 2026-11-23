@@ -6,6 +6,7 @@ import {
   formatStatus,
   getAssignmentFields,
   getExamFields,
+  getGymFields,
 } from './activity-format'
 import type { Activity } from './activity.types'
 
@@ -67,7 +68,7 @@ export default function ActivityDetails({
   }, [activityId, retry, onSessionExpired])
 
   const fields = activity?.type === 'academic.assignment'
-    ? getAssignmentFields(activity) : activity?.type === 'academic.exam' ? getExamFields(activity) : []
+    ? getAssignmentFields(activity) : activity?.type === 'academic.exam' ? getExamFields(activity) : activity?.type === 'sport.gym' ? getGymFields(activity) : []
 
   return (
     <dialog

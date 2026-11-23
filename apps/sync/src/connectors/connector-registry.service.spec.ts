@@ -1,3 +1,4 @@
+import type { CanonicalImportService } from '../imports/canonical-import.service';
 import type { StoredIngestionImporter } from '../ingestions/stored-ingestion.importer';
 import type { AcademicExamsImportService } from '../imports/academic-exams-import.service';
 import { BadRequestException } from '@nestjs/common';
@@ -10,6 +11,7 @@ describe('ConnectorRegistryService', () => {
     importer,
     importer as unknown as AcademicExamsImportService,
     importer as unknown as StoredIngestionImporter,
+    importer as unknown as CanonicalImportService,
   );
 
   it('selects the assignment importer from the captured connector and collection', () => {

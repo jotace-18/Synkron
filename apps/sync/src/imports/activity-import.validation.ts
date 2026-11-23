@@ -184,7 +184,8 @@ export function normalizeActivityImport(
   );
   requireValid(
     activity.schedule.role === schema.role &&
-      schema.kinds.includes(activity.schedule.kind),
+      schema.kinds.includes(activity.schedule.kind) &&
+      (!schema.isSchedule || schema.isSchedule(activity.schedule)),
     'activity.schedule',
     'El horario no está permitido para este tipo',
   );

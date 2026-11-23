@@ -1,6 +1,11 @@
 import type { ActivityType } from '../activities/activity.types';
 
 export const CONNECTOR_CATALOG = {
+  'standard.activities': {
+    source_collection: 'activities',
+    activity_type: null,
+    auth_type: 'bearer',
+  },
   'academic.exams': {
     source_collection: 'exams',
     activity_type: 'academic.exam',
@@ -15,7 +20,7 @@ export const CONNECTOR_CATALOG = {
   string,
   {
     source_collection: string;
-    activity_type: ActivityType;
+    activity_type: ActivityType | null;
     auth_type: 'none' | 'bearer';
   }
 >;

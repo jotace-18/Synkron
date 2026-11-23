@@ -1,3 +1,4 @@
+import { getEnabledActivityTypes } from '../activities/activity-schema';
 import {
   BadGatewayException,
   BadRequestException,
@@ -97,7 +98,10 @@ export class ConnectorImportTransport {
           tenant_id: tenantId,
           source_connection_id: connection.id,
           source_collection: connector.source_collection,
-          allowed_types: [connector.activity_type],
+          allowed_types:
+            connector.activity_type === null
+              ? getEnabledActivityTypes()
+              : [connector.activity_type],
         },
         instructions,
         onProgress,

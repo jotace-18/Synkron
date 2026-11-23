@@ -1,177 +1,269 @@
 import { useEffect, useRef, useState, type SubmitEvent } from 'react'
 import { SessionExpiredError } from '../activities/activities-client'
 import {
-  getRun, listDefinitions, requestRun,
-  type RunReference, type SyncDefinition, type SyncRun,
+  getRun,
+  listDefinitions,
+  type SyncDefinition,
+  type SyncRun,
 } from './sync-client'
+import { createBatch, submitBatch, type BatchEntry } from './sync-batch'
+import ConnectSourceForm from './ConnectSourceForm'
 
 interface SyncPanelProps {
   onSessionExpired: () => void
   onFinished: () => void
 }
-
-const statusLabels = {
-  queued: 'En cola. Esperando turno…',
-  running: 'Sincronizando actividades…',
-  completed: 'Sincronización completada.',
-  failed: 'No se pudo completar la sincronización.',
+const labels = {
+  queued: 'En cola',
+  running: 'Sincronizando…',
+  completed: 'Completada',
+  failed: 'Fallida',
 }
+const isTerminal = (run?: SyncRun) =>
+  run?.status === 'completed' || run?.status === 'failed'
 
-export default function SyncPanel({ onSessionExpired, onFinished }: SyncPanelProps) {
+export default function SyncPanel({
+  onSessionExpired,
+  onFinished,
+}: SyncPanelProps) {
   const [definitions, setDefinitions] = useState<SyncDefinition[] | null>(null)
-  const [definitionError, setDefinitionError] = useState<string | null>(null)
+  const [definitionError, setDefinitionError] = useState(false)
   const [definitionRetry, setDefinitionRetry] = useState(0)
-  const [selected, setSelected] = useState('')
+  const [selected, setSelected] = useState('all')
   const [requesting, setRequesting] = useState(false)
-  const [requestError, setRequestError] = useState<string | null>(null)
-  const [requested, setRequested] = useState<RunReference | null>(null)
-  const [run, setRun] = useState<SyncRun | null>(null)
-  const [pollError, setPollError] = useState<string | null>(null)
+  const [entries, setEntries] = useState<BatchEntry[]>([])
+  const [runs, setRuns] = useState<Record<string, SyncRun>>({})
+  const [pollErrors, setPollErrors] = useState<Record<string, string>>({})
   const [pollRetry, setPollRetry] = useState(0)
-  const attempt = useRef<{ definitionId: string; key: string } | null>(null)
+  const attempt = useRef<BatchEntry[]>([])
+  const cache = useRef<Record<string, SyncRun>>({})
+  const notified = useRef(new Set<string>())
   const requestController = useRef<AbortController | null>(null)
   const enabled = (definitions ?? []).filter((definition) => definition.enabled)
-  const definitionId = enabled.find(({ id }) => id === selected)?.id ?? enabled[0]?.id ?? ''
-  const currentRun = run?.id === requested?.id ? run : null
-  const terminal = currentRun?.status === 'completed' || currentRun?.status === 'failed'
-  const busy = requesting || (requested !== null && !terminal)
+  const busy =
+    requesting ||
+    entries.some(({ receipt }) => receipt && !isTerminal(runs[receipt.id]))
+  const unresolved = entries.some((entry) => !entry.receipt)
+  const receiptIds = entries
+    .flatMap(({ receipt }) => (receipt ? [receipt.id] : []))
+    .join(',')
 
   useEffect(() => {
     const controller = new AbortController()
     listDefinitions(controller.signal)
       .then((items) => {
-        if (!controller.signal.aborted) setDefinitions(items)
+        if (!controller.signal.aborted) {
+          setDefinitions(items)
+          setDefinitionError(false)
+        }
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return
         if (cause instanceof SessionExpiredError) return onSessionExpired()
-        setDefinitionError('No se pudieron cargar las sincronizaciones.')
+        setDefinitionError(true)
       })
     return () => controller.abort()
   }, [definitionRetry, onSessionExpired])
-
   useEffect(() => () => requestController.current?.abort(), [])
 
-  const requestedId = requested?.id
   useEffect(() => {
-    if (!requestedId) return
+    if (!receiptIds) return
     const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-
-    async function poll() {
+    const timers = new Set<ReturnType<typeof setTimeout>>()
+    async function poll(id: string) {
+      if (isTerminal(cache.current[id])) return
       try {
-        const result = await getRun(requestedId!, controller.signal)
+        const result = await getRun(id, controller.signal)
         if (controller.signal.aborted) return
-        setRun(result)
-        if (result.status === 'completed' || result.status === 'failed') {
-          onFinished()
+        cache.current[id] = result
+        setRuns((previous) => ({ ...previous, [id]: result }))
+        setPollErrors((previous) => {
+          const next = { ...previous }
+          delete next[id]
+          return next
+        })
+        if (isTerminal(result)) {
+          if (!notified.current.has(id)) {
+            notified.current.add(id)
+            onFinished()
+          }
         } else {
-          timer = setTimeout(() => { void poll() }, 1500)
+          const timer = setTimeout(() => {
+            timers.delete(timer)
+            void poll(id)
+          }, 1500)
+          timers.add(timer)
         }
       } catch (cause) {
         if (controller.signal.aborted) return
-        if (cause instanceof SessionExpiredError) return onSessionExpired()
-        setPollError('No se pudo consultar el estado. La sincronización puede seguir en curso.')
+        if (cause instanceof SessionExpiredError) {
+          controller.abort()
+          return onSessionExpired()
+        }
+        setPollErrors((previous) => ({
+          ...previous,
+          [id]: 'No se pudo consultar el estado. Puede seguir en curso.',
+        }))
       }
     }
-
-    void poll()
+    for (const id of receiptIds.split(',')) void poll(id)
     return () => {
       controller.abort()
-      clearTimeout(timer)
+      for (const timer of timers) clearTimeout(timer)
     }
-  }, [requestedId, pollRetry, onSessionExpired, onFinished])
+  }, [receiptIds, pollRetry, onSessionExpired, onFinished])
 
-  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+  async function start(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (busy || requestController.current || !definitionId) return
+    if (busy || requestController.current) return
+    if (!unresolved) {
+      attempt.current = createBatch(
+        selected === 'all'
+          ? enabled
+          : enabled.filter(({ id }) => id === selected),
+      )
+      cache.current = {}
+      notified.current.clear()
+      setRuns({})
+      setPollErrors({})
+    }
+    if (!attempt.current.length) return
     const controller = new AbortController()
     requestController.current = controller
-    attempt.current ??= { definitionId, key: crypto.randomUUID() }
-    const pending = attempt.current
     setRequesting(true)
-    setRequestError(null)
-    setPollError(null)
-    setRequested(null)
-    setRun(null)
-
+    setEntries(attempt.current.map((entry) => ({ ...entry })))
     try {
-      const result = await requestRun(pending.definitionId, pending.key, controller.signal)
-      if (controller.signal.aborted) return
-      attempt.current = null
-      setRequested(result)
+      await submitBatch(attempt.current, controller.signal, () => {
+        if (!controller.signal.aborted)
+          setEntries(attempt.current.map((entry) => ({ ...entry })))
+      })
     } catch (cause) {
-      if (controller.signal.aborted) return
-      if (cause instanceof SessionExpiredError) return onSessionExpired()
-      setRequestError(cause instanceof Error && !(cause instanceof TypeError) && !(cause instanceof DOMException) && !(cause instanceof SyntaxError)
-        ? cause.message : 'No se pudo confirmar la solicitud. Reintenta para comprobarla sin duplicarla.')
+      if (!controller.signal.aborted && cause instanceof SessionExpiredError)
+        onSessionExpired()
     } finally {
       requestController.current = null
       if (!controller.signal.aborted) setRequesting(false)
     }
   }
-
+  const completed =
+    entries.length > 0 &&
+    entries.every(({ receipt }) => receipt && isTerminal(runs[receipt.id]))
+  const failed = entries.some(
+    ({ receipt, error }) =>
+      error || (receipt && runs[receipt.id]?.status === 'failed'),
+  )
   return (
     <section className="sync-panel" aria-label="Sincronizar actividades">
       {definitionError ? (
         <div className="sync-feedback">
-          <p className="form-error" role="alert">{definitionError}</p>
-          <button className="secondary-button" type="button" onClick={() => {
-            setDefinitionError(null)
-            setDefinitionRetry((value) => value + 1)
-          }}>Reintentar</button>
+          <p className="form-error" role="alert">
+            No se pudieron cargar las sincronizaciones.
+          </p>
+          <button
+            className="secondary-button"
+            onClick={() => setDefinitionRetry((n) => n + 1)}
+          >
+            Reintentar
+          </button>
         </div>
       ) : definitions === null ? (
         <p role="status">Cargando sincronizaciones…</p>
       ) : enabled.length === 0 ? (
-        <p>No tienes ninguna sincronización habilitada todavía.</p>
+        <p>
+          No tienes ninguna sincronización habilitada todavía. Conecta una
+          fuente para empezar.
+        </p>
       ) : (
-        <>
-          <form className="sync-controls" onSubmit={handleSubmit}>
-            <label className="agenda-filter">
-              <span>Qué sincronizar</span>
-              <select value={definitionId} disabled={busy} onChange={(event) => {
-                setSelected(event.target.value)
-                attempt.current = null
-                setRequested(null)
-                setRun(null)
-                setRequestError(null)
-                setPollError(null)
-              }}>
-                {enabled.map((definition) => (
-                  <option key={definition.id} value={definition.id}>{definition.name}</option>
-                ))}
-              </select>
-            </label>
-            <button className="primary-button" type="submit" disabled={busy}>
-              {busy ? 'Sincronizando…' : requestError ? 'Reintentar solicitud' : 'Sincronizar ahora'}
-            </button>
-          </form>
-          {requestError && <p className="form-error" role="alert">{requestError}</p>}
-          {requested && (
-            <div className="sync-result">
-              <p role="status">{statusLabels[currentRun?.status ?? requested.status]}</p>
-              {currentRun?.status === 'failed' && <p>{currentRun.error_message ?? 'Inténtalo de nuevo más tarde.'}</p>}
-              {currentRun?.status === 'completed' && (
-                <p className="sync-counts">
-                  {currentRun.read_count} leídas · {currentRun.created_count} nuevas ·{' '}
-                  {currentRun.updated_count} actualizadas · {currentRun.unchanged_count} sin cambios ·{' '}
-                  {currentRun.retired_count} retiradas · {currentRun.ignored_count} ignoradas
-                </p>
-              )}
-            </div>
-          )}
-          {pollError && (
-            <div className="sync-feedback">
-              <p className="form-error" role="alert">{pollError}</p>
-              <button className="secondary-button" type="button" onClick={() => {
-                setPollError(null)
-                setPollRetry((value) => value + 1)
-              }}>Volver a consultar</button>
-            </div>
-          )}
-        </>
+        <form className="sync-controls" onSubmit={start}>
+          <label className="agenda-filter">
+            <span>Qué sincronizar</span>
+            <select
+              value={selected}
+              disabled={busy}
+              onChange={(e) => {
+                setSelected(e.target.value)
+                attempt.current = []
+                setEntries([])
+                setRuns({})
+                setPollErrors({})
+              }}
+            >
+              <option value="all">Todas las fuentes</option>
+              {enabled.map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-button" disabled={busy || !enabled.length}>
+            {busy
+              ? 'Sincronizando…'
+              : unresolved
+                ? 'Reintentar pendientes'
+                : selected === 'all'
+                  ? 'Sincronizar todo'
+                  : 'Sincronizar ahora'}
+          </button>
+        </form>
       )}
+      {entries.length > 0 && (
+        <div className="sync-result" aria-live="polite">
+          <p>
+            {completed
+              ? failed
+                ? 'Sincronización terminada con incidencias.'
+                : 'Sincronización completada.'
+              : 'Seguimiento de las fuentes seleccionadas'}
+          </p>
+          <ul className="sync-source-results">
+            {entries.map(({ definition, receipt, error }) => {
+              const run = receipt ? runs[receipt.id] : undefined
+              return (
+                <li key={definition.id}>
+                  <strong>{definition.name}</strong>
+                  <span>
+                    {receipt
+                      ? labels[run?.status ?? receipt.status]
+                      : error
+                        ? 'Solicitud sin confirmar'
+                        : 'Preparando solicitud…'}
+                  </span>
+                  {error && <p className="form-error">{error}</p>}
+                  {run?.status === 'failed' && (
+                    <p className="form-error">
+                      {run.error_message ?? 'No se pudo completar esta fuente.'}
+                    </p>
+                  )}
+                  {run?.status === 'completed' && (
+                    <p className="sync-counts">
+                      {run.read_count} leídas · {run.created_count} nuevas ·{' '}
+                      {run.updated_count} actualizadas · {run.unchanged_count}{' '}
+                      sin cambios · {run.retired_count} retiradas ·{' '}
+                      {run.ignored_count} ignoradas
+                    </p>
+                  )}
+                  {receipt && pollErrors[receipt.id] && (
+                    <p className="form-error">{pollErrors[receipt.id]}</p>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+      {Object.keys(pollErrors).length > 0 && (
+        <button
+          className="secondary-button"
+          onClick={() => setPollRetry((n) => n + 1)}
+        >
+          Volver a consultar
+        </button>
+      )}
+      <ConnectSourceForm
+        onSessionExpired={onSessionExpired}
+        onConnected={() => setDefinitionRetry((n) => n + 1)}
+      />
     </section>
   )
 }

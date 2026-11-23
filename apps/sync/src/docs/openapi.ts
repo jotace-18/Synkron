@@ -40,7 +40,7 @@ export function buildSyncOpenApi(): OpenAPIObject {
     name: text(100),
     source_connection_id: uuid,
     connector: values(CONNECTOR_NAMES),
-    source_collection: values(['assignments', 'exams']),
+    source_collection: values(['assignments', 'exams', 'activities']),
     enabled: boolean,
     ...timestamps,
   });
@@ -126,7 +126,14 @@ export function buildSyncOpenApi(): OpenAPIObject {
     Run: run,
     AssignmentActivity: activity('AssignmentUpsert'),
     ExamActivity: activity('ExamUpsert'),
-    Activity: { oneOf: [ref('AssignmentActivity'), ref('ExamActivity')] },
+    GymActivity: activity('GymUpsert'),
+    Activity: {
+      oneOf: [
+        ref('AssignmentActivity'),
+        ref('ExamActivity'),
+        ref('GymActivity'),
+      ],
+    },
   });
   doc.info.title = 'Synkron · Sync';
   doc.info.description =
@@ -140,6 +147,42 @@ export function buildSyncOpenApi(): OpenAPIObject {
     schema: { ...text(128), pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$' },
     description:
       'Misma solicitud: conserva la clave. Otra solicitud: nueva clave.',
+  };
+  const sourceInput = schemas.ConnectionInput as SchemaObject;
+  schemas.SyncSourceInput = {
+    ...sourceInput,
+    properties: {
+      ...sourceInput.properties,
+      connector: values(CONNECTOR_NAMES),
+      auth: object({
+        type: values(['bearer']),
+        token: {
+          ...text(4096),
+          writeOnly: true,
+          pattern: '^[A-Za-z0-9._~+/-]+=*$',
+        },
+      }),
+    },
+    required: [...sourceInput.required!, 'connector'],
+  };
+  schemas.SyncSource = object({
+    connection: ref('Connection'),
+    definition: ref('Definition'),
+  });
+  doc.paths['/api/v1/sync-sources'] = {
+    post: operation(
+      'Conexiones',
+      'Conectar una fuente de lectura y su definición de forma atómica',
+      201,
+      ref('SyncSource'),
+      {
+        body: ref('SyncSourceInput'),
+        security: write,
+        errors: writeErrors,
+        description:
+          'Un reintento del mismo propietario, URL, conector y credencial devuelve la misma conexión y definición. Otra credencial o una fuente existente deshabilitada devuelve 409. No reactiva ni renombra una fuente existente. standard.activities lee páginas de operaciones canónicas v1 (limit/offset, 20 registros, 64 KiB/página, máximo 100 páginas), incluidas retiradas explícitas; la ausencia de un registro no lo retira.',
+      },
+    ),
   };
   doc.paths['/api/v1/connections'] = {
     get: operation(

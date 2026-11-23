@@ -1,3 +1,4 @@
+import { CanonicalImportService } from '../imports/canonical-import.service';
 import { StoredIngestionImporter } from '../ingestions/stored-ingestion.importer';
 import { DIRECT_INGESTION_CONNECTOR } from './connector-catalog';
 import { AcademicExamsImportService } from '../imports/academic-exams-import.service';
@@ -26,10 +27,12 @@ export class ConnectorRegistryService {
     academic: AcademicImportService,
     exams: AcademicExamsImportService,
     private readonly ingestion: StoredIngestionImporter,
+    canonical: CanonicalImportService,
   ) {
     this.importers = {
       'academic.assignments': academic,
       'academic.exams': exams,
+      'standard.activities': canonical,
     };
   }
 

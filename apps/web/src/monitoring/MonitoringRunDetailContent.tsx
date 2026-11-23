@@ -24,6 +24,8 @@ const fieldLabels: Record<string, string> = {
   mandatory: 'Obligatoriedad',
   work_mode: 'Modalidad',
   group_members: 'Integrantes',
+  training_mode: 'Modalidad de entrenamiento',
+  accompanied: 'Compañía',
   weight_percent: 'Ponderación',
   weight_basis: 'Referencia de ponderación',
 }

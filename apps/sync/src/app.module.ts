@@ -1,3 +1,7 @@
+import { SyncSourcesController } from './connections/sync-sources.controller';
+import { SyncSourcesService } from './connections/sync-sources.service';
+import { CanonicalImportService } from './imports/canonical-import.service';
+import { CanonicalReaderService } from './connectors/canonical/canonical-reader.service';
 import { IngestionSourcesService } from './ingestions/ingestion-sources.service';
 import { IngestionSourceGuard } from './ingestions/ingestion-source.guard';
 import { IngestionsService } from './ingestions/ingestions.service';
@@ -41,6 +45,7 @@ import { AutomationActivitiesController } from './internals/automation-activitie
     IngestionsController,
     IngestionSourcesController,
     ConnectionsController,
+    SyncSourcesController,
     ActivitiesController,
     DefinitionsController,
     RunsController,
@@ -49,6 +54,8 @@ import { AutomationActivitiesController } from './internals/automation-activitie
     AutomationActivitiesController,
   ],
   providers: [
+    CanonicalReaderService,
+    CanonicalImportService,
     ConnectionTargetPolicyService,
     IngestionSourcesService,
     IngestionSourceGuard,
@@ -57,6 +64,7 @@ import { AutomationActivitiesController } from './internals/automation-activitie
     AppService,
     DatabaseService,
     ConnectionsService,
+    SyncSourcesService,
     SessionClientService,
     CredentialsService,
     ConnectionProbeService,

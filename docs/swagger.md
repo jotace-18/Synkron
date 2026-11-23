@@ -16,7 +16,7 @@ consultas y respuestas. El gateway reúne los documentos sin mezclar sus API.
 | Deporte · fuente externa | Sesiones de gimnasio: creación, consulta, exportación, edición parcial y retirada | `SportBearer`, credencial propia de la fuente deportiva. |
 | Academic · fuente externa | Entregas y exámenes: creación, consulta, exportación, edición parcial y retirada | `AcademicBearer`, distinto de la sesión de Synkron y de `IngestionToken`. |
 
-Las rutas de usuario existentes suman 56 operaciones HTTP. No se incluyen rutas
+Las rutas de usuario existentes suman 58 operaciones HTTP. No se incluyen rutas
 internas de autenticación entre servicios, ejecución de acciones ni creación
 interna de avisos. Tampoco se presenta la ruta raíz de salud como una operación
 de negocio ni se añaden operaciones CRUD que no existan en los controladores.
@@ -110,5 +110,6 @@ TLS, selector y peticiones reales en el navegador. Ese recorrido se realiza en
 el entorno de contenedores siguiendo los pasos anteriores.
 
 El backend deportivo requiere su bloque `SPORT_*`, migraciones y cuenta propia.
-Consulta la [guía de Sport](deporte.md#arranque-del-backend). Su incorporación al selector
-no implica que `sport.gym` ya esté habilitado en la recepción estandarizada.
+Consulta la [guía de Sport](deporte.md#arranque-del-backend). El esquema `sport.gym` está habilitado tanto en la entrada directa como en el
+lector canónico. La exportación `/sport/api/v1/activities/export` y la conexión
+atómica `/api/v1/sync-sources` están documentadas en sus servicios respectivos.

@@ -209,7 +209,7 @@ export default function ActivitiesCalendar({
           <p role="status">
             {activities.length === 0
               ? calendarView === 'day' ? 'No hay actividades para este día.' : 'No hay actividades en este periodo.'
-              : 'Horarios de Madrid · Verde: entregada/realizado · Ámbar: en curso · Rojo: pendiente · Violeta: examen programado · Gris: cancelado'}
+              : 'Horarios de Madrid · Verde: entregada/realizado · Ámbar: en curso · Rojo: pendiente · Violeta: examen programado · Naranja: gimnasio programado · Gris: cancelado'}
           </p>
         )}
       </div>

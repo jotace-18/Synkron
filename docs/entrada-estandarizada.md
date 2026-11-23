@@ -456,3 +456,24 @@ En esa suite, el worker y los lectores se controlan desde el propio test. Para
 lanzarla localmente, evita que otro `sync-worker` o publicador reclame sus
 trabajos mientras corre. No se presupone una validación manual de estos nuevos
 endpoints por haber pasado las pruebas unitarias.
+
+
+## Lectura de fuentes canónicas y gimnasio (23/11/2026)
+
+La migración 014 incorpora el conector genérico `standard.activities` para
+exportaciones HTTP de operaciones v1 paginadas con `limit/offset`, incluidas bajas
+explícitas. Utiliza `normalizeIngestionEnvelope`, la misma validación de dominio
+que la recepción directa, sin traducir datos de una aplicación específica. Su
+colección es `activities`; los IDs externos son opacos y sensibles a mayúsculas.
+
+Está registrado también `sport.gym`: intervalo de comienzo, duración positiva de
+minutos enteros (hasta 2147483647), estados `scheduled/completed/cancelled`, detalles
+exactos `training_mode` y `accompanied`. Se puede recibir por POST si la fuente
+lo permite, o mediante el lector canónico de Sport. No se habilitan aún los demás
+tipos deportivos previstos en el enum.
+
+`POST /api/v1/sync-sources`, con sesión y CSRF, crea conexión y definición de
+lectura en una transacción y conserva la procedencia ante reintentos. La guía de
+[Deporte](deporte.md#conectar-gimnasio-con-synkron) documenta la configuración,
+límites, paginación y el botón «Sincronizar todo». No se incorpora un conector
+específico de gimnasio ni un endpoint de recepción nuevo por disciplina.

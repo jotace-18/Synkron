@@ -1,3 +1,8 @@
+import { getEnabledActivityTypes } from '../activities/activity-schema';
+import {
+  GYM_STATUSES,
+  TRAINING_MODES,
+} from '../activities/sport/gym-details.validator';
 import type {
   OpenAPIObject,
   SchemaObject,
@@ -120,6 +125,7 @@ export function buildIngestionOpenApi(): OpenAPIObject {
     role: string,
     statuses: readonly string[],
     details: SchemaObject,
+    schedule: SchemaObject = { oneOf: [date(role), instant(role)] },
   ) =>
     object({
       schema_version: { type: 'integer', enum: [1] },
@@ -129,12 +135,32 @@ export function buildIngestionOpenApi(): OpenAPIObject {
       activity: object({
         type: { type: 'string', enum: [type] },
         title: text(200),
-        schedule: { oneOf: [date(role), instant(role)] },
+        schedule,
         status: { type: 'string', enum: [...statuses] },
         details,
       }),
     });
   const schemas: Record<string, SchemaObject | ReferenceObject> = {
+    GymUpsert: request(
+      'sport.gym',
+      'start',
+      GYM_STATUSES,
+      object({
+        training_mode: { type: 'string', enum: [...TRAINING_MODES] },
+        accompanied: { type: 'boolean' },
+      }),
+      {
+        ...object({
+          kind: { type: 'string', enum: ['interval'] },
+          role: { type: 'string', enum: ['start'] },
+          date: none,
+          at: timestamp,
+          end_at: timestamp,
+        }),
+        description:
+          'Intervalo de duración positiva en minutos enteros (máximo 2147483647). Inicio y final entre los años 1 y 9999.',
+      },
+    ),
     ExamUpsert: request(
       'academic.exam',
       'start',
@@ -168,7 +194,12 @@ export function buildIngestionOpenApi(): OpenAPIObject {
       source_deleted_at: timestamp,
     }),
     IngestionRequest: {
-      oneOf: [ref('ExamUpsert'), ref('AssignmentUpsert'), ref('Retirement')],
+      oneOf: [
+        ref('ExamUpsert'),
+        ref('AssignmentUpsert'),
+        ref('GymUpsert'),
+        ref('Retirement'),
+      ],
       description:
         'Representación completa, una operación por petición y máximo 64 KiB. La ponderación exige porcentaje y referencia juntos o ambos null; un trabajo individual exige integrantes vacíos.',
     },
@@ -211,7 +242,7 @@ export function buildIngestionOpenApi(): OpenAPIObject {
         uniqueItems: true,
         items: {
           type: 'string',
-          enum: ['academic.assignment', 'academic.exam'],
+          enum: getEnabledActivityTypes(),
         },
       },
     }),

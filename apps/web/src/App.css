@@ -622,3 +622,18 @@ button:disabled { opacity: 0.65; cursor: wait; }
 .calendar-event[data-status="completed"] { color: #166534; border-color: #227342; background: #e0efe1; }
 .calendar-event[data-status="cancelled"] { color: #64748b; border-color: #94a3b8; background: #f1f5f9; text-decoration: line-through; }
 .calendar-event[data-type="academic.exam"] { border-left-width: 5px; }
+
+/* Source refresh and canonical gym activities. */
+.source-connection { margin-top: 1.25rem; border-top: 1px solid var(--border, #d6e3dc); padding-top: 1rem; }
+.source-connection summary { cursor: pointer; color: var(--primary, #176956); font-weight: 600; }
+.source-connection > p { max-width: 72ch; }
+.source-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; max-width: 64rem; }
+.source-form label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.source-form input, .source-form select { width: 100%; min-width: 0; padding: .7rem; border: 1px solid #b5cdc0; border-radius: .5rem; background: white; color: inherit; font: inherit; }
+.source-form button { justify-self: start; }
+.sync-source-results { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: .75rem; }
+.sync-source-results li { padding: .75rem 1rem; border: 1px solid #d6e3dc; border-radius: .6rem; background: #f7faf8; }
+.sync-source-results li > span { margin-left: 1rem; }
+.sync-source-results p { margin: .4rem 0 0; }
+.calendar-event[data-type="sport.gym"][data-status="scheduled"] { color: #9a451d; border-color: #ba6a3e; background: #fff0e4; }
+@media (max-width: 700px) { .source-form { grid-template-columns: 1fr; } }

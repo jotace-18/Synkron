@@ -87,9 +87,9 @@ export default function ActivitiesList({
           </select>
         </label>
 
-        {(filters.category === 'all' || filters.category === 'academic') && (
+        {filters.category !== 'social' && (
           <label className="agenda-filter">
-            <span>Estado académico</span>
+            <span>Estado</span>
             <select
               value={filters.delivery}
               onChange={(event) => setFilters((current) => ({
@@ -98,11 +98,10 @@ export default function ActivitiesList({
               }))}
             >
               <option value="all">Cualquier estado</option>
-              <option value="submitted">Entregadas</option>
-              <option value="unsubmitted">No entregadas</option>
-              <option value="scheduled">Exámenes programados</option>
-              <option value="completed">Exámenes realizados</option>
-              <option value="cancelled">Exámenes cancelados</option>
+              {filters.category !== 'sport' && <><option value="submitted">Entregadas</option><option value="unsubmitted">No entregadas</option></>}
+              <option value="scheduled">Programados</option>
+              <option value="completed">Realizados</option>
+              <option value="cancelled">Cancelados</option>
             </select>
           </label>
         )}
