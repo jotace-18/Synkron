@@ -1,5 +1,9 @@
 # Servicios de origen y actividades
 
+> **Acceso actual:** la interfaz utiliza registro y sesión personales. Consulta
+> [Cuentas y conexión con Synkron](cuentas-fuentes.md). Los pasos con tokens demo de este
+> documento se conservan como compatibilidad de la API; ya no se inyectan en la interfaz.
+
 Este documento define las entradas de la demostración. Describe requisitos de
 producto; los modelos y rutas que todavía no existen no se presentan como código
 implementado. Las decisiones abiertas se enumeran al final.

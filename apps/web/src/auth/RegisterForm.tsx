@@ -48,13 +48,13 @@ export default function RegisterForm({ onRegistered, onBack }: RegisterFormProps
       <div className="form-field">
         <label htmlFor="register-password">Contraseña</label>
         <input id="register-password" name="password" type="password" autoComplete="new-password"
-          minLength={15} maxLength={128} required disabled={pending} aria-describedby="password-hint" />
-        <p id="password-hint" className="field-hint">Entre 15 y 128 caracteres. Puedes usar una frase.</p>
+          minLength={8} maxLength={128} required disabled={pending} aria-describedby="password-hint" />
+        <p id="password-hint" className="field-hint">Entre 8 y 128 caracteres. Puedes usar una frase.</p>
       </div>
       <div className="form-field">
         <label htmlFor="register-confirmation">Repite la contraseña</label>
         <input id="register-confirmation" name="confirmation" type="password" autoComplete="new-password"
-          minLength={15} maxLength={128} required disabled={pending} />
+          minLength={8} maxLength={128} required disabled={pending} />
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button" type="submit" disabled={pending}>

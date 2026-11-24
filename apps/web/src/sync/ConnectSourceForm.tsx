@@ -1,53 +1,69 @@
-import { useEffect, useRef, useState, type SubmitEvent } from 'react'
-import { SessionExpiredError } from '../activities/activities-client'
-import { connectSource } from './sync-client'
-import { SOURCE_PRESETS, type SourcePreset } from './source-presets'
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
+import { SessionExpiredError } from "../activities/activities-client";
+import { connectSource } from "./sync-client";
+import { SOURCE_PRESETS, type SourcePreset } from "./source-presets";
 
 export default function ConnectSourceForm({
   onConnected,
   onSessionExpired,
 }: {
-  onConnected: () => void
-  onSessionExpired: () => void
+  onConnected: () => void;
+  onSessionExpired: () => void;
 }) {
-  const [preset, setPreset] = useState<SourcePreset>('personal')
-  const [name, setName] = useState<string>(SOURCE_PRESETS.personal.name)
-  const [url, setUrl] = useState<string>(SOURCE_PRESETS.personal.url)
-  const [connector, setConnector] = useState('standard.activities')
-  const [token, setToken] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const controller = useRef<AbortController | null>(null)
-  useEffect(() => () => controller.current?.abort(), [])
+  const [preset, setPreset] = useState<SourcePreset>("personal");
+  const [name, setName] = useState<string>(SOURCE_PRESETS.personal.name);
+  const [url, setUrl] = useState<string>(SOURCE_PRESETS.personal.url);
+  const [connector, setConnector] = useState("standard.activities");
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
   async function save(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (controller.current) return
-    const request = new AbortController()
-    controller.current = request
-    setSaving(true)
-    setMessage(null)
+    event.preventDefault();
+    if (controller.current) return;
+    const request = new AbortController();
+    controller.current = request;
+    setSaving(true);
+    setMessage(null);
     try {
       await connectSource(
         { name: name.trim(), base_url: url.trim(), connector, token },
         request.signal,
-      )
-      if (request.signal.aborted) return
-      setToken('')
-      setMessage('Fuente conectada. Ya puedes sincronizarla.')
-      onConnected()
+      );
+      if (preset === "academic") {
+        await connectSource(
+          {
+            name: `${name.trim().slice(0, 87)} · Exámenes`,
+            base_url: "http://academic:3000/api/v1/exams/export",
+            connector: "academic.exams",
+            token,
+          },
+          request.signal,
+        );
+      }
+      if (request.signal.aborted) return;
+      setToken("");
+      setMessage(
+        preset === "academic"
+          ? "Académico conectado: entregas y exámenes."
+          : "Fuente conectada. Ya puedes sincronizarla.",
+      );
+      onConnected();
     } catch (cause) {
-      if (request.signal.aborted) return
-      if (cause instanceof SessionExpiredError) return onSessionExpired()
+      if (request.signal.aborted) return;
+      if (cause instanceof SessionExpiredError) return onSessionExpired();
+      onConnected();
       setMessage(
         cause instanceof Error &&
           !(cause instanceof TypeError) &&
           !(cause instanceof DOMException)
           ? cause.message
-          : 'No se pudo confirmar la conexión. Puedes reintentar sin duplicarla.',
-      )
+          : "No se pudo confirmar la conexión. Puedes reintentar sin duplicarla.",
+      );
     } finally {
-      controller.current = null
-      if (!request.signal.aborted) setSaving(false)
+      controller.current = null;
+      if (!request.signal.aborted) setSaving(false);
     }
   }
   return (
@@ -64,14 +80,14 @@ export default function ConnectSourceForm({
             value={preset}
             disabled={saving}
             onChange={(event) => {
-              const value = event.target.value as SourcePreset
-              const source = SOURCE_PRESETS[value]
-              setPreset(value)
-              setName(source.name)
-              setUrl(source.url)
-              setConnector(source.connector)
-              setToken('')
-              setMessage(null)
+              const value = event.target.value as SourcePreset;
+              const source = SOURCE_PRESETS[value];
+              setPreset(value);
+              setName(source.name);
+              setUrl(source.url);
+              setConnector(source.connector);
+              setToken("");
+              setMessage(null);
             }}
           >
             {Object.entries(SOURCE_PRESETS).map(([value, source]) => (
@@ -95,7 +111,7 @@ export default function ConnectSourceForm({
           Formato de la fuente
           <select
             value={connector}
-            disabled={saving}
+            disabled={saving || preset === "academic"}
             onChange={(e) => setConnector(e.target.value)}
           >
             <option value="standard.activities">
@@ -114,10 +130,10 @@ export default function ConnectSourceForm({
             value={url}
             disabled={saving}
             onChange={(e) => {
-              setUrl(e.target.value)
-              setPreset('custom')
-              setToken('')
-              setMessage(null)
+              setUrl(e.target.value);
+              setPreset("custom");
+              setToken("");
+              setMessage(null);
             }}
           />
         </label>
@@ -134,10 +150,10 @@ export default function ConnectSourceForm({
           />
         </label>
         <button className="secondary-button" disabled={saving}>
-          {saving ? 'Conectando…' : 'Conectar fuente'}
+          {saving ? "Conectando…" : "Conectar fuente"}
         </button>
       </form>
       {message && <p role="status">{message}</p>}
     </details>
-  )
+  );
 }

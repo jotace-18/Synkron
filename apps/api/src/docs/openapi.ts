@@ -40,7 +40,7 @@ export function buildAccountsOpenApi(): OpenAPIObject {
       securitySchemes,
       schemas: {
         Error: errorSchema,
-        RegisterAccount: credentials(15),
+        RegisterAccount: credentials(8),
         LoginAccount: credentials(1),
         Account: object({
           id: uuid,

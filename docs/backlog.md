@@ -639,6 +639,19 @@ Subpuntos de trabajo:
    agente haya ejecutado cada prueba manual restante. Pruebas locales de
    regresión mantenidas; guardar checkpoint y confirmar CI antes de cerrar.
 
+## Cuentas personales de las fuentes (23/11/2026)
+
+Implementados registro y sesión en Campus, Sport y Otros, con datos separados por
+cuenta y credenciales personales revocables de solo lectura para conectar Synkron.
+Las interfaces dejan de usar los tokens demo; sus cuentas y datos se conservan.
+El formulario central incorpora Académico completo (entregas y exámenes con una
+credencial). Migraciones nuevas: Academic 005, Sport 003 y Personal 003.
+
+Compilación, lint y pruebas locales comprobados. Se añaden recorridos PostgreSQL
+por fuente para identidad, aislamiento, CSRF, revocación y caducidad; deben
+confirmarse en CI y desde los contenedores antes de dar por validado el recorrido
+real. Véase [Cuentas y conexión con Synkron](cuentas-fuentes.md).
+
 ## Ampliaciones posteriores
 
 Reintentos (RF-17), recuperación de mensajes fallidos (RF-18), acciones HTTP (RF-19) y sincronización hacia destinos externos (RF-25) tendrán historias propias. La programación (RF-16) y los recordatorios (RF-26) se incluyen en US-20 y US-21 dentro del alcance inicial. La cancelación de ejecuciones (RF-20) es opcional y distinta de modificar el estado de un compromiso en su fuente. Hevy y Strava no se integran ahora. Guardar solicitudes, centralizar actividades, controlar duplicados y mostrar fallos forma parte de la implementación inicial que debe completarse en el Hito 2.

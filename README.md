@@ -1,5 +1,10 @@
 # Synkron
 
+**Evaluación desde cero:** sigue la [guía de demostración local](docs/guia-demostracion.md)
+para preparar configuración, migraciones, cuentas, fuentes y el recorrido de prueba.
+Las tres fuentes tienen [cuentas personales y credenciales de conexión](docs/cuentas-fuentes.md);
+las interfaces ya no utilizan automáticamente la cuenta demo.
+
 Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
 Es un proyecto en desarrollo. Ya funcionan las entregas y los exámenes académicos desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La ampliación a las demás fuentes sigue pendiente.

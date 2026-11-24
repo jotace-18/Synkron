@@ -1,3 +1,5 @@
+import { SourceIdentityController } from './auth/source-identity.controller';
+import { SourceIdentityService } from './auth/source-identity.service';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -8,8 +10,14 @@ import { EventsController } from './events/events.controller';
 import { EventsService } from './events/events.service';
 import { CanonicalActivitiesController } from './events/canonical-activities.controller';
 @Module({
-  controllers: [AppController, EventsController, CanonicalActivitiesController],
+  controllers: [
+    SourceIdentityController,
+    AppController,
+    EventsController,
+    CanonicalActivitiesController,
+  ],
   providers: [
+    SourceIdentityService,
     AppService,
     DatabaseService,
     AuthService,

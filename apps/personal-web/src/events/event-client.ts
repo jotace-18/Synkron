@@ -1,3 +1,4 @@
+import { sourceFetch } from '../auth/source-auth-client.ts';
 import { isDay } from "./event-time.ts";
 import type { EventInput, PersonalEvent } from "./event.types.ts";
 import { EVENT_STATUSES } from "./event.types.ts";
@@ -50,8 +51,8 @@ export async function listEvents(
     limit: String(PAGE_SIZE + 1),
     offset: String(page * PAGE_SIZE),
   });
-  const response = await fetch(`${base}?${params}`, {
-    credentials: "omit",
+  const response = await sourceFetch(`${base}?${params}`, {
+    credentials: "same-origin",
     cache: "no-store",
     redirect: "error",
     signal: signal
@@ -109,9 +110,9 @@ async function writeEvent(
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(id ? `${base}/${encodeURIComponent(id)}` : base, {
+    response = await sourceFetch(id ? `${base}/${encodeURIComponent(id)}` : base, {
       method,
-      credentials: "omit",
+      credentials: "same-origin",
       cache: "no-store",
       redirect: "error",
       headers: input ? { "Content-Type": "application/json" } : undefined,

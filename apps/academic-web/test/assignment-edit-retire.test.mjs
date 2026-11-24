@@ -102,6 +102,7 @@ test('switching between date-only and timed deadlines sends both mutually exclus
 test('uses PATCH and DELETE without client credentials, accepts 204 and reports an unavailable assignment', async (t) => {
   const calls = []
   t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({csrf_token: 'fresh-csrf'});
     calls.push({ url, options })
     return new Response(null, { status: [200, 204, 404][calls.length - 1] })
   })

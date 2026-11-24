@@ -1,3 +1,4 @@
+import { sourceFetch } from '../auth/source-auth-client.ts';
 import type { GymInput, GymSession } from "./gym.types.ts";
 import { GYM_STATUSES, TRAINING_MODES } from "./gym.types.ts";
 export const PAGE_SIZE = 20;
@@ -29,8 +30,8 @@ export async function listSessions(
     limit: String(PAGE_SIZE + 1),
     offset: String(page * PAGE_SIZE),
   });
-  const response = await fetch(`${base}?${params}`, {
-    credentials: "omit",
+  const response = await sourceFetch(`${base}?${params}`, {
+    credentials: "same-origin",
     cache: "no-store",
     redirect: "error",
     signal: signal
@@ -87,9 +88,9 @@ async function writeSession(
 ): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(id ? `${base}/${encodeURIComponent(id)}` : base, {
+    response = await sourceFetch(id ? `${base}/${encodeURIComponent(id)}` : base, {
       method,
-      credentials: "omit",
+      credentials: "same-origin",
       cache: "no-store",
       redirect: "error",
       headers: input ? { "Content-Type": "application/json" } : undefined,

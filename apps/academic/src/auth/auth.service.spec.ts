@@ -26,6 +26,7 @@ describe('AuthService', () => {
     expect(sql).not.toContain(token);
     expect(values).toEqual([
       'ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb',
+      false,
     ]);
   });
 

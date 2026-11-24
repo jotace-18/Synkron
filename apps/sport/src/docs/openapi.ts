@@ -1,3 +1,4 @@
+import { withSourceIdentity } from './source-identity-openapi';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import { TRAINING_MODES, GYM_STATUSES } from '../gym/gym.types';
 import {
@@ -17,7 +18,7 @@ import {
   values,
 } from './openapi-support';
 
-export function buildSportOpenApi(): OpenAPIObject {
+function baseSportOpenApi(): OpenAPIObject {
   const fields = {
     started_at: {
       ...instant,
@@ -219,4 +220,8 @@ export function buildSportOpenApi(): OpenAPIObject {
       },
     },
   };
+}
+
+export function buildSportOpenApi(): OpenAPIObject {
+  return withSourceIdentity(baseSportOpenApi(), 'sport');
 }

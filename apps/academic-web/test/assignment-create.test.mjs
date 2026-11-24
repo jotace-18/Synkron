@@ -75,6 +75,7 @@ test('converts Madrid deadlines independently of device time zone and handles da
 test('sends no Bearer from the browser and does not automatically retry an uncertain creation', async (t) => {
   let calls = 0
   t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({csrf_token: 'fresh-csrf'});
     calls += 1
     assert.equal(url, '/api/v1/assignments')
     assert.equal(options.method, 'POST')

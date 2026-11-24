@@ -1,5 +1,9 @@
 # Campus · Agenda académica
 
+> La interfaz usa ahora registro y sesión propios. La inyección del token demo
+> descrita en los pasos históricos se ha retirado. Consulta
+> [Cuentas de las fuentes](../../docs/cuentas-fuentes.md).
+
 Frontend externo de Academic, separado de la agenda centralizada de Synkron.
 Utiliza React y TypeScript con una interfaz azul e índigo. Actualmente permite
 listar, crear, editar y retirar entregas y exámenes, con secciones independientes. Dispone de contenedor e integración

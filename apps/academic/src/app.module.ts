@@ -1,3 +1,5 @@
+import { SourceIdentityController } from './auth/source-identity.controller';
+import { SourceIdentityService } from './auth/source-identity.service';
 import { ExamsService } from './exams/exams.service';
 import { ExamsController } from './exams/exams.controller';
 import { Module } from '@nestjs/common';
@@ -11,8 +13,14 @@ import { AssignmentsController } from './assignments/assignments.controller';
 
 @Module({
   imports: [],
-  controllers: [AppController, AssignmentsController, ExamsController],
+  controllers: [
+    SourceIdentityController,
+    AppController,
+    AssignmentsController,
+    ExamsController,
+  ],
   providers: [
+    SourceIdentityService,
     AppService,
     DatabaseService,
     AssignmentsService,

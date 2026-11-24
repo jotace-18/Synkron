@@ -124,3 +124,13 @@ El esquema `personal.event` está habilitado en Sync tras la migración 015, tan
 para recepción directa como para lectura con `standard.activities`. La conexión
 desde la agenda ofrece un preset «Otros (Personal)» con su URL canónica; utiliza
 la credencial personal y no el token deportivo.
+
+
+## Cuentas de las fuentes
+
+Los documentos de Academic, Sport y Personal incluyen `/api/v1/auth` para registro,
+login, sesión, logout y gestión de credenciales personales de lectura. Cada fuente
+tiene su cookie propia y exige CSRF y origen autorizado para las escrituras con
+sesión. El Bearer de integración es distinto de la sesión del navegador y se exige
+en las exportaciones; un token nuevo de Synkron no permite modificar datos.
+Consulta [Cuentas de las fuentes](cuentas-fuentes.md).

@@ -143,7 +143,7 @@ export async function register(credentials: LoginCredentials): Promise<void> {
 
   if (response.status === 409) throw new Error('El correo ya está registrado.')
   if (response.status === 422) {
-    throw new Error('Revisa el correo y utiliza una contraseña de entre 15 y 128 caracteres.')
+    throw new Error('Revisa el correo y utiliza una contraseña de entre 8 y 128 caracteres.')
   }
   if (response.status !== 201) throw new Error('No se pudo crear la cuenta. Inténtalo de nuevo.')
 }
