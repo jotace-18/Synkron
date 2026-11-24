@@ -1,3 +1,4 @@
+import { withSourceIdentity } from './source-identity-openapi';
 import type { OpenAPIObject } from '@nestjs/swagger';
 import { EVENT_STATUSES } from '../events/event.types';
 import {
@@ -16,7 +17,7 @@ import {
   uuid,
   values,
 } from './openapi-support';
-export function buildPersonalOpenApi(): OpenAPIObject {
+function basePersonalOpenApi(): OpenAPIObject {
   const fields = {
     title: {
       ...text(200),
@@ -268,4 +269,8 @@ export function buildPersonalOpenApi(): OpenAPIObject {
       },
     },
   };
+}
+
+export function buildPersonalOpenApi(): OpenAPIObject {
+  return withSourceIdentity(basePersonalOpenApi(), 'personal');
 }

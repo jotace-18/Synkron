@@ -10,7 +10,7 @@ export class RegisterAccountDto {
   email!: string;
 
   @IsString()
-  @MinLength(15)
+  @MinLength(8)
   @MaxLength(128)
   password!: string;
 }

@@ -1,3 +1,4 @@
+import { sourceFetch } from '../auth/source-auth-client.ts';
 import type { Assignment, AssignmentInput } from './assignment.types'
 
 export async function listAssignments(
@@ -12,7 +13,7 @@ export async function listAssignments(
       offset: String(assignments.length),
     })
 
-    const response = await fetch(`/api/v1/assignments?${query}`, {
+    const response = await sourceFetch(`/api/v1/assignments?${query}`, {
       cache: 'no-store',
       signal,
     })
@@ -62,7 +63,7 @@ async function writeAssignment(
     const path = id
       ? `/api/v1/assignments/${encodeURIComponent(id)}`
       : '/api/v1/assignments'
-    response = await fetch(path, {
+    response = await sourceFetch(path, {
       method,
       headers: input ? { 'Content-Type': 'application/json' } : undefined,
       body: input ? JSON.stringify(input) : undefined,

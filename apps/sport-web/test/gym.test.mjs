@@ -97,9 +97,10 @@ test("form sends only source fields, validates choices and duration, and derives
   assert.throws(() => sessionEnd("9999-12-31T23:30:00.000Z", 60), /fuera/);
 });
 
-test("client creates, patches, cancels and retires without browser credentials and never retries an uncertain write", async (t) => {
+test("client creates, patches, cancels and retires with session cookies and CSRF and never retries an uncertain write", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({csrf_token: 'fresh-csrf'});
     calls.push({ url, options });
     if (calls.length === 5) throw new TypeError("Connection lost");
     if (calls.length === 6) return new Response(null, { status: 404 });
@@ -127,7 +128,7 @@ test("client creates, patches, cancels and retires without browser credentials a
   assert.ok(
     calls.every(
       (call) =>
-        call.options.credentials === "omit" &&
+        call.options.credentials === "same-origin" &&
         !new Headers(call.options.headers).has("Authorization"),
     ),
   );
@@ -140,6 +141,7 @@ test("list uses one-record lookahead for paging and rejects malformed responses"
   }));
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({csrf_token: 'fresh-csrf'});
     calls.push({ url, options });
     return Response.json(
       calls.length === 1

@@ -1,0 +1,52 @@
+# Complemento para migraciones: usar con -f compose.yaml -f compose.migrations.yaml.
+# No usar este complemento para arrancar las aplicaciones.
+services:
+  api:
+    image: synkron-api-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/api/migrations:/app/migrations:ro
+  sync:
+    image: synkron-sync-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/sync/migrations:/app/migrations:ro
+  academic:
+    image: synkron-academic-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/academic/migrations:/app/migrations:ro
+  sport:
+    image: synkron-sport-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/sport/migrations:/app/migrations:ro
+  personal:
+    image: synkron-personal-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/personal/migrations:/app/migrations:ro
+  monitoring:
+    image: synkron-monitoring-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/monitoring/migrations:/app/migrations:ro
+  automation:
+    image: synkron-automation-migrations:local
+    build:
+      target: build
+    command: ["npm", "run", "migrate:up"]
+    volumes:
+      - ./apps/automation/migrations:/app/migrations:ro

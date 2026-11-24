@@ -127,6 +127,9 @@ services:
       - default
       - academic-data
     environment:
+      CSRF_SECRET: ${CSRF_SECRET:?Falta CSRF_SECRET}
+      SOURCE_COOKIE_SECURE: ${SOURCE_COOKIE_SECURE:-false}
+      SOURCE_APP_ORIGINS: ${ACADEMIC_APP_ORIGINS:-http://127.0.0.1:3103,http://localhost:3103,http://127.0.0.1:5174,http://localhost:5174,https://localhost:8443}
       PGHOST: academic-db
       PGPORT: "5432"
       PGDATABASE: ${ACADEMIC_DB_NAME:?Falta ACADEMIC_DB_NAME}
@@ -179,6 +182,9 @@ services:
       - default
       - sport-data
     environment:
+      CSRF_SECRET: ${CSRF_SECRET:?Falta CSRF_SECRET}
+      SOURCE_COOKIE_SECURE: ${SOURCE_COOKIE_SECURE:-false}
+      SOURCE_APP_ORIGINS: ${SPORT_APP_ORIGINS:-http://127.0.0.1:3105,http://localhost:3105,http://127.0.0.1:5175,http://localhost:5175,https://localhost:8443}
       PGHOST: sport-db
       PGPORT: "5432"
       PGDATABASE: ${SPORT_DB_NAME:?Falta SPORT_DB_NAME}
@@ -209,6 +215,9 @@ services:
       - default
       - personal-data
     environment:
+      CSRF_SECRET: ${CSRF_SECRET:?Falta CSRF_SECRET}
+      SOURCE_COOKIE_SECURE: ${SOURCE_COOKIE_SECURE:-false}
+      SOURCE_APP_ORIGINS: ${PERSONAL_APP_ORIGINS:-http://127.0.0.1:3107,http://localhost:3107,http://127.0.0.1:5176,http://localhost:5176,https://localhost:8443}
       PGHOST: personal-db
       PGPORT: "5432"
       PGDATABASE: ${PERSONAL_DB_NAME:?Falta PERSONAL_DB_NAME}
@@ -656,8 +665,6 @@ services:
     init: true
     ports:
       - "127.0.0.1:3103:8080"
-    environment:
-      ACADEMIC_DEMO_TOKEN: ${ACADEMIC_DEMO_TOKEN:?Falta ACADEMIC_DEMO_TOKEN}
     depends_on:
       academic:
         condition: service_healthy
@@ -681,8 +688,6 @@ services:
     init: true
     ports:
       - "127.0.0.1:3105:8080"
-    environment:
-      SPORT_DEMO_TOKEN: ${SPORT_DEMO_TOKEN:?Falta SPORT_DEMO_TOKEN}
     depends_on:
       sport:
         condition: service_healthy
@@ -706,8 +711,6 @@ services:
     init: true
     ports:
       - "127.0.0.1:3107:8080"
-    environment:
-      PERSONAL_DEMO_TOKEN: ${PERSONAL_DEMO_TOKEN:?Falta PERSONAL_DEMO_TOKEN}
     depends_on:
       personal:
         condition: service_healthy

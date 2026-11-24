@@ -1,3 +1,4 @@
+import { withSourceIdentity } from './source-identity-openapi';
 import type { OpenAPIObject, PathsObject, SchemaObject } from '@nestjs/swagger';
 import {
   array,
@@ -17,7 +18,7 @@ import {
   values,
 } from './openapi-support';
 
-export function buildAcademicOpenApi(): OpenAPIObject {
+function baseAcademicOpenApi(): OpenAPIObject {
   const common = {
     title: text(200),
     course_name: text(150),
@@ -230,4 +231,8 @@ export function buildAcademicOpenApi(): OpenAPIObject {
     },
     paths,
   };
+}
+
+export function buildAcademicOpenApi(): OpenAPIObject {
+  return withSourceIdentity(baseAcademicOpenApi(), 'academic');
 }

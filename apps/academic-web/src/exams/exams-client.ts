@@ -1,3 +1,4 @@
+import { sourceFetch } from '../auth/source-auth-client.ts';
 import type { Exam, ExamInput } from './exam.types'
 
 export async function listExams(signal?: AbortSignal): Promise<Exam[]> {
@@ -10,7 +11,7 @@ export async function listExams(signal?: AbortSignal): Promise<Exam[]> {
       offset: String(exams.length),
     })
 
-    const response = await fetch(`/api/v1/exams?${query}`, {
+    const response = await sourceFetch(`/api/v1/exams?${query}`, {
       cache: 'no-store',
       signal,
     })
@@ -60,7 +61,7 @@ async function writeExam(
     const path = id
       ? `/api/v1/exams/${encodeURIComponent(id)}`
       : '/api/v1/exams'
-    response = await fetch(path, {
+    response = await sourceFetch(path, {
       method,
       headers: input ? { 'Content-Type': 'application/json' } : undefined,
       body: input ? JSON.stringify(input) : undefined,

@@ -116,6 +116,7 @@ test("page lookahead validates all three time forms and detects malformed interv
   }));
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({csrf_token: 'fresh-csrf'});
     calls.push({ url, options });
     return Response.json(rows);
   });
@@ -123,7 +124,7 @@ test("page lookahead validates all three time forms and detects malformed interv
   assert.equal(page.events.length, 20);
   assert.equal(page.hasMore, true);
   assert.match(calls[0].url, /limit=21&offset=20/);
-  assert.equal(calls[0].options.credentials, "omit");
+  assert.equal(calls[0].options.credentials, "same-origin");
   rows[0] = {
     ...base,
     on_date: null,
@@ -140,9 +141,10 @@ test("page lookahead validates all three time forms and detects malformed interv
   rows[1] = { ...rows[1], end_at: "2026-11-25T09:45:00.000Z" };
   await assert.rejects(listEvents(0), /inesperada/);
 });
-test("writes omit credentials, avoid empty patches and do not automatically repeat uncertain operations", async (t) => {
+test("writes use session credentials and CSRF, avoid empty patches and do not automatically repeat uncertain operations", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({csrf_token: 'fresh-csrf'});
     calls.push({ url, options });
     if (calls.length === 1) throw new TypeError("lost response");
     if (calls.length === 2) return new Response(null, { status: 404 });
@@ -153,7 +155,7 @@ test("writes omit credentials, avoid empty patches and do not automatically repe
     UnconfirmedEventError,
   );
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].options.credentials, "omit");
+  assert.equal(calls[0].options.credentials, "same-origin");
   assert.equal(calls[0].options.headers.Authorization, undefined);
   await updateEvent(base.id, {});
   assert.equal(calls.length, 1);

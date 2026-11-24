@@ -1,5 +1,9 @@
 # Primer recorrido deportivo: gimnasio
 
+> **Acceso actual:** la interfaz utiliza registro y sesión personales. Consulta
+> [Cuentas y conexión con Synkron](cuentas-fuentes.md). Los pasos con tokens demo de este
+> documento se conservan como compatibilidad de la API; ya no se inyectan en la interfaz.
+
 Contrato de producto acordado el 23/11/2026. El backend de la fuente deportiva
 está implementado en `apps/sport` y su interfaz en `apps/sport-web`. La integración
 con Sync y el esquema común `sport.gym` están implementados. El usuario validó

@@ -31,7 +31,7 @@ describe('BearerGuard', () => {
 
       await expect(guard.canActivate(context)).resolves.toBe(true);
       expect(authenticate).toHaveBeenCalledTimes(1);
-      expect(authenticate).toHaveBeenCalledWith(token);
+      expect(authenticate).toHaveBeenCalledWith(token, false);
       expect(request.accountId).toBe(accountId);
     },
   );

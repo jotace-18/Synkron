@@ -27,7 +27,7 @@ describe('RegisterAccountDto', () => {
     },
     {
       name: 'a short password',
-      body: { ...validInput, password: 'a'.repeat(14) },
+      body: { ...validInput, password: 'a'.repeat(7) },
     },
     {
       name: 'a long password',

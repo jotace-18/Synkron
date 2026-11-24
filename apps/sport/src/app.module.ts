@@ -1,3 +1,5 @@
+import { SourceIdentityController } from './auth/source-identity.controller';
+import { SourceIdentityService } from './auth/source-identity.service';
 import { CanonicalActivitiesController } from './gym/canonical-activities.controller';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
@@ -9,8 +11,14 @@ import { GymController } from './gym/gym.controller';
 import { GymService } from './gym/gym.service';
 
 @Module({
-  controllers: [AppController, GymController, CanonicalActivitiesController],
+  controllers: [
+    SourceIdentityController,
+    AppController,
+    GymController,
+    CanonicalActivitiesController,
+  ],
   providers: [
+    SourceIdentityService,
     AppService,
     DatabaseService,
     AuthService,

@@ -1,5 +1,9 @@
 # Servicio académico
 
+> **Acceso actual:** la interfaz utiliza registro y sesión personales. Consulta
+> [Cuentas y conexión con Synkron](../../docs/cuentas-fuentes.md). Los pasos con tokens demo de este
+> documento se conservan como compatibilidad de la API; ya no se inyectan en la interfaz.
+
 Agenda académica de origen de Synkron, con NestJS y PostgreSQL. Las API de entregas y exámenes
 permiten crear, consultar, editar todos sus datos y eliminar registros conservando
 una marca para sincronizar el borrado. Campus permite crear y editar ambas actividades. Las sesiones de trabajo y los

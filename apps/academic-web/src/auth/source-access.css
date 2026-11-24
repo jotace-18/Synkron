@@ -1,0 +1,118 @@
+.source-access {
+  --source-accent: #7656a4;
+  color: #263343;
+}
+.source-access-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f5f5f8;
+}
+.source-access-card {
+  background: white;
+  border: 1px solid #dedee7;
+  border-top: 4px solid var(--source-accent);
+  border-radius: 16px;
+  padding: 28px;
+  width: min(100%, 560px);
+  box-sizing: border-box;
+}
+.source-access-card h1,
+.source-access-card h2 {
+  margin-top: 0;
+}
+.source-access-card p {
+  line-height: 1.6;
+}
+.source-access-eyebrow {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--source-accent);
+}
+.source-access-card form {
+  display: grid;
+  gap: 16px;
+  margin-block: 24px;
+}
+.source-access-card label {
+  display: grid;
+  gap: 6px;
+}
+.source-access-card input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #bfc5ce;
+  border-radius: 8px;
+  font: inherit;
+  box-sizing: border-box;
+}
+.source-access button {
+  cursor: pointer;
+}
+.source-access-card button,
+.source-account-bar button {
+  font: inherit;
+  padding: 10px 16px;
+  border: 1px solid var(--source-accent);
+  border-radius: 8px;
+  color: var(--source-accent);
+  background: white;
+}
+.source-access-card form > button {
+  color: white;
+  background: var(--source-accent);
+}
+.source-access button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.source-account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 5%;
+  background: white;
+  border-bottom: 1px solid #ddd;
+}
+.source-account-bar > strong {
+  margin-right: auto;
+  color: var(--source-accent);
+}
+.source-access-error {
+  color: #9c2538;
+  background: #fff0f1;
+  padding: 14px;
+  margin: 16px;
+  border-radius: 8px;
+}
+.source-connection-card {
+  width: 90%;
+  max-width: 1050px;
+  margin: 24px auto;
+}
+.source-token-reveal {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: #f5f5f8;
+  margin-bottom: 20px;
+}
+.source-token-list {
+  list-style: none;
+  padding: 0;
+}
+.source-token-list li {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e5e5;
+}
+.source-token-list li > span {
+  flex: 1;
+}
