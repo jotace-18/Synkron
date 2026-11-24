@@ -310,18 +310,22 @@ button:disabled { opacity: 0.65; cursor: wait; }
 .calendar-events > li { min-width: 0; max-width: 100%; }
 
 .calendar-event {
-  --event-color: #536b61;
-  --event-background: #edf2ee;
-  display: block;
+  --event-color: #475569;
+  --event-border: #94a3b8;
+  --event-background: #f1f5f9;
+  --event-strong-background: #e2e8f0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 6px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   padding: 6px 8px;
-  border: 1px solid var(--event-color);
-  border-left-width: 3px;
+  border: 1px solid var(--event-border);
+  border-left-width: 4px;
   border-radius: 6px;
-  background: white;
+  background: var(--event-background);
   color: var(--event-color);
   font-size: 14px;
   line-height: 1.4;
@@ -330,24 +334,80 @@ button:disabled { opacity: 0.65; cursor: wait; }
   cursor: pointer;
 }
 
-.calendar-event[data-status="submitted"] {
-  --event-color: #25613f;
-  --event-background: #deefdf;
+/* Activity hue stays visible independently of completion. */
+:is(.calendar-event, .calendar-legend-kind)[data-type="academic.assignment"] {
+  --event-color: #184e95;
+  --event-border: #3b82c4;
+  --event-background: #edf4ff;
+  --event-strong-background: #dbeafe;
 }
-
-.calendar-event[data-status="in_progress"] {
-  --event-color: #80500d;
-  --event-background: #fff0cb;
+:is(.calendar-event, .calendar-legend-kind)[data-type="academic.exam"] {
+  --event-color: #6032a0;
+  --event-border: #9063ca;
+  --event-background: #f5efff;
+  --event-strong-background: #e9dbff;
 }
-
-.calendar-event[data-status="pending"] {
-  --event-color: #923d39;
-  --event-background: #fbe4df;
+:is(.calendar-event, .calendar-legend-kind)[data-type^="sport."] {
+  --event-color: #a24515;
+  --event-border: #cf7a37;
+  --event-background: #fff3e8;
+  --event-strong-background: #ffe1c7;
 }
-
-.calendar-event[data-mandatory="true"] {
-  background: var(--event-background);
+:is(.calendar-event, .calendar-legend-kind):is([data-type="personal.event"], [data-type="social.plan"]) {
+  --event-color: #9a3465;
+  --event-border: #c9608c;
+  --event-background: #fff0f6;
+  --event-strong-background: #f9dbe8;
 }
+.calendar-event[data-type="academic.work_session"] {
+  --event-color: #116477;
+  --event-border: #3390a5;
+  --event-background: #edfafa;
+  --event-strong-background: #d0f0f2;
+}
+.calendar-event[data-type="academic.event"] {
+  --event-color: #454ba3;
+  --event-border: #8185cb;
+  --event-background: #f0f1ff;
+  --event-strong-background: #e0e3ff;
+}
+.calendar-event[data-mandatory="true"] { background: var(--event-strong-background); }
+.calendar-event[data-status="cancelled"] {
+  --event-color: #526171;
+  --event-border: #94a3b8;
+  --event-background: #f1f5f9;
+  --event-strong-background: #e2e8f0;
+  text-decoration: line-through;
+}
+.calendar-state-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: start;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+}
+.calendar-state-marker[data-status="pending"] { color: #9f3434; background: #ffe3e3; }
+.calendar-state-marker[data-status="scheduled"] { color: #245f87; background: #e0f2fe; }
+.calendar-state-marker[data-status="in_progress"] { color: #875107; background: #fff0c2; }
+.calendar-state-marker:is([data-status="submitted"], [data-status="completed"]) { color: #166534; background: #d7f4df; }
+.calendar-event:focus-visible { outline: 2px solid var(--event-color); outline-offset: 2px; }
+.calendar-legend { display: grid; gap: 10px; padding: 0 24px 18px; }
+.calendar-legend-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.calendar-legend-label { min-width: 80px; font-size: 13px; color: #536b61; font-weight: 650; }
+.calendar-legend-kind { display: inline-flex; align-items: center; gap: 7px; padding: 4px 9px; border: 1px solid var(--event-border); border-radius: 6px; color: var(--event-color); background: var(--event-background); font-size: 13px; }
+.calendar-legend-swatch { width: 8px; height: 8px; border-radius: 3px; background: var(--event-border); }
+.calendar-legend-state { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #536b61; }
+.calendar-legend-note { margin: 0; color: #536b61; font-size: 12px; line-height: 1.5; }
+@media (max-width: 600px) { .calendar-legend { padding-inline: 12px; } .calendar-legend-label { min-width: 100%; } }
 
 .calendar-event:hover { box-shadow: 0 0 0 1px var(--event-color); }
 .calendar-event-heading {
@@ -367,6 +427,7 @@ button:disabled { opacity: 0.65; cursor: wait; }
   font-weight: 650;
 }
 .calendar-event-meta {
+  grid-column: 2;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
@@ -618,11 +679,6 @@ button:disabled { opacity: 0.65; cursor: wait; }
   .sync-controls .primary-button { width: 100%; }
 }
 
-.calendar-event[data-status="scheduled"] { color: #4338a0; border-color: #7060be; background: #efecfc; }
-.calendar-event[data-status="completed"] { color: #166534; border-color: #227342; background: #e0efe1; }
-.calendar-event[data-status="cancelled"] { color: #64748b; border-color: #94a3b8; background: #f1f5f9; text-decoration: line-through; }
-.calendar-event[data-type="academic.exam"] { border-left-width: 5px; }
-
 /* Source refresh and canonical gym activities. */
 .source-connection { margin-top: 1.25rem; border-top: 1px solid var(--border, #d6e3dc); padding-top: 1rem; }
 .source-connection summary { cursor: pointer; color: var(--primary, #176956); font-weight: 600; }
@@ -635,20 +691,9 @@ button:disabled { opacity: 0.65; cursor: wait; }
 .sync-source-results li { padding: .75rem 1rem; border: 1px solid #d6e3dc; border-radius: .6rem; background: #f7faf8; }
 .sync-source-results li > span { margin-left: 1rem; }
 .sync-source-results p { margin: .4rem 0 0; }
-.calendar-event[data-type="sport.gym"][data-status="scheduled"] { color: #9a451d; border-color: #ba6a3e; background: #fff0e4; }
 @media (max-width: 700px) { .source-form { grid-template-columns: 1fr; } }
 
 /* Personal keeps its rose identity; completion and cancellation retain their state colors. */
-.calendar-event:is([data-type="personal.event"], [data-type="social.plan"]) { border-left-width: 4px; }
-.calendar-event:is([data-type="personal.event"], [data-type="social.plan"])[data-status="pending"] {
-  --event-color: #9d366b;
-  --event-background: #faedf4;
-  color: var(--event-color);
-  border-color: var(--event-color);
-  background: var(--event-background);
-}
-.calendar-event:is([data-type="personal.event"], [data-type="social.plan"])[data-status="completed"] { --event-color: #227342; }
-.calendar-event:is([data-type="personal.event"], [data-type="social.plan"])[data-status="cancelled"] { --event-color: #94a3b8; }
 .activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) { border-top: 4px solid #b45788; }
 .activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) .activity-detail-summary span:first-child,
 .activity-dialog:is([data-type="personal.event"], [data-type="social.plan"]) .activity-detail-summary span[data-status="pending"] { background: #faedf4; color: #88315c; }

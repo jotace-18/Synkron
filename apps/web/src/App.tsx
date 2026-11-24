@@ -1,5 +1,6 @@
 import './App.css'
 import { useCallback, useEffect, useState } from 'react'
+import ActivityExportPanel from './exports/ActivityExportPanel'
 import ActivitiesList from './activities/ActivitiesList'
 import ActivitiesCalendar from './activities/ActivitiesCalendar'
 import ActivityDetails from './activities/ActivityDetails'
@@ -193,6 +194,12 @@ function App() {
                 key={`sync:${session.user.id}`}
                 onSessionExpired={handleSessionExpired}
                 onFinished={refreshActivities}
+              />
+
+              <ActivityExportPanel
+                key={`export:${session.user.id}`}
+                onSessionExpired={handleSessionExpired}
+                refreshVersion={refreshVersion}
               />
 
               {view === 'calendar' ? (

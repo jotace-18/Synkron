@@ -4,8 +4,11 @@ Aplicación React y TypeScript creada con Vite. Incluye registro, inicio y cierr
 restauración al recargar, agenda básica y calendario con vistas Mes, Semana y Día.
 El calendario ocupa el 90 % del ancho en escritorio, consulta todas las páginas
 del periodo visible y muestra eventos compactos con título, sigla de asignatura,
-tipo, parte y estado. Los colores representan el estado y el fondo distingue las
-entregas obligatorias. El día actual se resalta en azul. Al pulsar un evento o
+tipo, parte y estado. El color principal distingue entregas (azul), exámenes (violeta), gimnasio
+(naranja) y Otros (rosa), y se conserva al completar una actividad. Un indicador
+con símbolo y color muestra el estado: pendiente, programado, en curso, hecho o
+cancelado. Las canceladas quedan grises y tachadas; las entregas obligatorias
+tienen un fondo más intenso. La leyenda explica ambas dimensiones. El día actual se resalta en azul. Al pulsar un evento o
 un título de la agenda se consulta su detalle y se abre un modal con los datos
 académicos, que puede cerrarse con el botón o Escape.
 En Mes, cada actividad ocupa una fila dentro de su día, con título, sigla y hora
@@ -98,3 +101,45 @@ Se han revisado los estados de carga, vacío, errores con reintento y sesión
 caducada, así como los estilos para pantallas pequeñas. La revisión visual final
 corresponde al navegador: comprobar a unos 320 px, entrar y salir, abrir el modal,
 crear una cuenta de prueba y solicitar una sincronización con la cuenta de demo.
+
+
+## Exportar la agenda y el calendario
+
+En Mi agenda, debajo del panel de sincronización, abre **Exportar agenda y
+calendario**. Elige el formato, el periodo y los bloques Académico, Deporte y
+Otros; todos están marcados al empezar. Desmarcar un bloque lo excluye tanto de
+la lista como de la imagen y su leyenda. Si desmarcas todos, no se permite generar.
+
+- **Lista para imprimir / PDF:** permite elegir un mes, una semana (seleccionando
+  cualquiera de sus días; siempre de lunes a domingo) o un día. Puede incluir
+  los detalles de cada actividad. Genera una vista previa por días, con títulos,
+  fechas, tipos, estados y colores. Abrir lista / Guardar PDF abre un documento
+  independiente; su botón de imprimir permite elegir Guardar como PDF en el
+  navegador. También puede descargarse como HTML para abrirlo sin conexión.
+- **Imagen · PNG / SVG** (opción inicial): permite elegir mes, semana o día.
+  El mes usa un calendario de 2240 píxeles de ancho; la semana, un diseño de
+  1600 píxeles con tarjetas por jornada de lunes a domingo; el día, una agenda
+  de 1200 píxeles con horarios y detalles de cada actividad. Las imágenes llevan
+  cabecera, resumen, colores por tipo y estados. No son capturas de la aplicación.
+  Los títulos y las tarjetas crecen para mostrar todo el contenido. Pulsa
+  **Crear imagen** y después **Descargar PNG**, o descarga SVG para ampliar sin
+  perder nitidez. Si supera 32 millones de píxeles o el límite de dimensiones del
+  PNG, se ofrece usar SVG sin eliminar actividades.
+
+Se incluyen los datos ya sincronizados de los bloques seleccionados, incluso
+realizados y cancelados; los filtros visuales de la agenda no se aplican. Se leen
+todas las páginas de la API del periodo antes de habilitar las descargas. Las
+actividades sin hora se colocan al final de cada día; los intervalos que abarcan
+varios días aparecen en cada día correspondiente y el resumen cuenta identidades
+únicas. Las horas se presentan en Europe/Madrid, incluidos los cambios de horario.
+
+Cambiar la selección o actualizar la agenda requiere preparar de nuevo la vista
+previa. La preparación se puede cancelar; una sesión caducada vuelve al acceso y
+no entrega un archivo parcial. Las URLs temporales se liberan al preparar otra
+exportación o desmontar el panel. Los documentos no incluyen credenciales ni IDs
+internos y el contenido de las actividades se escapa antes de generar HTML o SVG.
+
+Esta función se genera en el navegador sin dependencias nuevas ni migraciones.
+Las pruebas locales cubren rangos, selección de bloques, paginación existente,
+ordenación, intervalos, contenido escapado y los tres diseños con muchas actividades. La
+impresión PDF y la descarga PNG deben comprobarse también en el navegador.

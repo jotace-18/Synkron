@@ -1,0 +1,205 @@
+.activity-export-panel {
+  margin: 0 0 24px;
+  border: 1px solid #dce5dd;
+  border-radius: 14px;
+  background: white;
+}
+.activity-export-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 17px 20px;
+  color: #176452;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+.activity-export-panel > summary::-webkit-details-marker {
+  display: none;
+}
+.activity-export-panel > summary > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: #e8f3ed;
+  border-radius: 7px;
+  font-size: 20px;
+}
+.activity-export-panel > summary::after {
+  content: "+";
+  margin-left: auto;
+  font-size: 20px;
+}
+.activity-export-panel[open] > summary::after {
+  content: "−";
+}
+.activity-export-body {
+  padding: 4px 24px 24px;
+}
+.activity-export-heading {
+  max-width: 760px;
+  margin: 8px 0 22px;
+}
+.activity-export-heading h2 {
+  margin-bottom: 8px;
+  font-size: 24px;
+}
+.activity-export-heading > p:last-child {
+  color: #536b61;
+  line-height: 1.6;
+}
+.activity-export-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 1050px;
+  align-items: end;
+}
+.activity-export-form label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 550;
+}
+.activity-export-form select,
+.activity-export-form input:not([type="checkbox"]) {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 9px 12px;
+  border: 1px solid #b5cdc0;
+  border-radius: 8px;
+  background: white;
+  color: #19372f;
+}
+.activity-export-form select:focus-visible,
+.activity-export-form input:focus-visible,
+.activity-export-panel > summary:focus-visible {
+  outline: 3px solid #2a806a;
+  outline-offset: 3px;
+}
+.activity-export-form .activity-export-checkbox {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 10px;
+  font-weight: 400;
+}
+.activity-export-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #176452;
+}
+.activity-export-submit,
+.activity-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.activity-export-submit {
+  grid-column: 1 / -1;
+}
+.activity-export-period {
+  margin: 18px 0 8px;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+.activity-export-note {
+  color: #536b61;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.activity-export-body > .form-error,
+.activity-export-body > [role="status"] {
+  margin-top: 12px;
+}
+.activity-export-result {
+  border-top: 1px solid #dce5dd;
+  margin-top: 22px;
+  padding-top: 22px;
+}
+.activity-export-actions {
+  margin-bottom: 14px;
+}
+.activity-export-actions > p {
+  margin-right: auto;
+}
+.activity-export-actions a {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.activity-export-list-preview {
+  display: block;
+  width: 100%;
+  height: 580px;
+  margin-top: 16px;
+  border: 1px solid #dce5dd;
+  border-radius: 10px;
+  background: #f5f7f4;
+}
+.activity-export-image-preview {
+  max-height: 620px;
+  overflow: auto;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #dce5dd;
+  border-radius: 10px;
+  background: #edf2ee;
+}
+.activity-export-image-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: white;
+}
+@media (max-width: 800px) {
+  .activity-export-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .activity-export-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .activity-export-body {
+    padding: 4px 16px 18px;
+  }
+  .activity-export-actions > p {
+    flex: 1 1 100%;
+  }
+  .activity-export-list-preview {
+    height: 460px;
+  }
+}
+
+.activity-export-blocks {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid #dce5dd;
+  border-radius: 9px;
+  margin: 0;
+}
+.activity-export-blocks legend {
+  padding-inline: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.activity-export-blocks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+.activity-export-blocks input {
+  width: 18px;
+  height: 18px;
+  accent-color: #176452;
+}

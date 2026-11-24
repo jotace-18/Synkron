@@ -7,7 +7,7 @@ las interfaces ya no utilizan automáticamente la cuenta demo.
 
 Synkron conecta servicios de la vida personal y reúne sus actividades en un espacio común. Recoge información académica, deportiva y de planes sociales, adapta sus formatos y mantiene una colección centralizada que se consulta desde una agenda o calendario.
 
-Es un proyecto en desarrollo. Ya funcionan las entregas y los exámenes académicos desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La ampliación a las demás fuentes sigue pendiente.
+Es un proyecto en desarrollo. Ya funcionan las entregas y los exámenes académicos desde Campus hasta el calendario de Synkron, con autenticación, sincronización en segundo plano, programaciones, reglas, recordatorios y avisos. Monitoring ofrece seguimiento de resultados y cambios, y Automation conserva el historial de sus acciones. La agenda permite exportar listas por mes, semana o día y imágenes de mes, semana o día en PNG/SVG, eligiendo los bloques incluidos. La ampliación a las demás fuentes sigue pendiente.
 
 Sync también admite [entrada estandarizada](docs/entrada-estandarizada.md) desde
 fuentes externas: credenciales por fuente, envío JSON idempotente y procesamiento
