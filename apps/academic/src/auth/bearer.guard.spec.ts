@@ -49,9 +49,7 @@ describe('BearerGuard', () => {
 
     const pending = guard.canActivate(context);
     await expect(pending).rejects.toBeInstanceOf(UnauthorizedException);
-    await expect(pending).rejects.toThrow(
-      'Inicia sesión o utiliza una credencial válida',
-    );
+    await expect(pending).rejects.toThrow('Credencial académica no válida');
     expect(authenticate).not.toHaveBeenCalled();
     expect(request.accountId).toBeUndefined();
   });

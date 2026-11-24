@@ -1,3 +1,4 @@
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { validate } from 'class-validator';
 import { SourceRegisterDto } from './source-identity.controller';
 import { randomBytes } from 'node:crypto';
@@ -10,6 +11,51 @@ import { AuthService } from './auth.service';
 import type { ExecutionContext } from '@nestjs/common';
 
 describe('Source browser identity and integration credentials', () => {
+  it('authenticates browser writes before CSRF and preserves dependency errors', async () => {
+    const session = jest
+      .fn()
+      .mockRejectedValue(new UnauthorizedException('Inicia sesión'));
+    const checkWrite = jest.fn();
+    const guard = new BearerGuard(
+      {} as AuthService,
+      { session, checkWrite } as unknown as SourceIdentityService,
+    );
+    const request: {
+      headers: object;
+      path: string;
+      method: string;
+      accountId?: string;
+    } = { headers: {}, path: '/api/v1/events', method: 'PATCH' };
+    const context = {
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext;
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      status: 401,
+      message: 'Credencial deportiva no válida',
+    });
+    expect(checkWrite).not.toHaveBeenCalled();
+    expect(request.accountId).toBeUndefined();
+
+    const unavailable = new Error('Database unavailable');
+    session.mockRejectedValueOnce(unavailable);
+    await expect(guard.canActivate(context)).rejects.toBe(unavailable);
+    expect(checkWrite).not.toHaveBeenCalled();
+
+    session.mockResolvedValue({ id: 'verified-account' });
+    checkWrite.mockImplementationOnce(() => {
+      throw new ForbiddenException('Token CSRF no válido');
+    });
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(request.accountId).toBeUndefined();
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request.accountId).toBe('verified-account');
+    expect(session.mock.invocationCallOrder[0]).toBeLessThan(
+      checkWrite.mock.invocationCallOrder[0],
+    );
+  });
+
   it('bounds registration passwords and rejects non-string values before hashing', async () => {
     for (const password of [
       'a'.repeat(7),

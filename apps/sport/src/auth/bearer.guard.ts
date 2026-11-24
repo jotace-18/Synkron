@@ -37,12 +37,19 @@ export class BearerGuard implements CanActivate {
       this.identity &&
       !/\/export\/?$/i.test(request.path ?? '')
     ) {
+      let account;
+      try {
+        account = await this.identity.session(request);
+      } catch (error: unknown) {
+        if (error instanceof UnauthorizedException) {
+          throw new UnauthorizedException('Credencial deportiva no válida');
+        }
+        throw error;
+      }
       if (write) this.identity.checkWrite(request);
-      request.accountId = (await this.identity.session(request)).id;
+      request.accountId = account.id;
     } else {
-      throw new UnauthorizedException(
-        'Inicia sesión o utiliza una credencial válida',
-      );
+      throw new UnauthorizedException('Credencial deportiva no válida');
     }
 
     return true;
