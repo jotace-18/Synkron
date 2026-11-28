@@ -25,7 +25,12 @@ de Azure. La subred de entrada permite estas excepciones:
 | Dirección | Tráfico permitido |
 | --- | --- |
 | Entrada | TCP 80 y 443 desde Internet; TCP 22 desde `admin_cidr`, una IPv4 `/32`. |
-| Salida | TCP 80 y 443 hacia Internet; TCP y UDP 53 al DNS de Azure; UDP 123 hacia Internet. |
+| Salida | TCP 80 y 443 hacia Internet; UDP 123 hacia Internet. |
+
+El DNS de plataforma de Azure permanece disponible mediante su dirección
+especial `168.63.129.16`: este tráfico está exento de las reglas NSG generales.
+La etiqueta `AzurePlatformDNS` se utiliza para denegarlo explícitamente; no
+admite reglas `Allow`.
 
 La subred privada queda reservada para una separación futura de recursos. El
 alojamiento inicial previsto mantiene aplicaciones y bases de datos en una misma
@@ -69,12 +74,15 @@ proveedores.
 
 ## Estado de comprobación
 
-El 28/11/2026 se comprobaron inicialización, formato, validación y un plan de
-25 altas, sin cambios ni destrucciones, con los identificadores de red y subredes
-como salidas. El plan incluye un grupo, una red, dos subredes, dos tablas, dos
-rutas, cuatro asociaciones de subred, dos grupos de seguridad y once reglas.
+El 28/11/2026 se comprobaron inicialización, formato, validación y despliegue en
+Azure. La configuración gestiona 23 recursos: un grupo, una red, dos subredes,
+dos tablas, dos rutas, cuatro asociaciones de subred, dos grupos de seguridad
+y nueve reglas.
 
-Este checkpoint está planificado y todavía no aplicado en Azure. La conectividad
-efectiva, el acceso SSH, el comportamiento de las reglas y la destrucción deben
-verificarse durante el despliegue. La configuración actual no crea máquinas,
-discos ni direcciones IP públicas.
+El plan posterior refrescó los 23 recursos y terminó con
+`No changes. Your infrastructure matches the configuration.` Los identificadores
+de red y subredes están definidos como salidas.
+
+La conectividad efectiva, el acceso SSH, el comportamiento de las reglas y la
+destrucción deben verificarse durante el despliegue de la aplicación. La
+configuración actual no crea máquinas, discos ni direcciones IP públicas.

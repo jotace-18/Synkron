@@ -87,18 +87,6 @@ resource "azurerm_network_security_rule" "public_outbound" {
       ports       = ["80", "443"]
       destination = "Internet"
     }
-    dns_tcp = {
-      priority    = 110
-      protocol    = "Tcp"
-      ports       = ["53"]
-      destination = "AzurePlatformDNS"
-    }
-    dns_udp = {
-      priority    = 120
-      protocol    = "Udp"
-      ports       = ["53"]
-      destination = "AzurePlatformDNS"
-    }
     ntp = {
       priority    = 130
       protocol    = "Udp"
