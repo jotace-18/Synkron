@@ -12,3 +12,13 @@ output "subnet_ids" {
   description = "Identificadores de las subredes del laboratorio."
   value       = module.network.subnet_ids
 }
+
+output "public_ip_address" {
+  description = "Dirección IP pública de la máquina del laboratorio."
+  value       = module.compute.public_ip_address
+}
+
+output "admin_username" {
+  description = "Usuario administrador de la máquina del laboratorio."
+  value       = module.compute.admin_username
+}

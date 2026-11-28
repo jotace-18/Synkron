@@ -1,7 +1,7 @@
-# Red del laboratorio de Synkron
+# Infraestructura del laboratorio de Synkron
 
-Esta configuración define el grupo de recursos del laboratorio y un módulo de
-red. Utiliza el almacenamiento preparado por el [bootstrap](../../bootstrap/README.md),
+Esta configuración define el grupo de recursos del laboratorio y módulos de
+red, cómputo y almacenamiento. Utiliza el almacenamiento preparado por el [bootstrap](../../bootstrap/README.md),
 con la clave independiente `lab.tfstate`. El bootstrap conserva su propia clave
 `bootstrap.tfstate`.
 
@@ -40,6 +40,36 @@ alojamiento inicial previsto mantiene aplicaciones y bases de datos en una misma
 máquina, con redes Docker independientes. La política cloud no sustituye el
 aislamiento entre contenedores. Azure conserva comunicaciones especiales de
 plataforma, descritas en su [documentación de red](https://learn.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16).
+
+## Cómputo y persistencia
+
+El módulo `compute` define una máquina `Standard_B2ls_v2` (2 vCPU y 4 GiB),
+Ubuntu Server 24.04 LTS x64 Gen2, interfaz de red e IP pública Standard estática.
+Utiliza la subred de entrada y autenticación SSH sin contraseña. La clave pública
+se lee de `~/.ssh/synkron-lab.pub`; la privada permanece en el equipo administrador.
+
+La máquina y el disco de datos se configuran en la zona `2` de Austria East:
+la consulta de SKU de la suscripción mostró restricciones para las zonas `1`
+y `3`. Las cuotas consultadas fueron 6 vCPU regionales y 10 de la familia Bsv2,
+sin uso previo. Estas consultas no garantizan capacidad en el momento de crear.
+
+El disco del sistema es Standard SSD LRS de 32 GiB. El módulo `storage` define
+otro disco Standard SSD LRS de 32 GiB y su conexión en LUN 0. Es independiente
+del recurso de máquina, pero un `terraform destroy` del entorno también lo
+elimina: separar los recursos no constituye una copia de seguridad.
+
+La plantilla `cloud-init.yaml.tftpl` instala herramientas básicas y ejecuta
+`scripts/bootstrap.sh` como root en la VM. El script espera hasta 15 minutos al
+disco SCSI de LUN 0, rechaza particiones y firmas distintas de ext4, y solo crea
+ext4 si no detecta firmas. Conserva un ext4 existente, registra su UUID en
+`/etc/fstab` y comprueba el montaje en `/srv/synkron`.
+
+Docker y Compose se instalan desde los paquetes de Ubuntu. Docker utiliza
+`/srv/synkron/docker`, con el almacén clásico de imágenes y rotación de logs
+JSON de hasta tres archivos de 10 MB por contenedor, salvo configuración
+específica. Su unidad systemd exige el montaje del disco. El script está
+destinado exclusivamente a la VM; no debe ejecutarse en el equipo administrador.
+No contiene credenciales de la aplicación.
 
 ## Preparar la configuración local
 
@@ -93,6 +123,11 @@ sin cambios. La calculadora de Azure mostró para la futura máquina Linux
 100 horas de cómputo, sin incluir discos, IP pública ni otros consumos. No se
 obtuvo una tarifa para ese modelo en Denmark East.
 
-La conectividad efectiva, el acceso SSH, el comportamiento de las reglas y la
-destrucción deben verificarse durante el despliegue de la aplicación. La
-configuración actual no crea máquinas, discos ni direcciones IP públicas.
+La ampliación con cómputo, disco de datos y cloud-init ha pasado validación y
+produce un plan de cinco altas, sin cambios ni bajas. Todavía no se ha aplicado.
+La sintaxis Bash se comprobó sin ejecutar el script; las simulaciones del bloque
+de formato comprobaron disco vacío, conservación de ext4 existente, particiones,
+formatos inesperados y montajes ajenos. No sustituyen las pruebas en Azure.
+
+Quedan pendientes el arranque real de cloud-init, Docker y Compose, el acceso
+SSH, las pruebas de conectividad y persistencia, y la verificación del teardown.

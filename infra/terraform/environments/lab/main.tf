@@ -28,3 +28,39 @@ module "network" {
     }
   }
 }
+
+module "compute" {
+  source = "../../modules/compute"
+  zone   = "2"
+
+  name                = "vm-synkron-lab"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
+  subnet_id           = module.network.subnet_ids["public"]
+  vm_size             = "Standard_B2ls_v2"
+  admin_username      = "synkron"
+  ssh_public_key      = file(pathexpand("~/.ssh/synkron-lab.pub"))
+
+  depends_on = [module.network]
+
+  custom_data = base64encode(templatefile(
+    "${path.module}/cloud-init.yaml.tftpl",
+    {
+      bootstrap_script_base64 = filebase64(
+        "${path.module}/scripts/bootstrap.sh"
+      )
+    }
+  ))
+}
+
+module "storage" {
+  source = "../../modules/storage"
+  zone   = "2"
+
+  name                = "disk-synkron-lab-data"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
+  disk_size_gb        = 32
+  virtual_machine_id  = module.compute.virtual_machine_id
+
+}
