@@ -5,11 +5,14 @@ red. Utiliza el almacenamiento preparado por el [bootstrap](../../bootstrap/READ
 con la clave independiente `lab.tfstate`. El bootstrap conserva su propia clave
 `bootstrap.tfstate`.
 
+El laboratorio se despliega en Austria East. El almacenamiento del estado del
+bootstrap permanece en Denmark East; ambos pueden estar en regiones distintas.
+
 ## Topología y acceso
 
 | Recurso | Configuración |
 | --- | --- |
-| Región predeterminada | `denmarkeast`; comprobar las regiones permitidas de la suscripción. |
+| Región predeterminada | `austriaeast`; comprobar las regiones permitidas de la suscripción. |
 | Grupo | `rg-synkron-lab`. |
 | Red virtual | `vnet-synkron-lab`, `10.42.0.0/16`. |
 | Subred de entrada | `snet-public`, `10.42.1.0/24`, ruta general hacia `Internet`. |
@@ -82,6 +85,13 @@ y nueve reglas.
 El plan posterior refrescó los 23 recursos y terminó con
 `No changes. Your infrastructure matches the configuration.` Los identificadores
 de red y subredes están definidos como salidas.
+
+Ese mismo día se reconstruyeron los 23 recursos del laboratorio en Austria East
+mediante un plan de 23 altas y 23 bajas. Tras aplicarlo, el plan volvió a terminar
+sin cambios. La calculadora de Azure mostró para la futura máquina Linux
+`Standard_B2ls_v2` en Austria East una tarifa de 0,048 USD/h: 4,80 USD por
+100 horas de cómputo, sin incluir discos, IP pública ni otros consumos. No se
+obtuvo una tarifa para ese modelo en Denmark East.
 
 La conectividad efectiva, el acceso SSH, el comportamiento de las reglas y la
 destrucción deben verificarse durante el despliegue de la aplicación. La

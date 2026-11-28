@@ -1,4 +1,4 @@
-location            = "denmarkeast"
+location            = "austriaeast"
 resource_group_name = "rg-synkron-lab"
 
 # Sustituir por la IPv4 pública desde la que se administrará el laboratorio.
