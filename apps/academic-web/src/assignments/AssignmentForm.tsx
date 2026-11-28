@@ -11,21 +11,25 @@ import {
   assignmentDeadlineFields,
   assignmentCourseCode,
   CURRENT_COURSE,
+  type AssignmentCourse,
 } from './assignment-form'
 import type { Assignment, AssignmentInput } from './assignment.types'
 import { COURSES } from './courses'
 
 interface AssignmentFormProps {
   assignment?: Assignment
+  defaultCourse?: AssignmentCourse
   onSaved: (changed: boolean) => void
   onCancel: (checkList: boolean) => void
 }
 
 export default function AssignmentForm({
   assignment,
+  defaultCourse,
   onSaved,
   onCancel,
 }: AssignmentFormProps) {
+  const currentCourse = assignment ?? defaultCourse
   const [workMode, setWorkMode] = useState<AssignmentInput['work_mode']>(
     assignment?.work_mode ?? 'individual',
   )
@@ -33,9 +37,9 @@ export default function AssignmentForm({
     assignment?.group_members.join('\n') ?? '',
   )
   const [courseCode, setCourseCode] = useState(() =>
-    assignmentCourseCode(assignment),
+    assignmentCourseCode(currentCourse),
   )
-  const legacyCourse = assignmentCourseCode(assignment) === CURRENT_COURSE
+  const legacyCourse = assignmentCourseCode(currentCourse) === CURRENT_COURSE
   const deadline = assignmentDeadlineFields(assignment)
   const selectedCourse = COURSES.find(
     ({ abbreviation }) => abbreviation === courseCode,
@@ -53,7 +57,7 @@ export default function AssignmentForm({
     if (pending || checkRequired || request.current) return
     let input: AssignmentInput
     try {
-      input = readAssignmentForm(new FormData(event.currentTarget), assignment)
+      input = readAssignmentForm(new FormData(event.currentTarget), assignment, defaultCourse)
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -147,9 +151,9 @@ export default function AssignmentForm({
               <option value="" disabled>
                 Selecciona una asignatura
               </option>
-              {legacyCourse && assignment && (
+              {legacyCourse && currentCourse && (
                 <option value={CURRENT_COURSE}>
-                  {assignment.course_abbreviation ?? assignment.course_name}
+                  {currentCourse.course_abbreviation ?? currentCourse.course_name}
                 </option>
               )}
               {COURSES.map(({ abbreviation }) => (
@@ -160,7 +164,7 @@ export default function AssignmentForm({
             </select>
             <span id="selected-course-name" className="campus-course-name">
               {(courseCode === CURRENT_COURSE
-                ? assignment?.course_name
+                ? currentCourse?.course_name
                 : selectedCourse?.name) ??
                 'Elige una sigla para ver la asignatura.'}
             </span>

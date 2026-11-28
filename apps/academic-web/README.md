@@ -7,7 +7,24 @@
 Frontend externo de Academic, separado de la agenda centralizada de Synkron.
 Utiliza React y TypeScript con una interfaz azul e índigo. Actualmente permite
 listar, crear, editar y retirar entregas y exámenes, con secciones independientes. Dispone de contenedor e integración
-en CI. El resumen centralizado por asignatura se implementará en Synkron.
+en CI. La sección Asignaturas permite elegir una materia en un desplegable y consultar
+su vista dedicada: resumen general, progreso de entregas, pendientes ordenadas
+por vencimiento, exámenes programados, notas e historial plegable. La media
+de notas es aritmética, no una calificación final ponderada. Muestra el catálogo aunque todavía no tenga actividad,
+incorpora asignaturas antiguas fuera del catálogo y resume las entregas pendientes
+y los exámenes programados. En las entregas pendientes, «Marcar como entregada»
+abre un modal de confirmación y actualiza únicamente el estado. Tras confirmar,
+la entrega pasa al historial y se actualizan los contadores y el progreso.
+Si no se puede confirmar la operación, se ofrece comprobar los datos antes de
+reintentar. «Nueva entrega» abre el formulario con la asignatura actual
+preseleccionada, incluidas materias fuera del catálogo, y recarga el resumen al
+guardar. Se puede cambiar la asignatura antes de crear la entrega. Al entrar
+consulta de nuevo los datos de Academic. Las tablas de pendientes, próximos
+exámenes e historial incluyen «Editar» y «Eliminar»: reutilizan los formularios
+con los datos actuales y los diálogos de confirmación de retirada lógica.
+Después de guardar o eliminar, se recargan los datos, las notas y el resumen de
+la asignatura. Mientras se realiza una acción se bloquean las demás acciones
+y el selector de asignatura.
 
 ## Arranque con Docker
 

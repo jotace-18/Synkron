@@ -478,3 +478,108 @@
 .campus-badge[data-status="scheduled"] { background: #e4e9ff; color: #3730a3; }
 .campus-badge[data-status="completed"] { background: #dcfce7; color: #166534; }
 .campus-badge[data-status="cancelled"] { background: #f1f5f9; color: #64748b; }
+
+.campus-course-toolbar {
+  margin-bottom: 32px;
+  max-width: 720px;
+}
+
+.campus-course-dashboard {
+  display: grid;
+  gap: 24px;
+}
+
+.campus-course-dashboard .campus-heading {
+  margin-bottom: 0;
+}
+
+.campus-course-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.campus-course-stats > div {
+  padding: 18px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.campus-course-stats dt {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.campus-course-stats dd {
+  margin: 12px 0 0;
+  color: #172554;
+  font-size: clamp(22px, 2.5vw, 30px);
+  font-weight: 700;
+}
+
+.campus-course-progress {
+  display: grid;
+  gap: 10px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.campus-course-progress progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #4338ca;
+}
+
+.campus-course-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.campus-course-overdue {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.campus-course-history > summary {
+  color: #4338ca;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.campus-course-history > summary:focus-visible {
+  outline: 3px solid #6366f1;
+  outline-offset: 3px;
+}
+
+.campus-course-history h2 {
+  margin-top: 24px;
+}
+
+.campus-course-help {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1100px) {
+  .campus-course-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .campus-course-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.campus-navigation button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

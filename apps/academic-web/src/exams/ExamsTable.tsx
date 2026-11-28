@@ -2,9 +2,10 @@ import type { Exam } from './exam.types'
 
 interface ExamsTableProps {
   exams: Exam[]
+  retireLabel?: string
   disabled?: boolean
-  onEdit: (exam: Exam, opener: HTMLButtonElement) => void
-  onRetire: (exam: Exam, opener: HTMLButtonElement) => void
+  onEdit?: (exam: Exam, opener: HTMLButtonElement) => void
+  onRetire?: (exam: Exam, opener: HTMLButtonElement) => void
 }
 
 const statuses = {
@@ -52,6 +53,7 @@ function formatDeadline(exam: Exam): string {
 export default function ExamsTable({
   exams,
   disabled = false,
+  retireLabel = 'Retirar',
   onEdit,
   onRetire,
 }: ExamsTableProps) {
@@ -63,7 +65,7 @@ export default function ExamsTable({
       tabIndex={0}
     >
       <table className="campus-table">
-        <caption>Exámenes académicas</caption>
+        <caption>Exámenes académicos</caption>
 
         <thead>
           <tr>
@@ -73,7 +75,7 @@ export default function ExamsTable({
             <th scope="col">Celebración</th>
             <th scope="col">Estado</th>
             <th scope="col">Nota</th>
-            <th scope="col">Acciones</th>
+            {(onEdit || onRetire) && <th scope="col">Acciones</th>}
           </tr>
         </thead>
 
@@ -103,9 +105,9 @@ export default function ExamsTable({
                   ? 'Sin nota'
                   : `${gradeFormatter.format(exam.grade)} / 10`}
               </td>
-              <td>
+              {(onEdit || onRetire) && <td>
                 <div className="campus-row-actions">
-                  <button
+                  {onEdit && <button
                     className="campus-row-action"
                     type="button"
                     disabled={disabled}
@@ -113,19 +115,19 @@ export default function ExamsTable({
                     onClick={(event) => onEdit(exam, event.currentTarget)}
                   >
                     Editar
-                  </button>
-                  <button
+                  </button>}
+                  {onRetire && <button
                     className="campus-row-action campus-row-action-danger"
                     type="button"
                     disabled={disabled}
                     aria-haspopup="dialog"
-                    aria-label={`Retirar ${exam.title}`}
+                    aria-label={`${retireLabel} ${exam.title}`}
                     onClick={(event) => onRetire(exam, event.currentTarget)}
                   >
-                    Retirar
-                  </button>
+                    {retireLabel}
+                  </button>}
                 </div>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

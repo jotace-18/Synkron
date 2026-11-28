@@ -8,12 +8,14 @@ import type { Assignment } from './assignment.types'
 
 interface RetireAssignmentDialogProps {
   assignment: Assignment
+  actionLabel?: 'Retirar' | 'Eliminar'
   onRetired: () => void
   onCancel: (checkList: boolean) => void
 }
 
 export default function RetireAssignmentDialog({
   assignment,
+  actionLabel = 'Retirar',
   onRetired,
   onCancel,
 }: RetireAssignmentDialogProps) {
@@ -72,9 +74,9 @@ export default function RetireAssignmentDialog({
         if (!pending) onCancel(checkRequired)
       }}
     >
-      <h2 id="retire-title">Retirar entrega</h2>
+      <h2 id="retire-title">{actionLabel} entrega</h2>
       <p id="retire-description">
-        ¿Quieres retirar <strong>«{assignment.title}»</strong>? Dejará de
+        ¿Quieres {actionLabel.toLocaleLowerCase('es')} <strong>«{assignment.title}»</strong>? Dejará de
         aparecer en Campus y se retirará de Synkron en la siguiente
         sincronización.
       </p>
@@ -101,7 +103,7 @@ export default function RetireAssignmentDialog({
             void confirmRetirement()
           }}
         >
-          {pending ? 'Retirando…' : 'Retirar entrega'}
+          {pending ? (actionLabel === 'Eliminar' ? 'Eliminando…' : 'Retirando…') : `${actionLabel} entrega`}
         </button>
       </div>
     </dialog>
