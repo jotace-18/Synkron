@@ -1,0 +1,7 @@
+# Usar la cuenta creada mediante el bootstrap.
+storage_account_name = "stsynkrontfexample"
+container_name       = "tfstate"
+key                  = "lab.tfstate"
+
+use_azuread_auth = true
+use_cli          = true
