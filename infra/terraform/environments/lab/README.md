@@ -19,8 +19,8 @@ bootstrap permanece en Denmark East; ambos pueden estar en regiones distintas.
 | Subred privada | `snet-private`, `10.42.2.0/24`, ruta general de descarte `None`. |
 
 Ambas subredes tienen desactivada la salida implícita de Azure, una tabla de rutas
-y un grupo de seguridad asociados. La salida de la futura máquina requiere un
-mecanismo explícito, como una IP pública asociada a su interfaz.
+y un grupo de seguridad asociados. La salida de la máquina utiliza un mecanismo explícito: la IP pública
+asociada a su interfaz.
 
 Las reglas de denegación de prioridad 4096 preceden a los permisos predeterminados
 de Azure. La subred de entrada permite estas excepciones:
@@ -80,12 +80,18 @@ y acceso al contenedor de estado del bootstrap:
 az login
 az account show --query '{Suscripcion:name,Estado:state}' --output table
 az provider register --namespace Microsoft.Network --wait
+az provider register --namespace Microsoft.Compute --wait
 mkdir -p tmp/terraform
 cp -n infra/terraform/environments/lab/terraform.tfvars.example \
   infra/terraform/environments/lab/terraform.tfvars
 cp -n infra/terraform/environments/lab/backend.hcl.example \
   tmp/terraform/lab.backend.hcl
 ```
+
+Antes de planificar, prepara la clave SSH del administrador en
+`~/.ssh/synkron-lab` y `~/.ssh/synkron-lab.pub`, por ejemplo mediante
+`ssh-keygen -t rsa -b 4096 -f ~/.ssh/synkron-lab -C synkron-lab` si todavía no
+existe. No sobrescribas una clave existente.
 
 Edita `terraform.tfvars` con una región admitida y tu IPv4 pública seguida de
 `/32`. La IP del ejemplo está reservada para documentación. Si cambia la IP de
@@ -107,27 +113,23 @@ proveedores.
 
 ## Estado de comprobación
 
-El 28/11/2026 se comprobaron inicialización, formato, validación y despliegue en
-Azure. La configuración gestiona 23 recursos: un grupo, una red, dos subredes,
-dos tablas, dos rutas, cuatro asociaciones de subred, dos grupos de seguridad
-y nueve reglas.
+El 28/11/2026 se desplegaron y destruyeron los 28 recursos del laboratorio en
+Austria East. Los 23 de red se ampliaron con IP pública, interfaz, máquina,
+disco de datos y conexión del disco. El disco del sistema está incluido en el
+recurso de máquina y no cuenta como recurso Terraform separado.
 
-El plan posterior refrescó los 23 recursos y terminó con
-`No changes. Your infrastructure matches the configuration.` Los identificadores
-de red y subredes están definidos como salidas.
+Se verificaron SSH, `cloud-init status --wait` con resultado `done`, ext4 en
+`/srv/synkron`, Docker activo utilizando el disco de datos y Compose
+`2.40.3+ds1-0ubuntu1~24.04.1`. Un archivo en un volumen Docker sobrevivió a un
+reinicio de la máquina. No se ha probado su conservación al sustituir la VM ni
+se ha desplegado la aplicación completa en Azure.
 
-Ese mismo día se reconstruyeron los 23 recursos del laboratorio en Austria East
-mediante un plan de 23 altas y 23 bajas. Tras aplicarlo, el plan volvió a terminar
-sin cambios. La calculadora de Azure mostró para la futura máquina Linux
-`Standard_B2ls_v2` en Austria East una tarifa de 0,048 USD/h: 4,80 USD por
-100 horas de cómputo, sin incluir discos, IP pública ni otros consumos. No se
-obtuvo una tarifa para ese modelo en Denmark East.
+El experimento de drift cambió desde el portal el puerto de `allow-http` de 80
+a 8080. Terraform detectó un cambio, restauró 80 y después mostró `No changes`.
+El teardown terminó con 28 recursos destruidos, estado del lab vacío y
+`az group exists --name rg-synkron-lab` igual a `false`.
 
-La ampliación con cómputo, disco de datos y cloud-init ha pasado validación y
-produce un plan de cinco altas, sin cambios ni bajas. Todavía no se ha aplicado.
-La sintaxis Bash se comprobó sin ejecutar el script; las simulaciones del bloque
-de formato comprobaron disco vacío, conservación de ext4 existente, particiones,
-formatos inesperados y montajes ajenos. No sustituyen las pruebas en Azure.
-
-Quedan pendientes el arranque real de cloud-init, Docker y Compose, el acceso
-SSH, las pruebas de conectividad y persistencia, y la verificación del teardown.
+Las capturas, trazas, comandos de reproducción y límites de las comprobaciones
+están en el [informe del hito 3](../../../../docs/hito3.md).
+El bootstrap del estado permanece en Denmark East y puede generar consumo de
+almacenamiento y operaciones; el teardown del lab no implica coste total cero.
