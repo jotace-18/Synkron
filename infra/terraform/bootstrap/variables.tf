@@ -1,7 +1,7 @@
 variable "location" {
   description = "Región de Azure para almacenar el estado de Terraform."
   type        = string
-  default     = "westeurope"
+  default     = "denmarkeast"
 }
 
 variable "resource_group_name" {
