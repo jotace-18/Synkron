@@ -20,6 +20,25 @@ const weekdays = [
   'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
 ]
 
+const calendarKinds = [
+  { type: 'academic.assignment', label: 'Entregas' },
+  { type: 'academic.exam', label: 'Exámenes' },
+  { type: 'sport.gym', label: 'Gimnasio' },
+  { type: 'personal.event', label: 'Otros' },
+]
+
+const calendarStates = [
+  { status: 'pending', symbol: '○', label: 'Pendiente' },
+  { status: 'scheduled', symbol: '◷', label: 'Programado' },
+  { status: 'in_progress', symbol: '◐', label: 'En curso' },
+  { status: 'completed', symbol: '✓', label: 'Hecho' },
+  { status: 'cancelled', symbol: '×', label: 'Cancelado' },
+]
+
+function statusSymbol(status: string | null): string {
+  return calendarStates.find(item => item.status === (status === 'submitted' ? 'completed' : status))?.symbol ?? '·'
+}
+
 const hourFormatter = new Intl.DateTimeFormat('es-ES', {
   hour: '2-digit',
   minute: '2-digit',
@@ -210,9 +229,31 @@ export default function ActivitiesCalendar({
           <p role="status">
             {activities.length === 0
               ? calendarView === 'day' ? 'No hay actividades para este día.' : 'No hay actividades en este periodo.'
-              : 'Horarios de Madrid · Verde: entregada/realizado · Ámbar: en curso · Rojo: entrega pendiente · Violeta: examen programado · Naranja: gimnasio programado · Rosa: Otros pendientes · Gris: cancelado'}
+              : 'Horarios de Madrid · Ordenadas por hora; las actividades sin hora aparecen al final.'}
           </p>
         )}
+      </div>
+
+      <div className="calendar-legend" role="group" aria-label="Leyenda del calendario">
+        <div className="calendar-legend-row">
+          <span className="calendar-legend-label">Actividades</span>
+          {calendarKinds.map(kind => (
+            <span className="calendar-legend-kind" data-type={kind.type} key={kind.type}>
+              <span className="calendar-legend-swatch" aria-hidden="true" />
+              {kind.label}
+            </span>
+          ))}
+        </div>
+        <div className="calendar-legend-row">
+          <span className="calendar-legend-label">Estado</span>
+          {calendarStates.map(state => (
+            <span className="calendar-legend-state" key={state.status}>
+              <span className="calendar-state-marker" data-status={state.status} aria-hidden="true">{state.symbol}</span>
+              {state.label}
+            </span>
+          ))}
+        </div>
+        <p className="calendar-legend-note">Las entregas obligatorias tienen el fondo más intenso. Los colores de actividad se conservan al completarlas.</p>
       </div>
 
       <div className="calendar-scroll">
@@ -275,6 +316,9 @@ export default function ActivitiesCalendar({
                               title={`${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
                               aria-label={`Ver detalle: ${formatActivityType(activity.type)}. ${formatCalendarTitle(activity)}. ${activity.type === 'academic.assignment' ? formatSection(activity.details.section) + '. ' : ''}${formatSchedule(activity.schedule)}. ${formatStatus(activity.status)}`}
                             >
+                            <span className="calendar-state-marker" data-status={activity.status ?? 'unknown'} aria-hidden="true">
+                              {statusSymbol(activity.status)}
+                            </span>
                             <span className="calendar-event-heading">
                               <span className="calendar-event-title">
                                 {activity.title}

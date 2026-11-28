@@ -2,9 +2,11 @@ import type { Assignment } from './assignment.types'
 
 interface AssignmentsTableProps {
   assignments: Assignment[]
+  retireLabel?: string
   disabled?: boolean
-  onEdit: (assignment: Assignment, opener: HTMLButtonElement) => void
-  onRetire: (assignment: Assignment, opener: HTMLButtonElement) => void
+  onSubmit?: (assignment: Assignment, opener: HTMLButtonElement) => void
+  onEdit?: (assignment: Assignment, opener: HTMLButtonElement) => void
+  onRetire?: (assignment: Assignment, opener: HTMLButtonElement) => void
 }
 
 const statuses = {
@@ -52,6 +54,8 @@ function formatDeadline(assignment: Assignment): string {
 export default function AssignmentsTable({
   assignments,
   disabled = false,
+  retireLabel = 'Retirar',
+  onSubmit,
   onEdit,
   onRetire,
 }: AssignmentsTableProps) {
@@ -73,7 +77,7 @@ export default function AssignmentsTable({
             <th scope="col">Vencimiento</th>
             <th scope="col">Estado</th>
             <th scope="col">Nota</th>
-            <th scope="col">Acciones</th>
+            {(onEdit || onRetire || onSubmit) && <th scope="col">Acciones</th>}
           </tr>
         </thead>
 
@@ -108,9 +112,19 @@ export default function AssignmentsTable({
                   ? 'Sin nota'
                   : `${gradeFormatter.format(assignment.grade)} / 10`}
               </td>
-              <td>
+              {(onEdit || onRetire || onSubmit) && <td>
                 <div className="campus-row-actions">
-                  <button
+                  {onSubmit && assignment.status !== 'submitted' && <button
+                    className="campus-row-action"
+                    type="button"
+                    disabled={disabled}
+                    aria-haspopup="dialog"
+                    aria-label={`Marcar como entregada: ${assignment.title}`}
+                    onClick={(event) => onSubmit(assignment, event.currentTarget)}
+                  >
+                    Marcar como entregada
+                  </button>}
+                  {onEdit && <button
                     className="campus-row-action"
                     type="button"
                     disabled={disabled}
@@ -118,21 +132,21 @@ export default function AssignmentsTable({
                     onClick={(event) => onEdit(assignment, event.currentTarget)}
                   >
                     Editar
-                  </button>
-                  <button
+                  </button>}
+                  {onRetire && <button
                     className="campus-row-action campus-row-action-danger"
                     type="button"
                     disabled={disabled}
                     aria-haspopup="dialog"
-                    aria-label={`Retirar ${assignment.title}`}
+                    aria-label={`${retireLabel} ${assignment.title}`}
                     onClick={(event) =>
                       onRetire(assignment, event.currentTarget)
                     }
                   >
-                    Retirar
-                  </button>
+                    {retireLabel}
+                  </button>}
                 </div>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

@@ -1,4 +1,5 @@
 import ExamsPage from './exams/ExamsPage'
+import CoursesPage from './courses/CoursesPage'
 import { useEffect, useRef, useState } from 'react'
 import { listAssignments } from './assignments/assignments-client'
 import AssignmentsTable from './assignments/AssignmentsTable'
@@ -8,7 +9,7 @@ import type { Assignment } from './assignments/assignment.types'
 import './App.css'
 
 function App() {
-  const [view, setView] = useState<'assignments' | 'exams'>('assignments')
+  const [view, setView] = useState<'assignments' | 'exams' | 'courses'>('assignments')
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Assignment | null>(null)
   const [retiring, setRetiring] = useState<Assignment | null>(null)
@@ -63,7 +64,7 @@ function App() {
         })
       })
     return () => controller.abort()
-  }, [retry])
+  }, [retry, view])
 
   return (
     <div className="campus-shell">
@@ -81,6 +82,7 @@ function App() {
         <nav className="campus-navigation" aria-label="Secciones">
           <button type="button" disabled={creating || editing !== null || retiring !== null} aria-current={view === 'assignments' ? 'page' : undefined} onClick={() => setView('assignments')}>Entregas</button>
           <button type="button" disabled={creating || editing !== null || retiring !== null} aria-current={view === 'exams' ? 'page' : undefined} onClick={() => setView('exams')}>Exámenes</button>
+          <button type="button" disabled={creating || editing !== null || retiring !== null} aria-current={view === 'courses' ? 'page' : undefined} onClick={() => setView('courses')}>Asignaturas</button>
         </nav>
 
         <p className="campus-sidebar-note">
@@ -89,7 +91,7 @@ function App() {
       </aside>
 
       <main className="campus-main">
-        {view === 'exams' ? <ExamsPage /> : <>
+        {view === 'courses' ? <CoursesPage /> : view === 'exams' ? <ExamsPage /> : <>
         <header className="campus-heading">
           <div>
             <p className="campus-eyebrow">Agenda académica</p>

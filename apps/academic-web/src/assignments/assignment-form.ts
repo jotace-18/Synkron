@@ -3,7 +3,9 @@ import { COURSES } from './courses.ts'
 
 export const CURRENT_COURSE = '__current_course__'
 
-export function assignmentCourseCode(assignment?: Assignment): string {
+export type AssignmentCourse = Pick<Assignment, 'course_name' | 'course_abbreviation'>
+
+export function assignmentCourseCode(assignment?: AssignmentCourse): string {
   if (!assignment) return ''
   return (
     COURSES.find(
@@ -83,6 +85,7 @@ export function madridDeadline(date: string, time: string): string {
 export function readAssignmentForm(
   data: FormData,
   original?: Assignment,
+  defaultCourse?: AssignmentCourse,
 ): AssignmentInput {
   const text = (name: string) => String(data.get(name) ?? '').trim()
   const optionalNumber = (name: string) => {
@@ -98,11 +101,12 @@ export function readAssignmentForm(
   const selectedCourse = COURSES.find(
     ({ abbreviation }) => abbreviation === text('course_abbreviation'),
   )
+  const currentCourse = original ?? defaultCourse
   const course =
-    text('course_abbreviation') === CURRENT_COURSE && original
+    text('course_abbreviation') === CURRENT_COURSE && currentCourse
       ? {
-          name: original.course_name,
-          abbreviation: original.course_abbreviation,
+          name: currentCourse.course_name,
+          abbreviation: currentCourse.course_abbreviation,
         }
       : selectedCourse
   if (!course) throw new Error('Selecciona una asignatura.')

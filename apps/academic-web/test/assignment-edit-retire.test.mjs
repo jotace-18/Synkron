@@ -129,3 +129,67 @@ test('uses PATCH and DELETE without client credentials, accepts 204 and reports 
     ),
   )
 })
+
+test('quick submission writes only the submitted status and preserves the rest of the record', async (t) => {
+  const source = { ...original, status: 'pending' }
+  const calls = []
+  let saved = source
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({ csrf_token: 'fresh-csrf' })
+    calls.push({ url, options })
+    saved = { ...saved, ...JSON.parse(options.body) }
+    return Response.json(saved)
+  })
+  await updateAssignment(source.id, { status: 'submitted' })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].options.method, 'PATCH')
+  assert.equal(calls[0].url, `/api/v1/assignments/${source.id}`)
+  assert.deepEqual(JSON.parse(calls[0].options.body), { status: 'submitted' })
+  assert.deepEqual(saved, { ...source, status: 'submitted' })
+})
+
+test('a lost submission response reports uncertainty without automatically repeating the write', async (t) => {
+  const { UnconfirmedAssignmentError } = await import('../src/assignments/assignments-client.ts')
+  let writes = 0
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url === '/api/v1/auth/csrf') return Response.json({ csrf_token: 'fresh-csrf' })
+    writes += 1
+    throw new TypeError('Network connection lost')
+  })
+  await assert.rejects(updateAssignment(original.id, { status: 'submitted' }), UnconfirmedAssignmentError)
+  assert.equal(writes, 1)
+})
+
+test('creating from a course uses its identity by default and still allows selecting another course', () => {
+  const cc = { course_name: 'Cloud Computing', course_abbreviation: 'CC' }
+  const data = existingForm()
+  data.set('title', 'Nueva práctica')
+  data.set('course_abbreviation', assignmentCourseCode(cc))
+  data.set('status', 'pending')
+  data.set('work_mode', 'individual')
+  const input = readAssignmentForm(data, undefined, cc)
+  assert.equal(input.course_name, cc.course_name)
+  assert.equal(input.course_abbreviation, 'CC')
+  assert.equal(input.title, 'Nueva práctica')
+  assert.equal(input.status, 'pending')
+  assert.equal('id' in input, false)
+
+  data.set('course_abbreviation', 'TID')
+  const changed = readAssignmentForm(data, undefined, cc)
+  assert.equal(changed.course_name, 'Tratamiento Inteligente de Datos')
+  assert.equal(changed.course_abbreviation, 'TID')
+})
+
+test('creating from a course outside the catalog preserves its name and optional abbreviation', () => {
+  for (const abbreviation of ['OPT', null]) {
+    const custom = { course_name: 'Optativa antigua', course_abbreviation: abbreviation }
+    const data = existingForm()
+    data.set('course_abbreviation', assignmentCourseCode(custom))
+    const input = readAssignmentForm(data, undefined, custom)
+    assert.equal(input.course_name, custom.course_name)
+    assert.equal(input.course_abbreviation, abbreviation)
+  }
+  const data = existingForm()
+  assert.throws(() => readAssignmentForm(data), /Selecciona una asignatura/)
+  assert.equal(assignmentCourseCode(), '')
+})

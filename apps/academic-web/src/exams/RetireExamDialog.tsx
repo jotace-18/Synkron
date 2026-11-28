@@ -8,12 +8,14 @@ import type { Exam } from './exam.types'
 
 interface RetireExamDialogProps {
   exam: Exam
+  actionLabel?: 'Retirar' | 'Eliminar'
   onRetired: () => void
   onCancel: (checkList: boolean) => void
 }
 
 export default function RetireExamDialog({
   exam,
+  actionLabel = 'Retirar',
   onRetired,
   onCancel,
 }: RetireExamDialogProps) {
@@ -72,9 +74,9 @@ export default function RetireExamDialog({
         if (!pending) onCancel(checkRequired)
       }}
     >
-      <h2 id="retire-title">Retirar examen</h2>
+      <h2 id="retire-title">{actionLabel} examen</h2>
       <p id="retire-description">
-        ¿Quieres retirar <strong>«{exam.title}»</strong>? Dejará de aparecer en
+        ¿Quieres {actionLabel.toLocaleLowerCase('es')} <strong>«{exam.title}»</strong>? Dejará de aparecer en
         Campus y se retirará de Synkron en la siguiente sincronización.
       </p>
       {error && (
@@ -100,7 +102,7 @@ export default function RetireExamDialog({
             void confirmRetirement()
           }}
         >
-          {pending ? 'Retirando…' : 'Retirar examen'}
+          {pending ? (actionLabel === 'Eliminar' ? 'Eliminando…' : 'Retirando…') : `${actionLabel} examen`}
         </button>
       </div>
     </dialog>
