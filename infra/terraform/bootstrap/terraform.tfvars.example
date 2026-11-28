@@ -1,0 +1,5 @@
+location            = "denmarkeast"
+resource_group_name = "rg-synkron-tfstate"
+
+# Sustituir por un nombre globalmente único en Azure.
+storage_account_name = "stsynkrontfexample"

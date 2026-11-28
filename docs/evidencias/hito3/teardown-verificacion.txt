@@ -1,0 +1,15 @@
+Comandos ejecutados desde la raíz de Synkron, después de destroy.
+
+$ terraform -chdir=infra/terraform/environments/lab state list
+
+$ az group exists --name rg-synkron-lab
+false
+
+state list no produjo salida; el grupo del lab ya no existe.
+
+Inventario posterior comunicado por el administrador:
+$ az resource list --query "[].{Grupo:resourceGroup,Nombre:name,Tipo:type}" --output table
+Grupo               Nombre                      Tipo
+rg-synkron-tfstate   stsynkrontfjcmr2026          Microsoft.Storage/storageAccounts
+NetworkWatcherRG    NetworkWatcher_denmarkeast  Microsoft.Network/networkWatchers
+NetworkWatcherRG    NetworkWatcher_austriaeast  Microsoft.Network/networkWatchers

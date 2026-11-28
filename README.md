@@ -16,6 +16,10 @@ Automation, Monitoring, Academic y Sport; hay un
 [ejemplo con Node](examples/ingestions/README.md) independiente de Campus. Esta
 ampliación requiere la migración 013 y su comprobación real en el entorno local.
 
+La [infraestructura de Azure y el experimento de reconciliación](docs/hito3.md)
+se preparan con Terraform. El laboratorio fue desplegado, verificado y destruido;
+el backend remoto del estado se conserva.
+
 ## Qué permitirá hacer
 
 - Conectar fuentes académicas, deportivas y de planes sociales y elegir qué actividades incorporar.

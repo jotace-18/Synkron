@@ -1,0 +1,76 @@
+Extracto de la fase de destrucción; se omite el plan previo y la confirmación interactiva.
+
+module.storage.azurerm_virtual_machine_data_disk_attachment.this: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Compute/virtualMachines/vm-synkron-lab/dataDisks/disk-synkron-lab-data]
+module.storage.azurerm_virtual_machine_data_disk_attachment.this: Destruction complete after 7s
+module.storage.azurerm_managed_disk.this: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Compute/disks/disk-synkron-lab-data]
+module.compute.azurerm_linux_virtual_machine.this: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Compute/virtualMachines/vm-synkron-lab]
+module.storage.azurerm_managed_disk.this: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDt.Compute/disks/disk-synkron-lab-data, 00m10s elapsed]
+module.compute.azurerm_linux_virtual_machine.this: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDCompute/virtualMachines/vm-synkron-lab, 00m10s elapsed]
+module.storage.azurerm_managed_disk.this: Destruction complete after 12s
+module.compute.azurerm_linux_virtual_machine.this: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDCompute/virtualMachines/vm-synkron-lab, 00m20s elapsed]
+module.compute.azurerm_linux_virtual_machine.this: Destruction complete after 25s
+module.compute.azurerm_network_interface.this: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkInterfaces/nic-vm-synkron-lab]
+module.compute.azurerm_network_interface.this: Destruction complete after 3s
+module.compute.azurerm_public_ip.this: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/publicIPAddresses/pip-vm-synkron-lab]
+module.compute.azurerm_public_ip.this: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDk/publicIPAddresses/pip-vm-synkron-lab, 00m10s elapsed]
+module.compute.azurerm_public_ip.this: Destruction complete after 11s
+module.network.azurerm_subnet_route_table_association.this["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-public]
+module.network.azurerm_network_security_rule.public_outbound["ntp"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-ntp-outbound]
+module.network.azurerm_network_security_rule.deny_outbound["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-private/securityRules/deny-unmatched-outbound]
+module.network.azurerm_subnet_network_security_group_association.this["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-private]
+module.network.azurerm_network_security_rule.deny_inbound["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/deny-unmatched-inbound]
+module.network.azurerm_route.default["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/routeTables/rt-public/routes/default]
+module.network.azurerm_network_security_rule.ssh: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-ssh-admin]
+module.network.azurerm_network_security_rule.web["http"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-http]
+module.network.azurerm_network_security_rule.public_outbound["web"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-web-outbound]
+module.network.azurerm_network_security_rule.deny_inbound["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-private/securityRules/deny-unmatched-inbound]
+module.network.azurerm_network_security_rule.deny_inbound["public"]: Destruction complete after 3s
+module.network.azurerm_network_security_rule.deny_outbound["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/deny-unmatched-outbound]
+module.network.azurerm_network_security_rule.public_outbound["web"]: Destruction complete after 3s
+module.network.azurerm_network_security_rule.web["https"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-https]
+module.network.azurerm_network_security_rule.deny_outbound["private"]: Destruction complete after 3s
+module.network.azurerm_route.default["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/routeTables/rt-private/routes/default]
+module.network.azurerm_network_security_rule.deny_inbound["private"]: Destruction complete after 3s
+module.network.azurerm_subnet_network_security_group_association.this["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-public]
+module.network.azurerm_network_security_rule.public_outbound["ntp"]: Destruction complete after 3s
+module.network.azurerm_subnet_route_table_association.this["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-private]
+module.network.azurerm_route.default["public"]: Destruction complete after 3s
+module.network.azurerm_network_security_rule.web["https"]: Destruction complete after 1s
+module.network.azurerm_network_security_rule.deny_outbound["public"]: Destruction complete after 2s
+module.network.azurerm_subnet_network_security_group_association.this["private"]: Destruction complete after 5s
+module.network.azurerm_route.default["private"]: Destruction complete after 6s
+module.network.azurerm_subnet_route_table_association.this["public"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDs/vnet-synkron-lab/subnets/snet-public, 00m10s elapsed]
+module.network.azurerm_network_security_rule.web["http"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDps/nsg-public/securityRules/allow-http, 00m10s elapsed]
+module.network.azurerm_network_security_rule.ssh: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDg-public/securityRules/allow-ssh-admin, 00m10s elapsed]
+module.network.azurerm_subnet_route_table_association.this["public"]: Destruction complete after 10s
+module.network.azurerm_subnet_network_security_group_association.this["public"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDs/vnet-synkron-lab/subnets/snet-public, 00m10s elapsed]
+module.network.azurerm_subnet_route_table_association.this["private"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_ID/vnet-synkron-lab/subnets/snet-private, 00m10s elapsed]
+module.network.azurerm_network_security_rule.web["http"]: Destruction complete after 14s
+module.network.azurerm_subnet_route_table_association.this["private"]: Destruction complete after 12s
+module.network.azurerm_route_table.this["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/routeTables/rt-private]
+module.network.azurerm_route_table.this["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/routeTables/rt-public]
+module.network.azurerm_network_security_rule.ssh: Destruction complete after 16s
+module.network.azurerm_route_table.this["private"]: Destruction complete after 3s
+module.network.azurerm_subnet_network_security_group_association.this["public"]: Destruction complete after 16s
+module.network.azurerm_subnet.this["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-private]
+module.network.azurerm_subnet.this["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-public]
+module.network.azurerm_network_security_group.this["private"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-private]
+module.network.azurerm_network_security_group.this["public"]: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public]
+module.network.azurerm_network_security_group.this["private"]: Destruction complete after 3s
+module.network.azurerm_network_security_group.this["public"]: Destruction complete after 3s
+module.network.azurerm_route_table.this["public"]: Destruction complete after 8s
+module.network.azurerm_subnet.this["private"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_ID/vnet-synkron-lab/subnets/snet-private, 00m10s elapsed]
+module.network.azurerm_subnet.this["public"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDs/vnet-synkron-lab/subnets/snet-public, 00m10s elapsed]
+module.network.azurerm_subnet.this["public"]: Destruction complete after 12s
+module.network.azurerm_subnet.this["private"]: Still destroying... [id=/subscriptions/SUBSCRIPTION_ID/vnet-synkron-lab/subnets/snet-private, 00m20s elapsed]
+module.network.azurerm_subnet.this["private"]: Destruction complete after 23s
+module.network.azurerm_virtual_network.this: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab]
+module.network.azurerm_virtual_network.this: Still destroying... [id=/subscriptions/SUBSCRIPTION_IDtwork/virtualNetworks/vnet-synkron-lab, 00m10s elapsed]
+module.network.azurerm_virtual_network.this: Destruction complete after 12s
+azurerm_resource_group.lab: Destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab]
+azurerm_resource_group.lab: Still destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab, 00m10s elapsed]
+azurerm_resource_group.lab: Still destroying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab, 00m20s elapsed]
+azurerm_resource_group.lab: Destruction complete after 27s
+Releasing state lock. This may take a few moments...
+
+Destroy complete! Resources: 28 destroyed.

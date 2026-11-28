@@ -1,0 +1,17 @@
+Acquiring state lock. This may take a few moments...
+module.network.azurerm_network_security_rule.web["http"]: Modifying... [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-http]
+module.network.azurerm_network_security_rule.web["http"]: Modifications complete after 6s [id=/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/networkSecurityGroups/nsg-public/securityRules/allow-http]
+Releasing state lock. This may take a few moments...
+
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+
+Outputs:
+
+admin_username = "synkron"
+public_ip_address = "IP_PUBLICA_VM"
+resource_group_name = "rg-synkron-lab"
+subnet_ids = {
+  "private" = "/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-private"
+  "public" = "/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab/subnets/snet-public"
+}
+virtual_network_id = "/subscriptions/SUBSCRIPTION_ID/resourceGroups/rg-synkron-lab/providers/Microsoft.Network/virtualNetworks/vnet-synkron-lab"
